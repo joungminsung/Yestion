@@ -3,10 +3,58 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useSidebarStore } from "@/stores/sidebar";
+import { usePresenceStore, type PresenceUser } from "@/stores/presence";
 import { trpc } from "@/server/trpc/client";
+
+function getInitials(name: string): string {
+  return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+}
+
+const MAX_VISIBLE_AVATARS = 5;
+
+function PresenceAvatars({ users }: { users: PresenceUser[] }) {
+  if (users.length === 0) return null;
+  const visible = users.slice(0, MAX_VISIBLE_AVATARS);
+  const overflow = users.length - MAX_VISIBLE_AVATARS;
+
+  return (
+    <div className="flex items-center -space-x-1.5 mr-2">
+      {visible.map((u) => (
+        <div
+          key={u.id}
+          title={u.name}
+          className="flex items-center justify-center rounded-full text-white text-[10px] font-semibold ring-2"
+          style={{
+            width: 24,
+            height: 24,
+            backgroundColor: u.color,
+            ringColor: "var(--bg-primary)",
+          }}
+        >
+          {getInitials(u.name)}
+        </div>
+      ))}
+      {overflow > 0 && (
+        <div
+          className="flex items-center justify-center rounded-full text-[10px] font-semibold ring-2"
+          style={{
+            width: 24,
+            height: 24,
+            backgroundColor: "var(--bg-tertiary)",
+            color: "var(--text-secondary)",
+            ringColor: "var(--bg-primary)",
+          }}
+        >
+          +{overflow}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function Topbar() {
   const { isOpen, toggle } = useSidebarStore();
+  const presenceUsers = usePresenceStore((s) => s.users);
   const params = useParams();
   const pageId = params.pageId as string | undefined;
   const workspaceId = params.workspaceId as string | undefined;
@@ -85,6 +133,7 @@ export function Topbar() {
         </div>
       </div>
       <div className="flex items-center gap-0.5">
+        <PresenceAvatars users={presenceUsers} />
         <button className="px-3 py-1 rounded hover:bg-notion-bg-hover text-sm" style={{ color: "var(--text-secondary)" }}>
           공유
         </button>
