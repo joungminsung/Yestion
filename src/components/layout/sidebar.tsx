@@ -97,7 +97,7 @@ export function Sidebar() {
             >
               개인 페이지
             </div>
-            {pages?.map((page: any) => (
+            {pages?.map((page) => (
               <SidebarPageItem key={page.id} page={page} workspaceId={workspaceId} />
             ))}
             {(!pages || pages.length === 0) && (
