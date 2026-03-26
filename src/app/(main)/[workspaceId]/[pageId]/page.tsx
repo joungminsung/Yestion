@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { db } from "@/server/db/client";
 import { notFound, redirect } from "next/navigation";
 import { getServerSession } from "@/server/auth/session";
@@ -8,6 +9,9 @@ import { SubPagesList } from "@/components/page/sub-pages-list";
 export default async function PageView({ params }: { params: { workspaceId: string; pageId: string } }) {
   const session = await getServerSession();
   if (!session) redirect("/login");
+
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get("session-token")?.value ?? "";
 
   // Verify workspace membership
   const membership = await db.workspaceMember.findUnique({
@@ -60,6 +64,8 @@ export default async function PageView({ params }: { params: { workspaceId: stri
             parentId: b.parentId,
           }))}
           isLocked={page.isLocked}
+          sessionToken={sessionToken}
+          user={{ id: session.user.id, name: session.user.name }}
         />
         {page.children.length > 0 && (
           <SubPagesList pages={page.children} workspaceId={params.workspaceId} />

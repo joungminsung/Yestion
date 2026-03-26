@@ -2,6 +2,7 @@
 
 import { useCallback, useRef } from "react";
 import { NotionEditor } from "./editor";
+import { CollaborativeEditor } from "./collaborative-editor";
 import { tiptapToBlocks, blocksToTiptap, type TiptapDoc } from "./utils/block-serializer";
 import { trpc } from "@/server/trpc/client";
 import type { BlockType, BlockContent } from "@/types/editor";
@@ -10,9 +11,11 @@ type PageEditorProps = {
   pageId: string;
   initialBlocks: { id: string; type: string; content: unknown; position: number; parentId: string | null }[];
   isLocked?: boolean;
+  sessionToken?: string;
+  user?: { id: string; name: string };
 };
 
-export function PageEditor({ pageId, initialBlocks, isLocked = false }: PageEditorProps) {
+export function PageEditor({ pageId, initialBlocks, isLocked = false, sessionToken, user }: PageEditorProps) {
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const bulkSave = trpc.block.bulkSave.useMutation();
 
@@ -31,6 +34,17 @@ export function PageEditor({ pageId, initialBlocks, isLocked = false }: PageEdit
       });
     }, 1000);
   }, [pageId, bulkSave, isLocked]);
+
+  if (sessionToken && user) {
+    return (
+      <CollaborativeEditor
+        pageId={pageId}
+        sessionToken={sessionToken}
+        user={user}
+        isLocked={isLocked}
+      />
+    );
+  }
 
   return (
     <NotionEditor
