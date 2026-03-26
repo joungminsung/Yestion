@@ -17,10 +17,31 @@ export function Sidebar() {
   const { isOpen, width, isResizing } = useSidebarStore();
   const openPalette = useCommandPaletteStore((s) => s.open);
 
-  const { data: pages } = trpc.page.list.useQuery(
+  const { data: flatPages } = trpc.page.list.useQuery(
     { workspaceId },
     { enabled: !!workspaceId }
   );
+
+  // Build tree from flat list
+  const pages = (() => {
+    if (!flatPages) return undefined;
+    type FlatPage = (typeof flatPages)[number];
+    type PageNode = FlatPage & { children: PageNode[] };
+    const map = new Map<string, PageNode>();
+    for (const p of flatPages) {
+      map.set(p.id, { ...p, children: [] });
+    }
+    const roots: PageNode[] = [];
+    for (const p of flatPages) {
+      const node = map.get(p.id)!;
+      if (p.parentId && map.has(p.parentId)) {
+        map.get(p.parentId)!.children.push(node);
+      } else {
+        roots.push(node);
+      }
+    }
+    return roots;
+  })();
   const { data: memberships } = trpc.workspace.list.useQuery();
   const workspace = memberships?.find((m) => m.workspaceId === workspaceId)?.workspace;
 

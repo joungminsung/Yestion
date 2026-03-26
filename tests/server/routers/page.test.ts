@@ -87,16 +87,24 @@ describe("page router", () => {
       expect(pages[0].title).toBe("Active Page");
     });
 
-    it("should include children up to 3 levels deep", async () => {
+    it("should return flat list including all depths", async () => {
       const caller = getCaller();
       const l1 = await caller.page.create({ workspaceId, title: "Level 1" });
       const l2 = await caller.page.create({ workspaceId, title: "Level 2", parentId: l1.id });
-      await caller.page.create({ workspaceId, title: "Level 3", parentId: l2.id });
+      const l3 = await caller.page.create({ workspaceId, title: "Level 3", parentId: l2.id });
 
       const pages = await caller.page.list({ workspaceId });
-      expect(pages).toHaveLength(1);
-      expect(pages[0].children).toHaveLength(1);
-      expect(pages[0].children[0].children).toHaveLength(1);
+      // Flat list: all 3 levels returned + the "Active Page" from beforeEach
+      expect(pages.length).toBeGreaterThanOrEqual(3);
+      const ids = pages.map((p: { id: string }) => p.id);
+      expect(ids).toContain(l1.id);
+      expect(ids).toContain(l2.id);
+      expect(ids).toContain(l3.id);
+      // Verify parentId references are present
+      const l2Page = pages.find((p: { id: string }) => p.id === l2.id);
+      expect(l2Page?.parentId).toBe(l1.id);
+      const l3Page = pages.find((p: { id: string }) => p.id === l3.id);
+      expect(l3Page?.parentId).toBe(l2.id);
     });
   });
 

@@ -11,19 +11,14 @@ export function Topbar() {
   const pageId = params.pageId as string | undefined;
   const workspaceId = params.workspaceId as string | undefined;
 
-  const { data: page } = trpc.page.get.useQuery(
+  const { data: ancestors } = trpc.page.getAncestors.useQuery(
     { id: pageId! },
     { enabled: !!pageId },
   );
 
-  // Build breadcrumb: parent (if any) -> current page
-  const crumbs: { id: string; title: string | null; icon: string | null }[] = [];
-  if (page?.parent) {
-    crumbs.push({ id: page.parent.id, title: page.parent.title, icon: page.parent.icon });
-  }
-  if (page) {
-    crumbs.push({ id: page.id, title: page.title, icon: page.icon });
-  }
+  // Full breadcrumb from ancestors (root -> ... -> current page)
+  const crumbs: { id: string; title: string | null; icon: string | null }[] =
+    ancestors?.map((a) => ({ id: a.id, title: a.title, icon: a.icon })) ?? [];
 
   return (
     <header

@@ -1,10 +1,25 @@
 import { db } from "@/server/db/client";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getServerSession } from "@/server/auth/session";
 import { PageEditor } from "@/components/editor/page-editor";
 import { PageHeader } from "@/components/page/page-header";
 import { SubPagesList } from "@/components/page/sub-pages-list";
 
 export default async function PageView({ params }: { params: { workspaceId: string; pageId: string } }) {
+  const session = await getServerSession();
+  if (!session) redirect("/login");
+
+  // Verify workspace membership
+  const membership = await db.workspaceMember.findUnique({
+    where: {
+      userId_workspaceId: {
+        userId: session.user.id,
+        workspaceId: params.workspaceId,
+      },
+    },
+  });
+  if (!membership) notFound();
+
   const page = await db.page.findUnique({
     where: { id: params.pageId },
     include: {
@@ -21,7 +36,7 @@ export default async function PageView({ params }: { params: { workspaceId: stri
     },
   });
 
-  if (!page || page.isDeleted) notFound();
+  if (!page || page.isDeleted || page.workspaceId !== params.workspaceId) notFound();
 
   return (
     <div>

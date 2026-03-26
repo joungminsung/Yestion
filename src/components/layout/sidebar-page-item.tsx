@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { usePageTreeStore } from "@/stores/page-tree";
@@ -23,6 +23,19 @@ export function SidebarPageItem({
     usePageTreeStore();
   const addToast = useToastStore((s) => s.addToast);
   const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close context menu on click outside
+  useEffect(() => {
+    if (!showMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showMenu]);
 
   const isExpanded = expandedNodes.has(page.id);
   const isActive = activePageId === page.id;
@@ -133,6 +146,7 @@ export function SidebarPageItem({
 
       {showMenu && (
         <div
+          ref={menuRef}
           className="ml-8 rounded-lg overflow-hidden py-1 mb-1"
           style={{
             backgroundColor: "var(--bg-primary)",

@@ -32,6 +32,42 @@ async function verifyPageAccess(
   return page;
 }
 
+async function trashDescendants(
+  db: Context["db"],
+  pageId: string,
+  deletedAt: Date,
+) {
+  const children = await db.page.findMany({
+    where: { parentId: pageId, isDeleted: false },
+    select: { id: true },
+  });
+  for (const child of children) {
+    await db.page.update({
+      where: { id: child.id },
+      data: { isDeleted: true, deletedAt },
+    });
+    await trashDescendants(db, child.id, deletedAt);
+  }
+}
+
+async function restoreDescendants(
+  db: Context["db"],
+  pageId: string,
+  trashedAt: Date,
+) {
+  const children = await db.page.findMany({
+    where: { parentId: pageId, isDeleted: true, deletedAt: trashedAt },
+    select: { id: true },
+  });
+  for (const child of children) {
+    await db.page.update({
+      where: { id: child.id },
+      data: { isDeleted: false, deletedAt: null },
+    });
+    await restoreDescendants(db, child.id, trashedAt);
+  }
+}
+
 async function getNextPosition(
   db: Context["db"],
   workspaceId: string,
@@ -45,24 +81,13 @@ async function getNextPosition(
   return (last?.position ?? -1) + 1;
 }
 
-// ── Children include for 3-level deep tree ───────────────────
+// ── Children include for page detail view ─────────────────────
 
 const childrenInclude = {
   children: {
     where: { isDeleted: false },
     orderBy: { position: "asc" as const },
-    include: {
-      children: {
-        where: { isDeleted: false },
-        orderBy: { position: "asc" as const },
-        include: {
-          children: {
-            where: { isDeleted: false },
-            orderBy: { position: "asc" as const },
-          },
-        },
-      },
-    },
+    select: { id: true, title: true, icon: true, parentId: true, position: true },
   },
 };
 
@@ -100,14 +125,23 @@ export const pageRouter = router({
     .query(async ({ ctx, input }) => {
       await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, input.workspaceId);
 
+      // Flat query: fetch all non-deleted pages, client builds tree
       return ctx.db.page.findMany({
         where: {
           workspaceId: input.workspaceId,
-          parentId: null,
           isDeleted: false,
         },
         orderBy: { position: "asc" },
-        include: childrenInclude,
+        select: {
+          id: true,
+          title: true,
+          icon: true,
+          parentId: true,
+          position: true,
+          cover: true,
+          isFullWidth: true,
+          isLocked: true,
+        },
       });
     }),
 
@@ -154,6 +188,7 @@ export const pageRouter = router({
   updateTitle: protectedProcedure
     .input(z.object({ id: z.string(), title: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      await verifyPageAccess(ctx.db, ctx.session.user.id, input.id);
       return ctx.db.page.update({
         where: { id: input.id },
         data: { title: input.title, lastEditedBy: ctx.session.user.id },
@@ -164,21 +199,26 @@ export const pageRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await verifyPageAccess(ctx.db, ctx.session.user.id, input.id);
-      return ctx.db.page.update({
+      const deletedAt = new Date();
+      const result = await ctx.db.page.update({
         where: { id: input.id },
         data: {
           isDeleted: true,
-          deletedAt: new Date(),
+          deletedAt,
           lastEditedBy: ctx.session.user.id,
         },
       });
+      // Cascade: trash all descendant pages
+      await trashDescendants(ctx.db, input.id, deletedAt);
+      return result;
     }),
 
   restore: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await verifyPageAccess(ctx.db, ctx.session.user.id, input.id);
-      return ctx.db.page.update({
+      const page = await verifyPageAccess(ctx.db, ctx.session.user.id, input.id);
+      const trashedAt = page.deletedAt;
+      const result = await ctx.db.page.update({
         where: { id: input.id },
         data: {
           isDeleted: false,
@@ -186,6 +226,11 @@ export const pageRouter = router({
           lastEditedBy: ctx.session.user.id,
         },
       });
+      // Cascade: restore descendants that were trashed at the same time
+      if (trashedAt) {
+        await restoreDescendants(ctx.db, input.id, trashedAt);
+      }
+      return result;
     }),
 
   deletePermanently: protectedProcedure
@@ -269,6 +314,20 @@ export const pageRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Verify access: check all pages belong to a workspace the user can access
+      if (input.pages.length > 0) {
+        const pageRecords = await ctx.db.page.findMany({
+          where: { id: { in: input.pages.map((p) => p.id) } },
+          select: { id: true, workspaceId: true },
+        });
+        const workspaceIds = new Set(pageRecords.map((p) => p.workspaceId));
+        if (workspaceIds.size !== 1) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "All pages must belong to the same workspace" });
+        }
+        const workspaceId = pageRecords[0]!.workspaceId;
+        await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, workspaceId);
+      }
+
       await Promise.all(
         input.pages.map((p) =>
           ctx.db.page.update({
@@ -326,5 +385,30 @@ export const pageRouter = router({
         include: { page: true },
         orderBy: { position: "asc" },
       });
+    }),
+
+  getAncestors: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const ancestors: { id: string; title: string; icon: string | null }[] = [];
+      let currentId: string | null = input.id;
+      const maxDepth = 20; // safety limit
+      let depth = 0;
+      while (currentId && depth < maxDepth) {
+        const page: { id: string; title: string; icon: string | null; parentId: string | null; workspaceId: string } | null =
+          await ctx.db.page.findUnique({
+            where: { id: currentId },
+            select: { id: true, title: true, icon: true, parentId: true, workspaceId: true },
+          });
+        if (!page) break;
+        // Verify access on the first iteration
+        if (depth === 0) {
+          await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, page.workspaceId);
+        }
+        ancestors.unshift(page);
+        currentId = page.parentId;
+        depth++;
+      }
+      return ancestors;
     }),
 });
