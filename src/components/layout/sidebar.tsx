@@ -1,24 +1,41 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useRouter, useParams } from "next/navigation";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useCommandPaletteStore } from "@/stores/command-palette";
 import { SidebarResizer } from "./sidebar-resizer";
+import { SidebarPageItem } from "./sidebar-page-item";
+import { SidebarFavorites } from "./sidebar-favorites";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/server/trpc/client";
 
 export function Sidebar() {
-  const { isOpen, width, isResizing } = useSidebarStore();
-  const t = useTranslations("sidebar");
   const router = useRouter();
-  const openCommandPalette = useCommandPaletteStore((s) => s.open);
+  const params = useParams();
+  const workspaceId = params.workspaceId as string;
+  const { isOpen, width, isResizing } = useSidebarStore();
+  const openPalette = useCommandPaletteStore((s) => s.open);
+
+  const { data: pages } = trpc.page.list.useQuery(
+    { workspaceId },
+    { enabled: !!workspaceId }
+  );
+  const { data: memberships } = trpc.workspace.list.useQuery();
+  const workspace = memberships?.find((m) => m.workspaceId === workspaceId)?.workspace;
+
+  const utils = trpc.useUtils();
+  const createPage = trpc.page.create.useMutation({
+    onSuccess: (newPage) => {
+      utils.page.list.invalidate();
+      router.push(`/${workspaceId}/${newPage.id}`);
+    },
+  });
 
   return (
     <>
       <aside
         className={cn(
-          "fixed top-0 left-0 bottom-0 flex flex-col",
-          "bg-notion-bg-sidebar",
+          "fixed top-0 left-0 bottom-0 flex flex-col bg-notion-bg-sidebar",
           !isResizing && "transition-all duration-300 ease-in-out"
         )}
         style={{
@@ -33,52 +50,71 @@ export function Sidebar() {
             className="flex items-center px-3 h-[45px] hover:bg-notion-bg-hover cursor-pointer"
             style={{ fontSize: "14px", fontWeight: 500, color: "var(--text-primary)" }}
           >
-            <span className="mr-2 text-lg">📋</span>
-            <span className="truncate flex-1">Workspace</span>
+            <span className="mr-2 text-lg">{workspace?.icon || "📋"}</span>
+            <span className="truncate flex-1">{workspace?.name || "Workspace"}</span>
           </div>
 
           {/* Search */}
-          <div
-            className="flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer"
+          <button
+            onClick={openPalette}
+            className="flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto"
             style={{ fontSize: "14px", color: "var(--text-secondary)" }}
-            onClick={openCommandPalette}
           >
             <span>🔍</span>
-            <span>{t("search")}</span>
+            <span>검색</span>
             <span className="ml-auto text-xs opacity-50">⌘K</span>
-          </div>
+          </button>
 
           {/* Settings */}
-          <div
-            className="flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer"
+          <button
+            onClick={() => router.push(`/${workspaceId}/settings`)}
+            className="flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto"
             style={{ fontSize: "14px", color: "var(--text-secondary)" }}
-            onClick={() => router.push("/settings")}
           >
             <span>⚙️</span>
-            <span>{t("settings")}</span>
-          </div>
+            <span>설정</span>
+          </button>
 
           {/* Divider */}
-          <div className="mx-3 my-1" style={{ height: "1px", backgroundColor: "var(--border-divider)" }} />
+          <div
+            className="mx-3 my-1"
+            style={{ height: "1px", backgroundColor: "var(--border-divider)" }}
+          />
 
-          {/* Sections */}
+          {/* Page Tree */}
           <div className="flex-1 overflow-y-auto px-1">
-            <div className="px-3 py-1" style={{ fontSize: "12px", fontWeight: 500, color: "var(--text-tertiary)", letterSpacing: "0.02em" }}>
-              {t("favorites")}
+            {workspaceId && <SidebarFavorites workspaceId={workspaceId} />}
+
+            <div
+              className="px-3 py-1 mt-2"
+              style={{
+                fontSize: "12px",
+                fontWeight: 500,
+                color: "var(--text-tertiary)",
+                letterSpacing: "0.02em",
+              }}
+            >
+              개인 페이지
             </div>
-            <div className="px-3 py-1 mt-4" style={{ fontSize: "12px", fontWeight: 500, color: "var(--text-tertiary)", letterSpacing: "0.02em" }}>
-              {t("private")}
-            </div>
+            {pages?.map((page: any) => (
+              <SidebarPageItem key={page.id} page={page} workspaceId={workspaceId} />
+            ))}
+            {(!pages || pages.length === 0) && (
+              <div className="px-3 py-2 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                페이지가 없습니다
+              </div>
+            )}
           </div>
 
           {/* New Page */}
-          <div
-            className="flex items-center gap-2 mx-2 mb-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer"
+          <button
+            onClick={() => createPage.mutate({ workspaceId, title: "" })}
+            className="flex items-center gap-2 mx-2 mb-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto"
             style={{ fontSize: "14px", color: "var(--text-secondary)" }}
           >
             <span>➕</span>
-            <span>{t("newPage")}</span>
-          </div>
+            <span>새 페이지</span>
+          </button>
         </div>
 
         <SidebarResizer />
