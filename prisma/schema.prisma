@@ -83,10 +83,30 @@ model Page {
   parent    Page?      @relation("PageTree", fields: [parentId], references: [id], onDelete: SetNull)
   children  Page[]     @relation("PageTree")
   favorites Favorite[]
+  blocks    Block[]
 
   @@index([workspaceId])
   @@index([parentId])
   @@index([isDeleted])
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  pageId    String
+  parentId  String?
+  type      String
+  content   Json     @default("{}")
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  page     Page    @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  parent   Block?  @relation("BlockTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children Block[] @relation("BlockTree")
+
+  @@index([pageId])
+  @@index([parentId])
+  @@index([pageId, position])
 }
 
 model Favorite {
