@@ -1,0 +1,116 @@
+:root {
+  /* Notion Light Theme Colors */
+  --notion-font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
+  --notion-font-mono: iawriter-mono, Nitti, Menlo, Courier, monospace;
+
+  /* Background */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f7f6f3;
+  --bg-tertiary: #ffffff;
+  --bg-sidebar: #f7f6f3;
+  --bg-hover: rgba(55, 53, 47, 0.08);
+  --bg-active: rgba(55, 53, 47, 0.16);
+
+  /* Text */
+  --text-primary: #37352f;
+  --text-secondary: rgba(55, 53, 47, 0.65);
+  --text-tertiary: rgba(55, 53, 47, 0.45);
+  --text-link: #37352f;
+  --text-placeholder: rgba(55, 53, 47, 0.35);
+
+  /* Borders */
+  --border-default: rgba(55, 53, 47, 0.09);
+  --border-divider: rgba(55, 53, 47, 0.16);
+
+  /* Shadows */
+  --shadow-popup: rgba(15, 15, 15, 0.05) 0px 0px 0px 1px, rgba(15, 15, 15, 0.1) 0px 3px 6px, rgba(15, 15, 15, 0.2) 0px 9px 24px;
+  --shadow-tooltip: rgba(15, 15, 15, 0.05) 0px 0px 0px 1px, rgba(15, 15, 15, 0.1) 0px 3px 6px;
+
+  /* Notion Block Colors */
+  --color-default: #37352f;
+  --color-gray: #9b9a97;
+  --color-brown: #64473a;
+  --color-orange: #d9730d;
+  --color-yellow: #dfab01;
+  --color-green: #0f7b6c;
+  --color-blue: #0b6e99;
+  --color-purple: #6940a5;
+  --color-pink: #ad1a72;
+  --color-red: #e03e3e;
+
+  --color-gray-bg: #ebeced;
+  --color-brown-bg: #e9e5e3;
+  --color-orange-bg: #faebdd;
+  --color-yellow-bg: #fbf3db;
+  --color-green-bg: #ddedea;
+  --color-blue-bg: #ddebf1;
+  --color-purple-bg: #eae4f2;
+  --color-pink-bg: #f4dfeb;
+  --color-red-bg: #fbe4e4;
+
+  /* Sizing */
+  --sidebar-width: 280px;
+  --sidebar-min-width: 200px;
+  --sidebar-max-width: 480px;
+  --topbar-height: 45px;
+  --page-max-width: 900px;
+  --page-full-width: 100%;
+  --page-padding-x: 96px;
+  --page-padding-x-mobile: 24px;
+
+  /* Animation */
+  --transition-fast: 120ms ease;
+  --transition-normal: 200ms ease;
+  --transition-slow: 300ms ease;
+
+  /* Z-index */
+  --z-sidebar: 100;
+  --z-topbar: 90;
+  --z-modal: 200;
+  --z-toast: 300;
+  --z-command-palette: 250;
+  --z-dropdown: 150;
+  --z-tooltip: 350;
+}
+
+[data-theme="dark"] {
+  --bg-primary: #191919;
+  --bg-secondary: #202020;
+  --bg-tertiary: #2f2f2f;
+  --bg-sidebar: #202020;
+  --bg-hover: rgba(255, 255, 255, 0.055);
+  --bg-active: rgba(255, 255, 255, 0.1);
+
+  --text-primary: rgba(255, 255, 255, 0.9);
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-tertiary: rgba(255, 255, 255, 0.4);
+  --text-link: rgba(255, 255, 255, 0.9);
+  --text-placeholder: rgba(255, 255, 255, 0.3);
+
+  --border-default: rgba(255, 255, 255, 0.094);
+  --border-divider: rgba(255, 255, 255, 0.14);
+
+  --shadow-popup: rgba(15, 15, 15, 0.1) 0px 0px 0px 1px, rgba(15, 15, 15, 0.2) 0px 3px 6px, rgba(15, 15, 15, 0.4) 0px 9px 24px;
+  --shadow-tooltip: rgba(15, 15, 15, 0.1) 0px 0px 0px 1px, rgba(15, 15, 15, 0.2) 0px 3px 6px;
+
+  --color-default: rgba(255, 255, 255, 0.9);
+  --color-gray: #979a9b;
+  --color-brown: #937264;
+  --color-orange: #ffa344;
+  --color-yellow: #ffdc49;
+  --color-green: #4dab9a;
+  --color-blue: #529cca;
+  --color-purple: #9a6dd7;
+  --color-pink: #e255a1;
+  --color-red: #ff7369;
+
+  --color-gray-bg: #454b4e;
+  --color-brown-bg: #434040;
+  --color-orange-bg: #594a3a;
+  --color-yellow-bg: #59563b;
+  --color-green-bg: #354c4b;
+  --color-blue-bg: #364954;
+  --color-purple-bg: #443f57;
+  --color-pink-bg: #533b4c;
+  --color-red-bg: #594141;
+}
