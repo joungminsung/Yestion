@@ -19,6 +19,8 @@ import TableRow from "@tiptap/extension-table-row";
 import TableHeader from "@tiptap/extension-table-header";
 import TableCell from "@tiptap/extension-table-cell";
 import { common, createLowlight } from "lowlight";
+import Collaboration from "@tiptap/extension-collaboration";
+import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
 import { BlockId } from "./extensions/block-id";
 import { ToggleBlock, DetailsSummary, DetailsContent } from "./extensions/toggle";
 import { Callout } from "./extensions/callout";
@@ -31,19 +33,28 @@ import { InlineToolbar } from "./inline-toolbar";
 import { DragHandle } from "./drag-handle";
 import { BlockMenu } from "./block-menu";
 import "./utils/editor-styles.css";
+import "./cursor-styles.css";
 
 const lowlight = createLowlight(common);
+
+type CollaborationConfig = {
+  ydoc: any;
+  provider: any;
+  user: { id: string; name: string; color: string };
+};
 
 type NotionEditorProps = {
   initialContent?: Record<string, unknown>;
   onUpdate?: (json: Record<string, unknown>) => void;
   editable?: boolean;
+  collaboration?: CollaborationConfig;
 };
 
 export function NotionEditor({
   initialContent,
   onUpdate,
   editable = true,
+  collaboration,
 }: NotionEditorProps) {
   const [menuState, setMenuState] = useState<{pos: number; coords: {top: number; left: number}} | null>(null);
 
@@ -93,13 +104,20 @@ export function NotionEditor({
       Highlight.configure({ multicolor: true }),
       BlockId,
       SlashCommandExtension,
+      ...(collaboration ? [
+        Collaboration.configure({ document: collaboration.ydoc }),
+        CollaborationCursor.configure({
+          provider: collaboration.provider,
+          user: { name: collaboration.user.name, color: collaboration.user.color },
+        }),
+      ] : []),
     ],
-    content: initialContent || {
+    content: collaboration ? undefined : (initialContent || {
       type: "doc",
       content: [{ type: "paragraph" }],
-    },
+    }),
     editable,
-    onUpdate: ({ editor }) => {
+    onUpdate: collaboration ? undefined : ({ editor }) => {
       onUpdate?.(editor.getJSON() as Record<string, unknown>);
     },
     editorProps: {
