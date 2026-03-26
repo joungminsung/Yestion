@@ -19,12 +19,12 @@ export function BlockMenu({ editor, pos, coords, onClose }: BlockMenuProps) {
   const actions = [
     { label: "삭제", icon: "🗑", action: () => { const node = editor.state.doc.nodeAt(pos); if (node) editor.chain().focus().deleteRange({ from: pos, to: pos + node.nodeSize }).run(); onClose(); } },
     { label: "복제", icon: "📋", action: () => { const node = editor.state.doc.nodeAt(pos); if (node) editor.chain().focus().insertContentAt(pos + node.nodeSize, node.toJSON()).run(); onClose(); } },
-    { label: "텍스트로 변환", icon: "Aa", action: () => { editor.chain().focus().setNode("paragraph").run(); onClose(); } },
-    { label: "제목 1로 변환", icon: "H1", action: () => { editor.chain().focus().toggleHeading({ level: 1 }).run(); onClose(); } },
-    { label: "제목 2로 변환", icon: "H2", action: () => { editor.chain().focus().toggleHeading({ level: 2 }).run(); onClose(); } },
-    { label: "글머리 기호 목록", icon: "•", action: () => { editor.chain().focus().toggleBulletList().run(); onClose(); } },
-    { label: "번호 목록", icon: "1.", action: () => { editor.chain().focus().toggleOrderedList().run(); onClose(); } },
-    { label: "할 일", icon: "☑", action: () => { editor.chain().focus().toggleTaskList().run(); onClose(); } },
+    { label: "텍스트로 변환", icon: "Aa", action: () => { editor.chain().focus().setTextSelection(pos + 1).setNode("paragraph").run(); onClose(); } },
+    { label: "제목 1로 변환", icon: "H1", action: () => { editor.chain().focus().setTextSelection(pos + 1).toggleHeading({ level: 1 }).run(); onClose(); } },
+    { label: "제목 2로 변환", icon: "H2", action: () => { editor.chain().focus().setTextSelection(pos + 1).toggleHeading({ level: 2 }).run(); onClose(); } },
+    { label: "글머리 기호 목록", icon: "•", action: () => { editor.chain().focus().setTextSelection(pos + 1).toggleBulletList().run(); onClose(); } },
+    { label: "번호 목록", icon: "1.", action: () => { editor.chain().focus().setTextSelection(pos + 1).toggleOrderedList().run(); onClose(); } },
+    { label: "할 일", icon: "☑", action: () => { editor.chain().focus().setTextSelection(pos + 1).toggleTaskList().run(); onClose(); } },
   ];
 
   return (

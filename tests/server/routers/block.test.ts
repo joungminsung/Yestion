@@ -79,4 +79,50 @@ describe("block router", () => {
     const blocks = await caller.block.list({ pageId });
     expect(blocks[0].id).toBe(b2.id);
   });
+
+  describe("bulkSave", () => {
+    it("should create new blocks via upsert", async () => {
+      const caller = getCaller();
+      const blockId = "test-block-id-1";
+      await caller.block.bulkSave({
+        pageId,
+        blocks: [
+          { id: blockId, type: "paragraph", content: { richText: [] }, position: 0, parentId: null },
+        ],
+      });
+      const blocks = await caller.block.list({ pageId });
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].id).toBe(blockId);
+    });
+
+    it("should delete blocks not in the input", async () => {
+      const old = await db.block.create({ data: { pageId, type: "paragraph", content: {}, position: 0 } });
+      const caller = getCaller();
+      await caller.block.bulkSave({
+        pageId,
+        blocks: [
+          { id: "new-block", type: "heading_1", content: { richText: [] }, position: 0, parentId: null },
+        ],
+      });
+      const found = await db.block.findUnique({ where: { id: old.id } });
+      expect(found).toBeNull();
+      const blocks = await caller.block.list({ pageId });
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].type).toBe("heading_1");
+    });
+
+    it("should update existing blocks", async () => {
+      const existing = await db.block.create({ data: { pageId, type: "paragraph", content: { richText: [] }, position: 0 } });
+      const caller = getCaller();
+      await caller.block.bulkSave({
+        pageId,
+        blocks: [
+          { id: existing.id, type: "heading_2", content: { richText: [{ text: "Updated" }] }, position: 0, parentId: null },
+        ],
+      });
+      const blocks = await caller.block.list({ pageId });
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].type).toBe("heading_2");
+    });
+  });
 });
