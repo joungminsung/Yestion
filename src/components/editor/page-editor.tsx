@@ -9,9 +9,10 @@ import type { BlockType, BlockContent } from "@/types/editor";
 type PageEditorProps = {
   pageId: string;
   initialBlocks: { id: string; type: string; content: unknown; position: number; parentId: string | null }[];
+  isLocked?: boolean;
 };
 
-export function PageEditor({ pageId, initialBlocks }: PageEditorProps) {
+export function PageEditor({ pageId, initialBlocks, isLocked = false }: PageEditorProps) {
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const bulkSave = trpc.block.bulkSave.useMutation();
 
@@ -20,6 +21,7 @@ export function PageEditor({ pageId, initialBlocks }: PageEditorProps) {
   );
 
   const handleUpdate = useCallback((json: Record<string, unknown>) => {
+    if (isLocked) return;
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(() => {
       const blocks = tiptapToBlocks(json as unknown as TiptapDoc, pageId);
@@ -28,7 +30,13 @@ export function PageEditor({ pageId, initialBlocks }: PageEditorProps) {
         blocks: blocks.map((b) => ({ id: b.id, type: b.type, content: b.content as Record<string, unknown>, position: b.position, parentId: b.parentId })),
       });
     }, 1000);
-  }, [pageId, bulkSave]);
+  }, [pageId, bulkSave, isLocked]);
 
-  return <NotionEditor initialContent={initialContent.content.length > 0 ? initialContent : undefined} onUpdate={handleUpdate} />;
+  return (
+    <NotionEditor
+      initialContent={initialContent.content.length > 0 ? initialContent : undefined}
+      onUpdate={handleUpdate}
+      editable={!isLocked}
+    />
+  );
 }
