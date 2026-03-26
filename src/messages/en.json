@@ -1,0 +1,56 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "settings": "Settings",
+    "logout": "Log out",
+    "undo": "Undo",
+    "loading": "Loading..."
+  },
+  "auth": {
+    "login": "Log in",
+    "signup": "Sign up",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "emailPlaceholder": "Enter your email",
+    "passwordPlaceholder": "Enter your password",
+    "namePlaceholder": "Enter your name",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "loginError": "Invalid email or password",
+    "signupError": "Failed to sign up"
+  },
+  "sidebar": {
+    "search": "Quick search",
+    "settings": "Settings",
+    "newPage": "New page",
+    "favorites": "Favorites",
+    "private": "Private",
+    "shared": "Shared",
+    "trash": "Trash"
+  },
+  "settings": {
+    "title": "Settings",
+    "account": "My account",
+    "workspace": "Workspace",
+    "members": "Members",
+    "language": "Language",
+    "theme": "Appearance",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "profile": "Profile",
+    "changePassword": "Change password"
+  },
+  "page": {
+    "untitled": "Untitled",
+    "addIcon": "Add icon",
+    "addCover": "Add cover",
+    "typeSlash": "Type '/' for commands"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "common": {
+    "save": "저장",
+    "cancel": "취소",
+    "delete": "삭제",
+    "edit": "수정",
+    "create": "생성",
+    "search": "검색",
+    "settings": "설정",
+    "logout": "로그아웃",
+    "undo": "실행 취소",
+    "loading": "로딩 중..."
+  },
+  "auth": {
+    "login": "로그인",
+    "signup": "회원가입",
+    "email": "이메일",
+    "password": "비밀번호",
+    "name": "이름",
+    "emailPlaceholder": "이메일을 입력하세요",
+    "passwordPlaceholder": "비밀번호를 입력하세요",
+    "namePlaceholder": "이름을 입력하세요",
+    "noAccount": "계정이 없으신가요?",
+    "hasAccount": "이미 계정이 있으신가요?",
+    "loginError": "이메일 또는 비밀번호가 올바르지 않습니다",
+    "signupError": "회원가입에 실패했습니다"
+  },
+  "sidebar": {
+    "search": "빠른 검색",
+    "settings": "설정",
+    "newPage": "새 페이지",
+    "favorites": "즐겨찾기",
+    "private": "개인 페이지",
+    "shared": "공유됨",
+    "trash": "휴지통"
+  },
+  "settings": {
+    "title": "설정",
+    "account": "내 계정",
+    "workspace": "워크스페이스",
+    "members": "멤버",
+    "language": "언어",
+    "theme": "테마",
+    "themeLight": "라이트",
+    "themeDark": "다크",
+    "themeSystem": "시스템",
+    "profile": "프로필",
+    "changePassword": "비밀번호 변경"
+  },
+  "page": {
+    "untitled": "제목 없음",
+    "addIcon": "아이콘 추가",
+    "addCover": "커버 추가",
+    "typeSlash": "'/'를 입력하여 명령어 사용"
+  }
+}
