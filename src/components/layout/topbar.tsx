@@ -1,9 +1,29 @@
 "use client";
 
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useSidebarStore } from "@/stores/sidebar";
+import { trpc } from "@/server/trpc/client";
 
 export function Topbar() {
   const { isOpen, toggle } = useSidebarStore();
+  const params = useParams();
+  const pageId = params.pageId as string | undefined;
+  const workspaceId = params.workspaceId as string | undefined;
+
+  const { data: page } = trpc.page.get.useQuery(
+    { id: pageId! },
+    { enabled: !!pageId },
+  );
+
+  // Build breadcrumb: parent (if any) -> current page
+  const crumbs: { id: string; title: string | null; icon: string | null }[] = [];
+  if (page?.parent) {
+    crumbs.push({ id: page.parent.id, title: page.parent.title, icon: page.parent.icon });
+  }
+  if (page) {
+    crumbs.push({ id: page.id, title: page.title, icon: page.icon });
+  }
 
   return (
     <header
@@ -15,11 +35,11 @@ export function Topbar() {
         fontSize: "14px",
       }}
     >
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 min-w-0">
         {!isOpen && (
           <button
             onClick={toggle}
-            className="p-1 rounded hover:bg-notion-bg-hover"
+            className="p-1 rounded hover:bg-notion-bg-hover flex-shrink-0"
             style={{ color: "var(--text-secondary)" }}
             title="Open sidebar"
           >
@@ -28,8 +48,45 @@ export function Topbar() {
             </svg>
           </button>
         )}
-        <div className="flex items-center gap-1 px-1" style={{ color: "var(--text-secondary)" }}>
-          <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>Getting Started</span>
+        <div className="flex items-center gap-1 px-1 min-w-0">
+          {crumbs.length > 0 ? (
+            crumbs.map((crumb, i) => (
+              <span key={crumb.id} className="flex items-center gap-1 min-w-0">
+                {i > 0 && (
+                  <span style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>/</span>
+                )}
+                {i < crumbs.length - 1 ? (
+                  <Link
+                    href={`/${workspaceId}/${crumb.id}`}
+                    className="truncate hover:underline"
+                    style={{
+                      color: "var(--text-secondary)",
+                      maxWidth: "150px",
+                    }}
+                  >
+                    {crumb.icon && <span className="mr-1">{crumb.icon}</span>}
+                    {crumb.title || "제목 없음"}
+                  </Link>
+                ) : (
+                  <span
+                    className="truncate"
+                    style={{
+                      color: "var(--text-primary)",
+                      fontWeight: 500,
+                      maxWidth: "250px",
+                    }}
+                  >
+                    {crumb.icon && <span className="mr-1">{crumb.icon}</span>}
+                    {crumb.title || "제목 없음"}
+                  </span>
+                )}
+              </span>
+            ))
+          ) : (
+            <span style={{ color: "var(--text-secondary)" }}>
+              {pageId ? "..." : ""}
+            </span>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-0.5">
