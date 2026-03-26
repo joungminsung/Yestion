@@ -4,14 +4,42 @@ import { useCallback, useEffect, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { cn } from "@/lib/utils";
 
+const TEXT_COLORS = [
+  { name: "기본", value: "default", css: "var(--text-primary)" },
+  { name: "회색", value: "gray", css: "var(--color-gray)" },
+  { name: "갈색", value: "brown", css: "var(--color-brown)" },
+  { name: "주황", value: "orange", css: "var(--color-orange)" },
+  { name: "노랑", value: "yellow", css: "var(--color-yellow)" },
+  { name: "초록", value: "green", css: "var(--color-green)" },
+  { name: "파랑", value: "blue", css: "var(--color-blue)" },
+  { name: "보라", value: "purple", css: "var(--color-purple)" },
+  { name: "분홍", value: "pink", css: "var(--color-pink)" },
+  { name: "빨강", value: "red", css: "var(--color-red)" },
+];
+
+const BG_COLORS = [
+  { name: "기본", value: "default", css: "transparent" },
+  { name: "회색", value: "gray", css: "var(--color-gray-bg)" },
+  { name: "갈색", value: "brown", css: "var(--color-brown-bg)" },
+  { name: "주황", value: "orange", css: "var(--color-orange-bg)" },
+  { name: "노랑", value: "yellow", css: "var(--color-yellow-bg)" },
+  { name: "초록", value: "green", css: "var(--color-green-bg)" },
+  { name: "파랑", value: "blue", css: "var(--color-blue-bg)" },
+  { name: "보라", value: "purple", css: "var(--color-purple-bg)" },
+  { name: "분홍", value: "pink", css: "var(--color-pink-bg)" },
+  { name: "빨강", value: "red", css: "var(--color-red-bg)" },
+];
+
 export function InlineToolbar({ editor }: { editor: Editor }) {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [showColors, setShowColors] = useState(false);
 
   const updatePosition = useCallback(() => {
     const { from, to } = editor.state.selection;
     if (from === to) {
       setIsVisible(false);
+      setShowColors(false);
       return;
     }
     const start = editor.view.coordsAtPos(from);
@@ -71,45 +99,133 @@ export function InlineToolbar({ editor }: { editor: Editor }) {
       },
       isActive: () => editor.isActive("link"),
     },
+    {
+      label: "Color",
+      icon: "A",
+      action: () => setShowColors((prev) => !prev),
+      isActive: () => showColors,
+    },
   ];
 
   if (!isVisible) return null;
 
   return (
     <div
-      className="fixed flex items-center rounded-lg overflow-hidden"
+      className="fixed flex flex-col items-start rounded-lg overflow-visible"
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,
         transform: "translateX(-50%)",
         zIndex: "var(--z-dropdown)",
-        backgroundColor: "var(--bg-primary)",
-        boxShadow: "var(--shadow-popup)",
       }}
     >
-      {buttons.map((btn) => (
-        <button
-          key={btn.label}
-          onClick={btn.action}
-          className={cn(
-            "px-3 py-2 text-sm font-medium hover:bg-notion-bg-hover transition-colors",
-          )}
+      <div
+        className="flex items-center rounded-lg overflow-hidden"
+        style={{
+          backgroundColor: "var(--bg-primary)",
+          boxShadow: "var(--shadow-popup)",
+        }}
+      >
+        {buttons.map((btn) => (
+          <button
+            key={btn.label}
+            onClick={btn.action}
+            className={cn(
+              "px-3 py-2 text-sm font-medium hover:bg-notion-bg-hover transition-colors",
+            )}
+            style={{
+              color: btn.isActive() ? "#2383e2" : "var(--text-primary)",
+              fontWeight: btn.label === "Bold" ? 700 : undefined,
+              fontStyle: btn.label === "Italic" ? "italic" : undefined,
+              textDecoration:
+                btn.label === "Underline"
+                  ? "underline"
+                  : btn.label === "Strikethrough"
+                    ? "line-through"
+                    : undefined,
+              ...(btn.label === "Color"
+                ? {
+                    borderBottom: "2px solid currentColor",
+                    paddingBottom: "6px",
+                  }
+                : {}),
+            }}
+            title={btn.label}
+          >
+            {btn.icon}
+          </button>
+        ))}
+      </div>
+      {showColors && (
+        <div
+          className="absolute top-full left-0 mt-1 p-2 rounded-lg"
           style={{
-            color: btn.isActive() ? "#2383e2" : "var(--text-primary)",
-            fontWeight: btn.label === "Bold" ? 700 : undefined,
-            fontStyle: btn.label === "Italic" ? "italic" : undefined,
-            textDecoration:
-              btn.label === "Underline"
-                ? "underline"
-                : btn.label === "Strikethrough"
-                  ? "line-through"
-                  : undefined,
+            backgroundColor: "var(--bg-primary)",
+            boxShadow: "var(--shadow-popup)",
+            width: "220px",
+            zIndex: 1,
           }}
-          title={btn.label}
         >
-          {btn.icon}
-        </button>
-      ))}
+          <div
+            className="mb-2"
+            style={{
+              fontSize: "11px",
+              color: "var(--text-tertiary)",
+              fontWeight: 500,
+            }}
+          >
+            텍스트 색상
+          </div>
+          <div className="flex flex-wrap gap-1 mb-3">
+            {TEXT_COLORS.map((c) => (
+              <button
+                key={c.value}
+                className="w-6 h-6 rounded flex items-center justify-center text-sm hover:ring-2 ring-[#2383e2]"
+                style={{ color: c.css }}
+                title={c.name}
+                onClick={() => {
+                  if (c.value === "default")
+                    editor.chain().focus().unsetColor().run();
+                  else editor.chain().focus().setColor(c.css).run();
+                  setShowColors(false);
+                }}
+              >
+                A
+              </button>
+            ))}
+          </div>
+          <div
+            className="mb-2"
+            style={{
+              fontSize: "11px",
+              color: "var(--text-tertiary)",
+              fontWeight: 500,
+            }}
+          >
+            배경 색상
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {BG_COLORS.map((c) => (
+              <button
+                key={c.value}
+                className="w-6 h-6 rounded border hover:ring-2 ring-[#2383e2]"
+                style={{
+                  backgroundColor: c.css,
+                  borderColor: "var(--border-default)",
+                }}
+                title={c.name}
+                onClick={() => {
+                  if (c.value === "default")
+                    editor.chain().focus().unsetHighlight().run();
+                  else
+                    editor.chain().focus().setHighlight({ color: c.css }).run();
+                  setShowColors(false);
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

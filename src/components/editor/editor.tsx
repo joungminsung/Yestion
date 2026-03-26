@@ -11,12 +11,20 @@ import TaskItem from "@tiptap/extension-task-item";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import Image from "@tiptap/extension-image";
 import HorizontalRule from "@tiptap/extension-horizontal-rule";
+import { TextStyle } from "@tiptap/extension-text-style";
+import Color from "@tiptap/extension-color";
+import Highlight from "@tiptap/extension-highlight";
 import { Table } from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableHeader from "@tiptap/extension-table-header";
 import TableCell from "@tiptap/extension-table-cell";
 import { common, createLowlight } from "lowlight";
 import { BlockId } from "./extensions/block-id";
+import { ToggleBlock, DetailsSummary, DetailsContent } from "./extensions/toggle";
+import { Callout } from "./extensions/callout";
+import { Equation } from "./extensions/equation";
+import { TableOfContents } from "./extensions/table-of-contents";
+import { ColumnList, Column } from "./extensions/column-list";
 import { SlashCommandExtension } from "./extensions/slash-command-ext";
 import { SlashCommand } from "./slash-command/slash-command";
 import { InlineToolbar } from "./inline-toolbar";
@@ -72,6 +80,17 @@ export function NotionEditor({
       TableRow,
       TableHeader,
       TableCell,
+      ToggleBlock,
+      DetailsSummary,
+      DetailsContent,
+      Callout,
+      Equation,
+      TableOfContents,
+      ColumnList,
+      Column,
+      TextStyle,
+      Color,
+      Highlight.configure({ multicolor: true }),
       BlockId,
       SlashCommandExtension,
     ],
