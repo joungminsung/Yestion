@@ -9,7 +9,7 @@ const USER_COLORS = [
 export function getColorForUser(userId: string): string {
   let hash = 0;
   for (let i = 0; i < userId.length; i++) hash = userId.charCodeAt(i) + ((hash << 5) - hash);
-  return USER_COLORS[Math.abs(hash) % USER_COLORS.length];
+  return USER_COLORS[Math.abs(hash) % USER_COLORS.length]!;
 }
 
 export function createCollaborationProvider({ pageId, token }: { pageId: string; token: string }) {

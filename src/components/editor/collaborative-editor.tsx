@@ -35,7 +35,8 @@ export function CollaborativeEditor({ pageId, sessionToken, user, isLocked }: Pr
       if (!prov.awareness) return;
       const states = prov.awareness.getStates();
       const users: { id: string; name: string; color: string }[] = [];
-      states.forEach((state: any, clientId: number) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      states.forEach((state: Record<string, any>, clientId: number) => {
         if (state.user && clientId !== prov.awareness?.clientID) {
           users.push({ id: state.user.id, name: state.user.name, color: state.user.color });
         }

@@ -21,6 +21,8 @@ import TableCell from "@tiptap/extension-table-cell";
 import { common, createLowlight } from "lowlight";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
+import type { HocuspocusProvider } from "@hocuspocus/provider";
+import type { Doc as YDoc } from "yjs";
 import { BlockId } from "./extensions/block-id";
 import { ToggleBlock, DetailsSummary, DetailsContent } from "./extensions/toggle";
 import { Callout } from "./extensions/callout";
@@ -38,8 +40,8 @@ import "./cursor-styles.css";
 const lowlight = createLowlight(common);
 
 type CollaborationConfig = {
-  ydoc: any;
-  provider: any;
+  ydoc: YDoc;
+  provider: HocuspocusProvider;
   user: { id: string; name: string; color: string };
 };
 

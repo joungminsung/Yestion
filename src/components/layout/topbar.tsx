@@ -23,12 +23,12 @@ function PresenceAvatars({ users }: { users: PresenceUser[] }) {
         <div
           key={u.id}
           title={u.name}
-          className="flex items-center justify-center rounded-full text-white text-[10px] font-semibold ring-2"
+          className="flex items-center justify-center rounded-full text-white text-[10px] font-semibold"
           style={{
             width: 24,
             height: 24,
             backgroundColor: u.color,
-            ringColor: "var(--bg-primary)",
+            boxShadow: "0 0 0 2px var(--bg-primary)",
           }}
         >
           {getInitials(u.name)}
@@ -36,13 +36,13 @@ function PresenceAvatars({ users }: { users: PresenceUser[] }) {
       ))}
       {overflow > 0 && (
         <div
-          className="flex items-center justify-center rounded-full text-[10px] font-semibold ring-2"
+          className="flex items-center justify-center rounded-full text-[10px] font-semibold"
           style={{
             width: 24,
             height: 24,
             backgroundColor: "var(--bg-tertiary)",
             color: "var(--text-secondary)",
-            ringColor: "var(--bg-primary)",
+            boxShadow: "0 0 0 2px var(--bg-primary)",
           }}
         >
           +{overflow}
