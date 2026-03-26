@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, forwardRef, useImperativeHandle } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -52,12 +52,17 @@ type NotionEditorProps = {
   collaboration?: CollaborationConfig;
 };
 
-export function NotionEditor({
+export type NotionEditorHandle = { commands: { setContent: (content: unknown) => boolean } };
+
+export const NotionEditor = forwardRef<
+  NotionEditorHandle,
+  NotionEditorProps
+>(function NotionEditor({
   initialContent,
   onUpdate,
   editable = true,
   collaboration,
-}: NotionEditorProps) {
+}, ref) {
   const [menuState, setMenuState] = useState<{pos: number; coords: {top: number; left: number}} | null>(null);
 
   const editor = useEditor({
@@ -66,6 +71,9 @@ export function NotionEditor({
         heading: { levels: [1, 2, 3] },
         codeBlock: false,
         horizontalRule: false,
+        // C2: Disable StarterKit history when collaboration is active to avoid
+        // conflicts with Yjs undo manager
+        ...(collaboration ? { history: false } : {}),
       }),
       Placeholder.configure({
         placeholder: ({ node }) => {
@@ -127,6 +135,13 @@ export function NotionEditor({
     },
   });
 
+  // Expose editor commands via ref for C3 block-to-Yjs hydration
+  useImperativeHandle(ref, () => {
+    if (!editor) return { commands: { setContent: () => false } };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return { commands: { setContent: (content: unknown) => editor.commands.setContent(content as any) } };
+  }, [editor]);
+
   if (!editor) return null;
 
   return (
@@ -141,4 +156,4 @@ export function NotionEditor({
       {menuState && <BlockMenu editor={editor} pos={menuState.pos} coords={menuState.coords} onClose={() => setMenuState(null)} />}
     </div>
   );
-}
+});

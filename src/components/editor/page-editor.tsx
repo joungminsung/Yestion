@@ -42,6 +42,7 @@ export function PageEditor({ pageId, initialBlocks, isLocked = false, sessionTok
         sessionToken={sessionToken}
         user={user}
         isLocked={isLocked}
+        initialBlocks={initialBlocks}
       />
     );
   }

@@ -70,6 +70,49 @@ export const SLASH_ITEMS: SlashItem[] = [
     command: (editor) => editor.chain().focus().toggleTaskList().run(),
   },
   {
+    title: "토글",
+    description: "토글로 콘텐츠를 접거나 펼칩니다.",
+    icon: "▶",
+    category: "기본 블록",
+    keywords: ["toggle", "토글", "접기"],
+    command: (editor) => {
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: "details",
+          content: [
+            {
+              type: "detailsSummary",
+              content: [{ type: "text", text: "토글" }],
+            },
+            {
+              type: "detailsContent",
+              content: [{ type: "paragraph" }],
+            },
+          ],
+        })
+        .run();
+    },
+  },
+  {
+    title: "콜아웃",
+    description: "아이콘이 있는 강조 블록을 추가합니다.",
+    icon: "💡",
+    category: "기본 블록",
+    keywords: ["callout", "콜아웃", "강조"],
+    command: (editor) => {
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: "callout",
+          attrs: { icon: "💡", color: "default" },
+        })
+        .run();
+    },
+  },
+  {
     title: "인용",
     description: "인용문을 표시합니다.",
     icon: "❝",
@@ -92,6 +135,61 @@ export const SLASH_ITEMS: SlashItem[] = [
     category: "고급 블록",
     keywords: ["code", "코드"],
     command: (editor) => editor.chain().focus().toggleCodeBlock().run(),
+  },
+  {
+    title: "수식",
+    description: "수학 공식을 추가합니다.",
+    icon: "∑",
+    category: "고급 블록",
+    keywords: ["equation", "math", "수식", "공식"],
+    command: (editor) => {
+      const expr = window.prompt("수식을 입력하세요 (LaTeX):");
+      if (expr) {
+        editor
+          .chain()
+          .focus()
+          .insertContent({ type: "equation", attrs: { expression: expr } })
+          .run();
+      }
+    },
+  },
+  {
+    title: "목차",
+    description: "페이지의 제목 목록을 표시합니다.",
+    icon: "📑",
+    category: "고급 블록",
+    keywords: ["toc", "table of contents", "목차"],
+    command: (editor) => {
+      editor.chain().focus().insertContent({ type: "tableOfContents" }).run();
+    },
+  },
+  {
+    title: "2열",
+    description: "2개의 열 레이아웃을 추가합니다.",
+    icon: "⬜⬜",
+    category: "고급 블록",
+    keywords: ["column", "열", "레이아웃"],
+    command: (editor) => {
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: "columnList",
+          content: [
+            {
+              type: "column",
+              attrs: { width: 0.5 },
+              content: [{ type: "paragraph" }],
+            },
+            {
+              type: "column",
+              attrs: { width: 0.5 },
+              content: [{ type: "paragraph" }],
+            },
+          ],
+        })
+        .run();
+    },
   },
   {
     title: "이미지",

@@ -22,6 +22,11 @@ export const BlockId = Extension.create({
           "horizontalRule",
           "image",
           "table",
+          "details",
+          "callout",
+          "equation",
+          "tableOfContents",
+          "columnList",
         ],
         attributes: {
           blockId: {
