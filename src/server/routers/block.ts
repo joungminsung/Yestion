@@ -1,0 +1,74 @@
+import { z } from "zod";
+import { TRPCError } from "@trpc/server";
+import { router, protectedProcedure } from "@/server/trpc/init";
+
+export const blockRouter = router({
+  list: protectedProcedure
+    .input(z.object({ pageId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return ctx.db.block.findMany({
+        where: { pageId: input.pageId, parentId: null },
+        include: { children: { orderBy: { position: "asc" }, include: { children: { orderBy: { position: "asc" } } } } },
+        orderBy: { position: "asc" },
+      });
+    }),
+
+  create: protectedProcedure
+    .input(z.object({ pageId: z.string(), parentId: z.string().optional(), type: z.string(), content: z.record(z.string(), z.any()).default({}), position: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const block = await ctx.db.block.create({ data: { pageId: input.pageId, parentId: input.parentId, type: input.type, content: input.content, position: input.position } });
+      await ctx.db.page.update({ where: { id: input.pageId }, data: { lastEditedBy: ctx.session.user.id } });
+      return block;
+    }),
+
+  update: protectedProcedure
+    .input(z.object({ id: z.string(), type: z.string().optional(), content: z.record(z.string(), z.any()).optional(), parentId: z.string().nullable().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const block = await ctx.db.block.findUnique({ where: { id: input.id } });
+      if (!block) throw new TRPCError({ code: "NOT_FOUND" });
+      const updated = await ctx.db.block.update({
+        where: { id: input.id },
+        data: { ...(input.type !== undefined && { type: input.type }), ...(input.content !== undefined && { content: input.content }), ...(input.parentId !== undefined && { parentId: input.parentId }) },
+      });
+      await ctx.db.page.update({ where: { id: block.pageId }, data: { lastEditedBy: ctx.session.user.id } });
+      return updated;
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const block = await ctx.db.block.findUnique({ where: { id: input.id } });
+      if (!block) throw new TRPCError({ code: "NOT_FOUND" });
+      await ctx.db.block.delete({ where: { id: input.id } });
+      await ctx.db.page.update({ where: { id: block.pageId }, data: { lastEditedBy: ctx.session.user.id } });
+      return { success: true };
+    }),
+
+  reorder: protectedProcedure
+    .input(z.object({ pageId: z.string(), blocks: z.array(z.object({ id: z.string(), position: z.number(), parentId: z.string().nullable().optional() })) }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.$transaction(input.blocks.map((b) => ctx.db.block.update({ where: { id: b.id }, data: { position: b.position, ...(b.parentId !== undefined && { parentId: b.parentId }) } })));
+      await ctx.db.page.update({ where: { id: input.pageId }, data: { lastEditedBy: ctx.session.user.id } });
+      return { success: true };
+    }),
+
+  bulkSave: protectedProcedure
+    .input(z.object({ pageId: z.string(), blocks: z.array(z.object({ id: z.string(), type: z.string(), content: z.record(z.string(), z.any()), position: z.number(), parentId: z.string().nullable().optional() })) }))
+    .mutation(async ({ ctx, input }) => {
+      const existingIds = (await ctx.db.block.findMany({ where: { pageId: input.pageId }, select: { id: true } })).map((b) => b.id);
+      const inputIds = new Set(input.blocks.map((b) => b.id));
+      const toDelete = existingIds.filter((id) => !inputIds.has(id));
+
+      await ctx.db.$transaction([
+        ...(toDelete.length > 0 ? [ctx.db.block.deleteMany({ where: { id: { in: toDelete } } })] : []),
+        ...input.blocks.map((b) => ctx.db.block.upsert({
+          where: { id: b.id },
+          create: { id: b.id, pageId: input.pageId, type: b.type, content: b.content, position: b.position, parentId: b.parentId ?? null },
+          update: { type: b.type, content: b.content, position: b.position, parentId: b.parentId ?? null },
+        })),
+      ]);
+
+      await ctx.db.page.update({ where: { id: input.pageId }, data: { lastEditedBy: ctx.session.user.id } });
+      return { success: true };
+    }),
+});
