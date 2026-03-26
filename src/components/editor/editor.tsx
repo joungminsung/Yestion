@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -19,6 +20,8 @@ import { BlockId } from "./extensions/block-id";
 import { SlashCommandExtension } from "./extensions/slash-command-ext";
 import { SlashCommand } from "./slash-command/slash-command";
 import { InlineToolbar } from "./inline-toolbar";
+import { DragHandle } from "./drag-handle";
+import { BlockMenu } from "./block-menu";
 import "./utils/editor-styles.css";
 
 const lowlight = createLowlight(common);
@@ -34,6 +37,8 @@ export function NotionEditor({
   onUpdate,
   editable = true,
 }: NotionEditorProps) {
+  const [menuState, setMenuState] = useState<{pos: number; coords: {top: number; left: number}} | null>(null);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -90,6 +95,11 @@ export function NotionEditor({
       <EditorContent editor={editor} />
       <InlineToolbar editor={editor} />
       <SlashCommand editor={editor} />
+      <DragHandle editor={editor} onMenuOpen={(pos) => {
+        const coords = editor.view.coordsAtPos(pos);
+        setMenuState({ pos, coords: { top: coords.top, left: coords.left - 4 } });
+      }} />
+      {menuState && <BlockMenu editor={editor} pos={menuState.pos} coords={menuState.coords} onClose={() => setMenuState(null)} />}
     </div>
   );
 }
