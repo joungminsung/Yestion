@@ -1,11 +1,17 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useSidebarStore } from "@/stores/sidebar";
+import { useCommandPaletteStore } from "@/stores/command-palette";
 import { SidebarResizer } from "./sidebar-resizer";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
   const { isOpen, width, isResizing } = useSidebarStore();
+  const t = useTranslations("sidebar");
+  const router = useRouter();
+  const openCommandPalette = useCommandPaletteStore((s) => s.open);
 
   return (
     <>
@@ -35,9 +41,10 @@ export function Sidebar() {
           <div
             className="flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer"
             style={{ fontSize: "14px", color: "var(--text-secondary)" }}
+            onClick={openCommandPalette}
           >
             <span>🔍</span>
-            <span>검색</span>
+            <span>{t("search")}</span>
             <span className="ml-auto text-xs opacity-50">⌘K</span>
           </div>
 
@@ -45,9 +52,10 @@ export function Sidebar() {
           <div
             className="flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer"
             style={{ fontSize: "14px", color: "var(--text-secondary)" }}
+            onClick={() => router.push("/settings")}
           >
             <span>⚙️</span>
-            <span>설정</span>
+            <span>{t("settings")}</span>
           </div>
 
           {/* Divider */}
@@ -56,10 +64,10 @@ export function Sidebar() {
           {/* Sections */}
           <div className="flex-1 overflow-y-auto px-1">
             <div className="px-3 py-1" style={{ fontSize: "12px", fontWeight: 500, color: "var(--text-tertiary)", letterSpacing: "0.02em" }}>
-              즐겨찾기
+              {t("favorites")}
             </div>
             <div className="px-3 py-1 mt-4" style={{ fontSize: "12px", fontWeight: 500, color: "var(--text-tertiary)", letterSpacing: "0.02em" }}>
-              개인 페이지
+              {t("private")}
             </div>
           </div>
 
@@ -69,7 +77,7 @@ export function Sidebar() {
             style={{ fontSize: "14px", color: "var(--text-secondary)" }}
           >
             <span>➕</span>
-            <span>새 페이지</span>
+            <span>{t("newPage")}</span>
           </div>
         </div>
 

@@ -70,7 +70,7 @@ export function AccountSettings() {
           {([{ id: "ko" as const, label: "한국어" }, { id: "en" as const, label: "English" }]).map((l) => (
             <button
               key={l.id}
-              onClick={() => { setLocale(l.id); updateProfile.mutate({ locale: l.id }); }}
+              onClick={() => { setLocale(l.id); updateProfile.mutate({ locale: l.id }); document.cookie = `locale=${l.id}; path=/; max-age=${365 * 24 * 60 * 60}; samesite=lax`; }}
               className={cn("px-4 py-2 rounded text-sm border", locale === l.id ? "border-[#2383e2] font-medium" : "border-transparent hover:bg-notion-bg-hover")}
               style={{ color: locale === l.id ? "var(--color-blue)" : "var(--text-secondary)", backgroundColor: locale === l.id ? "var(--color-blue-bg)" : undefined }}
             >

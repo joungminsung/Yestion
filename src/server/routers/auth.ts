@@ -68,6 +68,8 @@ export const authRouter = router({
         },
       });
 
+      ctx.headers.set('Set-Cookie', `session-token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`);
+
       return {
         user: { id: user.id, email: user.email, name: user.name },
         token,
@@ -113,6 +115,8 @@ export const authRouter = router({
         },
       });
 
+      ctx.headers.set('Set-Cookie', `session-token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`);
+
       return {
         user: { id: user.id, email: user.email, name: user.name },
         token,
@@ -125,6 +129,7 @@ export const authRouter = router({
       await ctx.db.session.deleteMany({
         where: { token: input.token },
       });
+      ctx.headers.set('Set-Cookie', `session-token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
       return { success: true };
     }),
 });

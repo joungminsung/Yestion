@@ -22,6 +22,8 @@
     "namePlaceholder": "Enter your name",
     "noAccount": "Don't have an account?",
     "hasAccount": "Already have an account?",
+    "loggingIn": "Logging in...",
+    "signingUp": "Signing up...",
     "loginError": "Invalid email or password",
     "signupError": "Failed to sign up"
   },

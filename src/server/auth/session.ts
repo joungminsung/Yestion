@@ -23,6 +23,9 @@ export async function getServerSession(): Promise<Session | null> {
   });
 
   if (!session || session.expiresAt < new Date()) {
+    if (session) {
+      await db.session.delete({ where: { id: session.id } });
+    }
     return null;
   }
 
