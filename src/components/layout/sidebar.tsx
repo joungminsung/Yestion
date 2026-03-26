@@ -6,6 +6,7 @@ import { useCommandPaletteStore } from "@/stores/command-palette";
 import { SidebarResizer } from "./sidebar-resizer";
 import { SidebarPageItem } from "./sidebar-page-item";
 import { SidebarFavorites } from "./sidebar-favorites";
+import { SidebarTrash } from "./sidebar-trash";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/server/trpc/client";
 
@@ -105,6 +106,9 @@ export function Sidebar() {
               </div>
             )}
           </div>
+
+          {/* Trash */}
+          {workspaceId && <SidebarTrash workspaceId={workspaceId} />}
 
           {/* New Page */}
           <button
