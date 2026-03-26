@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function PageView({ params }: { params: { workspaceId: string; pageId: string } }) {
   return (
     <div className="mx-auto py-12" style={{ maxWidth: "var(--page-max-width)", paddingLeft: "var(--page-padding-x)", paddingRight: "var(--page-padding-x)" }}>
