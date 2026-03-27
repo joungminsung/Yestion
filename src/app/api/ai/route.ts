@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { getServerSession } from "@/server/auth/session";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { prompt, context, action } = await request.json();
 
     const defaultMessage = "You are a writing assistant. Write content based on the user's prompt. Output in Korean unless specified otherwise.";

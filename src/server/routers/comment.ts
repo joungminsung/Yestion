@@ -54,7 +54,7 @@ export const commentRouter = router({
     .mutation(async ({ ctx, input }) => {
       await verifyPageAccess(ctx.db, ctx.session.user.id, input.pageId);
 
-      return ctx.db.comment.create({
+      const comment = await ctx.db.comment.create({
         data: {
           pageId: input.pageId,
           blockId: input.blockId ?? null,
@@ -66,6 +66,21 @@ export const commentRouter = router({
           author: { select: { id: true, name: true, avatarUrl: true } },
         },
       });
+
+      // Create notification for the page owner
+      const page = await ctx.db.page.findUnique({ where: { id: input.pageId }, select: { createdBy: true } });
+      if (page && page.createdBy !== ctx.session.user.id) {
+        await ctx.db.notification.create({
+          data: {
+            userId: page.createdBy,
+            type: "comment",
+            title: `${ctx.session.user.name}님이 댓글을 남겼습니다`,
+            pageId: input.pageId,
+          },
+        });
+      }
+
+      return comment;
     }),
 
   update: protectedProcedure

@@ -4,6 +4,8 @@ import crypto from "crypto";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "@/server/trpc/init";
 
+const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+
 export const authRouter = router({
   signup: publicProcedure
     .input(
@@ -68,7 +70,7 @@ export const authRouter = router({
         },
       });
 
-      ctx.headers.set('Set-Cookie', `session-token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`);
+      ctx.headers.set('Set-Cookie', `session-token=${token}; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=${30 * 24 * 60 * 60}`);
 
       return {
         user: { id: user.id, email: user.email, name: user.name },
@@ -115,7 +117,7 @@ export const authRouter = router({
         },
       });
 
-      ctx.headers.set('Set-Cookie', `session-token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`);
+      ctx.headers.set('Set-Cookie', `session-token=${token}; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=${30 * 24 * 60 * 60}`);
 
       return {
         user: { id: user.id, email: user.email, name: user.name },
@@ -129,7 +131,7 @@ export const authRouter = router({
       await ctx.db.session.deleteMany({
         where: { token: input.token },
       });
-      ctx.headers.set('Set-Cookie', `session-token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+      ctx.headers.set('Set-Cookie', `session-token=; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=0`);
       return { success: true };
     }),
 });

@@ -52,10 +52,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET /api/v1/pages?all=true — List all pages
+// GET /api/v1/pages — List pages with pagination
 export async function GET(request: NextRequest) {
   const auth = await authenticateApiKey(request);
   if (!auth) return unauthorized();
+
+  const url = new URL(request.url);
+  const limit = Math.min(parseInt(url.searchParams.get("page_size") || "100", 10) || 100, 100);
+  const cursor = url.searchParams.get("start_cursor");
 
   const pages = await db.page.findMany({
     where: {
@@ -63,6 +67,8 @@ export async function GET(request: NextRequest) {
       isDeleted: false,
     },
     orderBy: { updatedAt: "desc" },
+    take: limit + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     select: {
       id: true,
       title: true,
@@ -73,9 +79,14 @@ export async function GET(request: NextRequest) {
     },
   });
 
+  const hasMore = pages.length > limit;
+  const results = hasMore ? pages.slice(0, limit) : pages;
+  const lastResult = results[results.length - 1];
+  const nextCursor = hasMore && lastResult ? lastResult.id : null;
+
   return Response.json({
     object: "list",
-    results: pages.map((p) => ({
+    results: results.map((p) => ({
       object: "page",
       id: p.id,
       title: p.title,
@@ -87,6 +98,7 @@ export async function GET(request: NextRequest) {
       last_edited_time: p.updatedAt.toISOString(),
       archived: false,
     })),
-    has_more: false,
+    has_more: hasMore,
+    next_cursor: nextCursor,
   });
 }

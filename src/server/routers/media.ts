@@ -4,7 +4,7 @@ import { router, protectedProcedure } from "../trpc/init";
 export const mediaRouter = router({
   fetchOgMetadata: protectedProcedure
     .input(z.object({ url: z.string().url() }))
-    .mutation(async ({ input }) => {
+    .query(async ({ input }) => {
       const { url } = input;
 
       try {

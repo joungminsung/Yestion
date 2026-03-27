@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
 import { router, protectedProcedure } from "@/server/trpc/init";
+
+function hashKey(key: string): string {
+  return createHash("sha256").update(key).digest("hex");
+}
 
 export const apiKeyRouter = router({
   create: protectedProcedure
@@ -25,19 +29,20 @@ export const apiKeyRouter = router({
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
-      const key = `nclone_${randomBytes(32).toString("hex")}`;
+      const rawKey = `nclone_${randomBytes(32).toString("hex")}`;
+      const hashedKey = hashKey(rawKey);
 
       const apiKey = await ctx.db.apiKey.create({
         data: {
           workspaceId: input.workspaceId,
           name: input.name,
-          key,
+          key: hashedKey,
           createdBy: ctx.session.user.id,
         },
       });
 
-      // Return the full key only on creation
-      return { ...apiKey, key };
+      // Return the raw key only on creation (one-time); the stored value is hashed
+      return { ...apiKey, key: rawKey };
     }),
 
   list: protectedProcedure
@@ -60,10 +65,10 @@ export const apiKeyRouter = router({
         orderBy: { createdAt: "desc" },
       });
 
-      // Mask keys: show only first 10 chars + ...
+      // Keys are stored as hashes; mask them in the listing
       return keys.map((k) => ({
         ...k,
-        key: k.key.slice(0, 14) + "..." + k.key.slice(-4),
+        key: k.key.slice(0, 8) + "...",
       }));
     }),
 

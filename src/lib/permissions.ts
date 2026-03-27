@@ -4,8 +4,11 @@ export async function getEffectivePermission(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any,
   userId: string,
-  pageId: string
+  pageId: string,
+  depth: number = 0
 ): Promise<EffectivePermission> {
+  if (depth > 20) return "none";
+
   // 1. Check direct page permission
   const directPerm = await db.pagePermission.findUnique({
     where: { pageId_userId: { pageId, userId } },
@@ -26,7 +29,7 @@ export async function getEffectivePermission(
     if (membership.role === "GUEST") {
       // Guests: check parent chain for inherited permission
       if (page.parentId) {
-        return getEffectivePermission(db, userId, page.parentId);
+        return getEffectivePermission(db, userId, page.parentId, depth + 1);
       }
       return "none";
     }

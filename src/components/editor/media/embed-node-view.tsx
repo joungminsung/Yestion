@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { EmbedInput } from "./embed-input";
+import { isValidEmbedUrl } from "../extensions/embed-block";
 
 export function EmbedNodeView({ node, updateAttributes, selected, editor }: NodeViewProps) {
   const url = node.attrs.url as string;
@@ -42,6 +43,21 @@ export function EmbedNodeView({ node, updateAttributes, selected, editor }: Node
             <span>임베드를 추가하려면 클릭하세요</span>
           </div>
         )}
+      </NodeViewWrapper>
+    );
+  }
+
+  // Validate URL protocol to prevent XSS (e.g., javascript: URLs)
+  const iframeSrc = embedUrl || url;
+  if (!isValidEmbedUrl(iframeSrc)) {
+    return (
+      <NodeViewWrapper>
+        <div className="notion-embed-block" style={{ padding: "1em", color: "red" }}>
+          Invalid embed URL: only http and https protocols are allowed.
+          {selected && (
+            <button className="notion-embed-delete" onClick={handleDelete} title="삭제" style={{ marginLeft: 8 }}>✕</button>
+          )}
+        </div>
       </NodeViewWrapper>
     );
   }

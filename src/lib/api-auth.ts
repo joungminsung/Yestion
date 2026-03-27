@@ -1,11 +1,17 @@
 import { db } from "@/server/db/client";
+import crypto from "crypto";
+
+function hashKey(key: string): string {
+  return crypto.createHash("sha256").update(key).digest("hex");
+}
 
 export async function authenticateApiKey(request: Request) {
   const authHeader = request.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) return null;
-  const key = authHeader.slice(7);
+  const rawKey = authHeader.slice(7);
+  const hashedKey = hashKey(rawKey);
   const apiKey = await db.apiKey.findUnique({
-    where: { key },
+    where: { key: hashedKey },
     include: { workspace: true },
   });
   if (!apiKey) return null;

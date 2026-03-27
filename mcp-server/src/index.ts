@@ -4,6 +4,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
@@ -367,6 +368,19 @@ const RESOURCES = [
 
 server.setRequestHandler(ListResourcesRequestSchema, async () => {
   return { resources: RESOURCES };
+});
+
+server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+  return {
+    resourceTemplates: [
+      {
+        uriTemplate: "page://{id}",
+        name: "Page by ID",
+        description: "Get a specific page and its content by page ID",
+        mimeType: "application/json",
+      },
+    ],
+  };
 });
 
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {

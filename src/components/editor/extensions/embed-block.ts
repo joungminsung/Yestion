@@ -7,8 +7,18 @@ export type EmbedInfo = {
   embedUrl: string;
 };
 
+export function isValidEmbedUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" || u.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 export function getEmbedInfo(url: string): EmbedInfo | null {
   if (!url) return null;
+  if (!isValidEmbedUrl(url)) return null;
 
   try {
     const parsed = new URL(url);

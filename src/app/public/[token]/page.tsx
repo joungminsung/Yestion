@@ -165,6 +165,98 @@ function PublicBlock({ block }: { block: BlockData }) {
             )}
           </div>
         ) : null;
+      case "video":
+        return content?.url ? (
+          <div className="my-3">
+            <video src={content.url} controls className="max-w-full rounded" />
+            {content.caption && (
+              <p className="text-xs mt-1 text-center" style={{ color: "var(--text-secondary)" }}>{content.caption}</p>
+            )}
+          </div>
+        ) : null;
+      case "audio":
+        return content?.url ? (
+          <div className="my-3">
+            <audio src={content.url} controls className="w-full" />
+          </div>
+        ) : null;
+      case "file":
+        return content?.url ? (
+          <div className="my-3">
+            <a
+              href={content.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded text-sm"
+              style={{ backgroundColor: "var(--bg-secondary)", color: "var(--text-primary)" }}
+            >
+              📎 {content.name || content.url}
+            </a>
+          </div>
+        ) : null;
+      case "embed":
+      case "bookmark": {
+        const embedUrl = content?.embedUrl || content?.url;
+        if (!embedUrl) return null;
+        // For bookmarks, show as a link card
+        if (block.type === "bookmark") {
+          return (
+            <div className="my-3 border rounded p-3" style={{ borderColor: "var(--border-default)" }}>
+              <a href={embedUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-primary)" }}>
+                {content.title || embedUrl}
+              </a>
+              {content.description && (
+                <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>{content.description}</p>
+              )}
+            </div>
+          );
+        }
+        // For embeds, render an iframe
+        return (
+          <div className="my-3">
+            <iframe
+              src={embedUrl}
+              width="100%"
+              height={content.height || 400}
+              frameBorder="0"
+              allowFullScreen
+              style={{ border: "none", borderRadius: 4 }}
+            />
+          </div>
+        );
+      }
+      case "callout":
+        return (
+          <div
+            className="flex gap-2 p-3 rounded my-2"
+            style={{ backgroundColor: "var(--bg-secondary)", color: "var(--text-primary)" }}
+          >
+            {content.icon && <span>{content.icon}</span>}
+            <span>{text}</span>
+          </div>
+        );
+      case "equation":
+        return (
+          <div className="my-2 text-center" style={{ color: "var(--text-primary)", fontStyle: "italic" }}>
+            {content.expression || text}
+          </div>
+        );
+      case "table_of_contents":
+        return (
+          <div className="my-3 p-3 rounded text-sm" style={{ backgroundColor: "var(--bg-secondary)", color: "var(--text-secondary)" }}>
+            목차 (Table of Contents)
+          </div>
+        );
+      case "column_list":
+        return (
+          <div className="flex gap-4 my-2">
+            {block.children?.map((child) => (
+              <div key={child.id} className="flex-1">
+                <PublicBlock block={child} />
+              </div>
+            ))}
+          </div>
+        );
       default:
         return <p className="min-h-[1.5em]" style={{ color: "var(--text-primary)" }}>{text || "\u00A0"}</p>;
     }

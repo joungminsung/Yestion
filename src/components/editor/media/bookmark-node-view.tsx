@@ -17,7 +17,7 @@ export function BookmarkNodeView({ node, updateAttributes, selected, editor }: N
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchOg = trpc.media.fetchOgMetadata.useMutation();
+  const trpcUtils = trpc.useUtils();
 
   useEffect(() => {
     if (!url) setShowInput(true);
@@ -38,7 +38,7 @@ export function BookmarkNodeView({ node, updateAttributes, selected, editor }: N
     setError(null);
 
     try {
-      const meta = await fetchOg.mutateAsync({ url: trimmed });
+      const meta = await trpcUtils.media.fetchOgMetadata.fetch({ url: trimmed });
       updateAttributes({
         url: trimmed,
         title: meta.title || "",
@@ -62,7 +62,7 @@ export function BookmarkNodeView({ node, updateAttributes, selected, editor }: N
     }
 
     setIsLoading(false);
-  }, [inputUrl, fetchOg, updateAttributes]);
+  }, [inputUrl, trpcUtils, updateAttributes]);
 
   const handleDelete = useCallback(() => {
     const pos = editor.view.state.selection.from;
