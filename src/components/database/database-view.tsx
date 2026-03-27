@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { trpc } from "@/server/trpc/client";
 import { useDatabaseStore } from "@/stores/database";
@@ -13,7 +13,7 @@ import { ListView } from "./views/list-view";
 import { GalleryView } from "./views/gallery-view";
 import { CalendarView } from "./views/calendar-view";
 import { TimelineView } from "./views/timeline-view";
-import type { ViewConfig, FilterGroup, SortRule, DatabaseData } from "@/types/database";
+import type { ViewConfig, FilterGroup, SortRule, DatabaseData, RowData } from "@/types/database";
 
 type DatabaseViewProps = {
   databaseId: string;
@@ -45,6 +45,8 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
     setActiveView,
     localFilters,
     localSorts,
+    setLocalSorts,
+    localGroup,
     resetLocal,
   } = useDatabaseStore();
 
@@ -85,6 +87,9 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
   const effectiveSorts: SortRule[] | undefined =
     localSorts ?? activeViewConfig?.sorts;
 
+  // Effective group
+  const effectiveGroup = localGroup ?? activeViewConfig?.group;
+
   // Persist view config changes via tRPC
   const handleUpdateViewConfig = useCallback(
     (configPatch: Partial<ViewConfig>) => {
@@ -92,6 +97,14 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
       updateViewMutation.mutate({ id: activeView.id, config: configPatch });
     },
     [activeView, updateViewMutation],
+  );
+
+  // Sort change handler (from table header clicks)
+  const handleSortChange = useCallback(
+    (newSorts: SortRule[]) => {
+      setLocalSorts(newSorts.length > 0 ? newSorts : null);
+    },
+    [setLocalSorts],
   );
 
   // ── View callback handlers ──────────────────────────────────
@@ -134,7 +147,6 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
   // Apply filter + sort
   const processedRows = useMemo(() => {
     if (!data) return [];
-    // Cast rows: Prisma values field is JsonValue; treat as Record<string, unknown>
     const rows = data.rows.map((r) => ({
       ...r,
       values: (r.values && typeof r.values === "object" && !Array.isArray(r.values)
@@ -145,15 +157,56 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
     return sortRows(filtered, effectiveSorts, propertyTypes);
   }, [data, effectiveFilter, effectiveSorts, propertyTypes]);
 
+  // ── Grouping ────────────────────────────────────────────────
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  const toggleGroupCollapse = useCallback((groupValue: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupValue)) {
+        next.delete(groupValue);
+      } else {
+        next.add(groupValue);
+      }
+      return next;
+    });
+  }, []);
+
+  const groupedRows = useMemo(() => {
+    if (!effectiveGroup) return null;
+    const groups = new Map<string, RowData[]>();
+    processedRows.forEach((row) => {
+      const rawValue = row.values[effectiveGroup.propertyId];
+      const value = rawValue != null ? String(rawValue) : "No value";
+      if (!groups.has(value)) groups.set(value, []);
+      groups.get(value)!.push(row);
+    });
+    return groups;
+  }, [processedRows, effectiveGroup]);
+
+  const allGroupKeys = useMemo(() => {
+    if (!groupedRows) return [];
+    return Array.from(groupedRows.keys());
+  }, [groupedRows]);
+
+  const handleCollapseAll = useCallback(() => {
+    setCollapsedGroups(new Set(allGroupKeys));
+  }, [allGroupKeys]);
+
+  const handleExpandAll = useCallback(() => {
+    setCollapsedGroups(new Set());
+  }, []);
+
   // ── Render the active view component ────────────────────────
 
-  function renderView() {
+  function renderView(rowsToRender: RowData[]) {
     if (!data || !activeViewConfig) return null;
 
     const viewProps = {
       databaseId: data.id ?? databaseId,
       properties: data.properties as DatabaseData["properties"],
-      rows: processedRows,
+      rows: rowsToRender,
       viewConfig: activeViewConfig,
       onAddRow: handleAddRow,
       onUpdateRow: handleUpdateRow,
@@ -163,7 +216,13 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
 
     switch (activeView?.type) {
       case "table":
-        return <TableView {...viewProps} />;
+        return (
+          <TableView
+            {...viewProps}
+            sorts={effectiveSorts}
+            onSortChange={handleSortChange}
+          />
+        );
       case "board":
         return <BoardView {...viewProps} />;
       case "list":
@@ -175,7 +234,13 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
       case "timeline":
         return <TimelineView {...viewProps} />;
       default:
-        return <TableView {...viewProps} />;
+        return (
+          <TableView
+            {...viewProps}
+            sorts={effectiveSorts}
+            onSortChange={handleSortChange}
+          />
+        );
     }
   }
 
@@ -225,9 +290,69 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
         databaseId={databaseId}
       />
 
+      {/* Group collapse/expand controls */}
+      {groupedRows && (
+        <div
+          className="flex items-center gap-2 border-b px-3 py-1"
+          style={{ borderColor: "var(--border-default)" }}
+        >
+          <button
+            onClick={handleExpandAll}
+            className="rounded px-1.5 py-0.5 text-xs transition-colors hover:bg-[var(--bg-hover)]"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Expand all
+          </button>
+          <button
+            onClick={handleCollapseAll}
+            className="rounded px-1.5 py-0.5 text-xs transition-colors hover:bg-[var(--bg-hover)]"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Collapse all
+          </button>
+        </div>
+      )}
+
       {/* Active view */}
       <div className="min-h-[200px]">
-        {renderView()}
+        {groupedRows ? (
+          Array.from(groupedRows.entries()).map(([groupValue, groupRows]) => (
+            <div key={groupValue}>
+              <button
+                onClick={() => toggleGroupCollapse(groupValue)}
+                className="flex items-center gap-2 px-3 py-1.5 w-full text-left transition-colors hover:bg-[var(--bg-hover)]"
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  color: "var(--text-secondary)",
+                }}
+              >
+                <span
+                  style={{
+                    transform: collapsedGroups.has(groupValue)
+                      ? "rotate(0deg)"
+                      : "rotate(90deg)",
+                    transition: "transform 150ms",
+                    display: "inline-block",
+                    fontSize: "10px",
+                  }}
+                >
+                  {"\u25B6"}
+                </span>
+                {groupValue}
+                <span
+                  className="text-xs"
+                  style={{ color: "var(--text-tertiary)" }}
+                >
+                  ({groupRows.length})
+                </span>
+              </button>
+              {!collapsedGroups.has(groupValue) && renderView(groupRows)}
+            </div>
+          ))
+        ) : (
+          renderView(processedRows)
+        )}
       </div>
     </div>
   );

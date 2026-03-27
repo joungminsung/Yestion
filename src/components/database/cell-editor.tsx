@@ -9,12 +9,13 @@ type CellEditorProps = {
   config: PropertyConfig;
   onChange: (value: unknown) => void;
   onClose: () => void;
+  onNavigate?: (e: React.KeyboardEvent) => void;
 };
 
 /**
  * Inline cell editor, switching on property type.
  */
-export function CellEditor({ value, type, config, onChange, onClose }: CellEditorProps) {
+export function CellEditor({ value, type, config, onChange, onClose, onNavigate }: CellEditorProps) {
   switch (type) {
     case "title":
     case "text":
@@ -26,6 +27,7 @@ export function CellEditor({ value, type, config, onChange, onClose }: CellEdito
           value={String(value ?? "")}
           onChange={onChange}
           onClose={onClose}
+          onNavigate={onNavigate}
           inputType={type === "email" ? "email" : type === "url" ? "url" : "text"}
         />
       );
@@ -36,6 +38,7 @@ export function CellEditor({ value, type, config, onChange, onClose }: CellEdito
           value={value != null ? Number(value) : undefined}
           onChange={onChange}
           onClose={onClose}
+          onNavigate={onNavigate}
         />
       );
 
@@ -67,6 +70,7 @@ export function CellEditor({ value, type, config, onChange, onClose }: CellEdito
           includeTime={config.includeTime}
           onChange={onChange}
           onClose={onClose}
+          onNavigate={onNavigate}
         />
       );
 
@@ -85,6 +89,7 @@ export function CellEditor({ value, type, config, onChange, onClose }: CellEdito
           value={String(value ?? "")}
           onChange={onChange}
           onClose={onClose}
+          onNavigate={onNavigate}
         />
       );
   }
@@ -96,11 +101,13 @@ function TextCellEditor({
   value,
   onChange,
   onClose,
+  onNavigate,
   inputType = "text",
 }: {
   value: string;
   onChange: (v: unknown) => void;
   onClose: () => void;
+  onNavigate?: (e: React.KeyboardEvent) => void;
   inputType?: string;
 }) {
   const [localValue, setLocalValue] = useState(value);
@@ -113,8 +120,7 @@ function TextCellEditor({
 
   const commit = useCallback(() => {
     onChange(localValue);
-    onClose();
-  }, [localValue, onChange, onClose]);
+  }, [localValue, onChange]);
 
   return (
     <input
@@ -122,10 +128,15 @@ function TextCellEditor({
       type={inputType}
       value={localValue}
       onChange={(e) => setLocalValue(e.target.value)}
-      onBlur={commit}
+      onBlur={() => { commit(); onClose(); }}
       onKeyDown={(e) => {
-        if (e.key === "Enter") commit();
-        if (e.key === "Escape") onClose();
+        if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+          e.preventDefault();
+          commit();
+          onNavigate?.(e);
+          return;
+        }
+        if (e.key === "Escape") { onClose(); return; }
       }}
       className="w-full rounded border px-2 py-1 text-sm outline-none focus:border-[#2383e2]"
       style={{
@@ -143,10 +154,12 @@ function NumberCellEditor({
   value,
   onChange,
   onClose,
+  onNavigate,
 }: {
   value: number | undefined;
   onChange: (v: unknown) => void;
   onClose: () => void;
+  onNavigate?: (e: React.KeyboardEvent) => void;
 }) {
   const [localValue, setLocalValue] = useState(value?.toString() ?? "");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -159,8 +172,7 @@ function NumberCellEditor({
   const commit = useCallback(() => {
     const parsed = parseFloat(localValue);
     onChange(isNaN(parsed) ? null : parsed);
-    onClose();
-  }, [localValue, onChange, onClose]);
+  }, [localValue, onChange]);
 
   return (
     <input
@@ -168,10 +180,15 @@ function NumberCellEditor({
       type="number"
       value={localValue}
       onChange={(e) => setLocalValue(e.target.value)}
-      onBlur={commit}
+      onBlur={() => { commit(); onClose(); }}
       onKeyDown={(e) => {
-        if (e.key === "Enter") commit();
-        if (e.key === "Escape") onClose();
+        if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+          e.preventDefault();
+          commit();
+          onNavigate?.(e);
+          return;
+        }
+        if (e.key === "Escape") { onClose(); return; }
       }}
       className="w-full rounded border px-2 py-1 text-sm outline-none focus:border-[#2383e2]"
       style={{
@@ -342,17 +359,18 @@ function DateCellEditor({
   includeTime,
   onChange,
   onClose,
+  onNavigate,
 }: {
   value: string;
   includeTime?: boolean;
   onChange: (v: unknown) => void;
   onClose: () => void;
+  onNavigate?: (e: React.KeyboardEvent) => void;
 }) {
   const [localValue, setLocalValue] = useState(() => {
     if (!value) return "";
     const date = new Date(value);
     if (isNaN(date.getTime())) return "";
-    // Format for input type="date" or "datetime-local"
     if (includeTime) {
       return date.toISOString().slice(0, 16);
     }
@@ -367,8 +385,7 @@ function DateCellEditor({
 
   const commit = useCallback(() => {
     onChange(localValue || null);
-    onClose();
-  }, [localValue, onChange, onClose]);
+  }, [localValue, onChange]);
 
   return (
     <input
@@ -376,10 +393,15 @@ function DateCellEditor({
       type={includeTime ? "datetime-local" : "date"}
       value={localValue}
       onChange={(e) => setLocalValue(e.target.value)}
-      onBlur={commit}
+      onBlur={() => { commit(); onClose(); }}
       onKeyDown={(e) => {
-        if (e.key === "Enter") commit();
-        if (e.key === "Escape") onClose();
+        if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+          e.preventDefault();
+          commit();
+          onNavigate?.(e);
+          return;
+        }
+        if (e.key === "Escape") { onClose(); return; }
       }}
       className="w-full rounded border px-2 py-1 text-sm outline-none focus:border-[#2383e2]"
       style={{
