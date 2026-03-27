@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useParams } from "next/navigation";
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useCommandPaletteStore } from "@/stores/command-palette";
 import { SidebarResizer } from "./sidebar-resizer";
@@ -11,8 +11,9 @@ import { SidebarTrash } from "./sidebar-trash";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/server/trpc/client";
-import { Search, Settings, Plus } from "lucide-react";
+import { Search, Settings, Plus, FileText, LayoutTemplate } from "lucide-react";
 import { useSidebarKeyboardNav } from "./sidebar-keyboard-nav";
+import { PageTemplatePicker } from "@/components/page/page-template-picker";
 
 export function Sidebar() {
   const router = useRouter();
@@ -87,6 +88,10 @@ export function Sidebar() {
       router.push(`/${workspaceId}/${newPage.id}`);
     },
   });
+
+  const [showNewPageMenu, setShowNewPageMenu] = useState(false);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const newPageMenuRef = useRef<HTMLDivElement>(null);
 
   useSidebarKeyboardNav(pages || [], workspaceId);
 
@@ -177,14 +182,70 @@ export function Sidebar() {
           {workspaceId && <SidebarTrash workspaceId={workspaceId} />}
 
           {/* New Page */}
-          <button
-            onClick={() => createPage.mutate({ workspaceId, title: "" })}
-            className="flex items-center gap-2 mx-2 mb-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto"
-            style={{ fontSize: "14px", color: "var(--text-secondary)" }}
-          >
-            <Plus size={16} />
-            <span>새 페이지</span>
-          </button>
+          <div className="relative mx-2 mb-2">
+            <button
+              onClick={() => setShowNewPageMenu((v) => !v)}
+              className="flex items-center gap-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-full"
+              style={{ fontSize: "14px", color: "var(--text-secondary)" }}
+            >
+              <Plus size={16} />
+              <span>새 페이지</span>
+            </button>
+
+            {showNewPageMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowNewPageMenu(false)} />
+                <div
+                  ref={newPageMenuRef}
+                  className="absolute bottom-full left-0 mb-1 w-48 rounded-lg py-1 z-20"
+                  style={{
+                    backgroundColor: "var(--bg-primary)",
+                    boxShadow: "var(--shadow-popup)",
+                    border: "1px solid var(--border-default)",
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      setShowNewPageMenu(false);
+                      createPage.mutate({ workspaceId, title: "" });
+                    }}
+                    className="flex items-center gap-2 w-full px-3 py-2 hover:bg-notion-bg-hover text-left"
+                    style={{ fontSize: "13px", color: "var(--text-primary)" }}
+                  >
+                    <FileText size={15} style={{ color: "var(--text-tertiary)" }} />
+                    <span>빈 페이지</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowNewPageMenu(false);
+                      setShowTemplatePicker(true);
+                    }}
+                    className="flex items-center gap-2 w-full px-3 py-2 hover:bg-notion-bg-hover text-left"
+                    style={{ fontSize: "13px", color: "var(--text-primary)" }}
+                  >
+                    <LayoutTemplate size={15} style={{ color: "var(--text-tertiary)" }} />
+                    <span>템플릿에서 시작</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Template Picker Modal */}
+          {showTemplatePicker && (
+            <PageTemplatePicker
+              workspaceId={workspaceId}
+              onBlank={() => {
+                setShowTemplatePicker(false);
+                createPage.mutate({ workspaceId, title: "" });
+              }}
+              onSelect={(pageId) => {
+                setShowTemplatePicker(false);
+                router.push(`/${workspaceId}/${pageId}`);
+              }}
+              onClose={() => setShowTemplatePicker(false)}
+            />
+          )}
         </div>
 
         <SidebarResizer />

@@ -8,6 +8,8 @@ import superjson from "superjson";
 import { ToastContainer } from "@/components/ui/toast-container";
 import { ShortcutsProvider } from "@/components/shortcuts-provider";
 import { ScrollToTop } from "@/components/ui/scroll-to-top";
+import { ShortcutsHelpModal } from "@/components/shortcuts-help-modal";
+import { QuickActions } from "@/components/quick-actions";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
@@ -28,6 +30,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <ShortcutsProvider>{children}</ShortcutsProvider>
         <ToastContainer />
         <ScrollToTop />
+        <ShortcutsHelpModal />
+        <QuickActions />
       </QueryClientProvider>
     </trpc.Provider>
   );

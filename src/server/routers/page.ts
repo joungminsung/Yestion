@@ -416,6 +416,16 @@ export const pageRouter = router({
       });
     }),
 
+  listTemplates: protectedProcedure
+    .input(z.object({ workspaceId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, input.workspaceId);
+      return ctx.db.page.findMany({
+        where: { workspaceId: input.workspaceId, isTemplate: true, isDeleted: false },
+        select: { id: true, title: true, icon: true },
+      });
+    }),
+
   getAncestors: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
