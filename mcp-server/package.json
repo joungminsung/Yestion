@@ -1,0 +1,13 @@
+{
+  "name": "notion-clone-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "latest",
+    "tsx": "^4.21.0"
+  }
+}
