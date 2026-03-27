@@ -5,6 +5,7 @@ import { workspaceRouter } from "@/server/routers/workspace";
 import { blockRouter } from "@/server/routers/block";
 import { pageRouter } from "@/server/routers/page";
 import { databaseRouter } from "@/server/routers/database";
+import { mediaRouter } from "@/server/routers/media";
 
 export const appRouter = router({
   auth: authRouter,
@@ -13,6 +14,7 @@ export const appRouter = router({
   block: blockRouter,
   page: pageRouter,
   database: databaseRouter,
+  media: mediaRouter,
 });
 
 export type AppRouter = typeof appRouter;
