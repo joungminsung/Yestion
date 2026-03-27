@@ -471,6 +471,44 @@ export function TableView({
           </div>
         ))}
 
+        {/* ── Summary Row ──────────────────────────── */}
+        <div style={{ display: "contents" }}>
+          {/* Empty cell for row number column */}
+          <div
+            className="border-t"
+            style={{
+              borderColor: "var(--border-divider)",
+              height: 36,
+            }}
+          />
+          {visibleProperties.map((prop) => {
+            const aggregate = calculateAggregate(rows, prop);
+            return (
+              <div
+                key={prop.id}
+                className="flex items-center border-t px-3 text-right"
+                style={{
+                  borderColor: "var(--border-divider)",
+                  fontSize: "12px",
+                  color: "var(--text-tertiary)",
+                  height: 36,
+                  justifyContent: prop.type === "title" ? "flex-start" : "flex-end",
+                }}
+              >
+                {prop.type === "title" ? "합계" : aggregate}
+              </div>
+            );
+          })}
+          {/* Empty cell under the "+" column */}
+          <div
+            className="border-t"
+            style={{
+              borderColor: "var(--border-divider)",
+              height: 36,
+            }}
+          />
+        </div>
+
         {/* ── "+ New" row ────────────────────────────── */}
         <div style={{ display: "contents" }}>
           <div style={{ height: 33 }} />
@@ -490,6 +528,35 @@ export function TableView({
       </div>
     </div>
   );
+}
+
+// ── Aggregate Calculation ──────────────────────────────────
+
+function calculateAggregate(
+  rows: RowData[],
+  prop: DatabaseData["properties"][number],
+): string {
+  if (prop.type === "title") return "";
+
+  if (prop.type === "number") {
+    const values = rows
+      .map((r) => Number(r.values[prop.id]))
+      .filter((v) => !isNaN(v));
+    if (values.length === 0) return "";
+    const sum = values.reduce((a, b) => a + b, 0);
+    return `합계: ${sum.toLocaleString()}`;
+  }
+
+  if (prop.type === "checkbox") {
+    const checked = rows.filter((r) => r.values[prop.id] === true).length;
+    return `${checked}/${rows.length}`;
+  }
+
+  // For others: count non-empty values
+  const nonEmpty = rows.filter(
+    (r) => r.values[prop.id] != null && r.values[prop.id] !== "",
+  ).length;
+  return nonEmpty > 0 ? `${nonEmpty}개` : "";
 }
 
 // ── Column Header with Resize + Sort ───────────────────────

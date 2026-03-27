@@ -288,6 +288,36 @@
   min-width: 0;
 }
 
+/* Mention chip */
+.notion-mention {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: inherit;
+  line-height: 1.4;
+  color: #2383e2;
+  background-color: rgba(35, 131, 226, 0.08);
+  cursor: pointer;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.notion-mention:hover {
+  background-color: rgba(35, 131, 226, 0.16);
+}
+.notion-mention[data-mention-type="page"] {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(35, 131, 226, 0.4);
+}
+.notion-mention[data-mention-type="date"] {
+  color: var(--color-orange);
+  background-color: var(--color-orange-bg);
+}
+.notion-mention[data-mention-type="date"]:hover {
+  background-color: rgba(217, 115, 13, 0.16);
+}
+
 /* File drop zone */
 .notion-file-dropzone {
   position: relative;

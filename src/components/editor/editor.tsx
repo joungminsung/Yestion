@@ -39,12 +39,15 @@ import { Equation } from "./extensions/equation";
 import { TableOfContents } from "./extensions/table-of-contents";
 import { ColumnList, Column } from "./extensions/column-list";
 import { SlashCommandExtension } from "./extensions/slash-command-ext";
+import { MentionNode } from "./extensions/mention-node";
+import { MentionExtension } from "./extensions/mention-ext";
 import { BlockSelection, BLOCK_SELECTION_KEY } from "./extensions/block-selection";
 import { MicroInteractions } from "./extensions/micro-interactions";
 import { MarkdownPaste } from "./extensions/markdown-paste";
 import { ClipboardImage } from "./extensions/clipboard-image";
 import { FileDrop } from "./extensions/file-drop";
 import { SlashCommand } from "./slash-command/slash-command";
+import { MentionList, type MentionItem } from "./mention/mention-list";
 import { FindReplace } from "./find-replace";
 import { InlineToolbar } from "./inline-toolbar";
 import { DragHandle } from "./drag-handle";
@@ -68,6 +71,7 @@ type NotionEditorProps = {
   onUpdate?: (json: Record<string, unknown>) => void;
   editable?: boolean;
   collaboration?: CollaborationConfig;
+  mentionItems?: MentionItem[];
 };
 
 export type NotionEditorHandle = { commands: { setContent: (content: unknown) => boolean } };
@@ -80,6 +84,7 @@ export const NotionEditor = forwardRef<
   onUpdate,
   editable = true,
   collaboration,
+  mentionItems = [],
 }, ref) {
   const [menuState, setMenuState] = useState<{pos: number; coords: {top: number; left: number}} | null>(null);
   const aiStore = useAiStore();
@@ -143,6 +148,8 @@ export const NotionEditor = forwardRef<
       ClipboardImage,
       FileDrop,
       SlashCommandExtension,
+      MentionNode,
+      MentionExtension,
       MicroInteractions,
       ...(collaboration ? [
         Collaboration.configure({ document: collaboration.ydoc }),
@@ -265,6 +272,7 @@ export const NotionEditor = forwardRef<
         <>
           <InlineToolbar editor={editor} />
           <SlashCommand editor={editor} />
+          <MentionList editor={editor} items={mentionItems} />
           <BlockContextMenu editor={editor} />
           <DragHandle editor={editor} onMenuOpen={(pos) => {
             if (!editor.view) return;

@@ -13,6 +13,7 @@ import { ListView } from "./views/list-view";
 import { GalleryView } from "./views/gallery-view";
 import { CalendarView } from "./views/calendar-view";
 import { TimelineView } from "./views/timeline-view";
+import { RowPeekPanel } from "./row-peek-panel";
 import type { ViewConfig, FilterGroup, SortRule, DatabaseData, RowData } from "@/types/database";
 
 type DatabaseViewProps = {
@@ -129,13 +130,6 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
     [updateRowMutation],
   );
 
-  const handleRowClick = useCallback(
-    (pageId: string) => {
-      router.push(`/page/${pageId}`);
-    },
-    [router],
-  );
-
   const handleAddProperty = useCallback(() => {
     addPropertyMutation.mutate({
       databaseId,
@@ -156,6 +150,29 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
     const filtered = filterRows(rows, effectiveFilter);
     return sortRows(filtered, effectiveSorts, propertyTypes);
   }, [data, effectiveFilter, effectiveSorts, propertyTypes]);
+
+  // ── Peek view state ──────────────────────────────────────────
+  const [peekRow, setPeekRow] = useState<RowData | null>(null);
+
+  const handleRowClick = useCallback(
+    (pageId: string) => {
+      const row = processedRows.find((r) => r.pageId === pageId);
+      if (row) {
+        setPeekRow(row);
+      } else {
+        router.push(`/page/${pageId}`);
+      }
+    },
+    [processedRows, router],
+  );
+
+  const handleOpenFullPage = useCallback(
+    (pageId: string) => {
+      setPeekRow(null);
+      router.push(`/page/${pageId}`);
+    },
+    [router],
+  );
 
   // ── Grouping ────────────────────────────────────────────────
 
@@ -354,6 +371,20 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
           renderView(processedRows)
         )}
       </div>
+
+      {/* Row Peek Panel */}
+      {peekRow && data && (
+        <RowPeekPanel
+          rowId={peekRow.id}
+          pageId={peekRow.pageId}
+          databaseId={databaseId}
+          properties={data.properties as DatabaseData["properties"]}
+          values={peekRow.values}
+          onClose={() => setPeekRow(null)}
+          onUpdateRow={handleUpdateRow}
+          onOpenFullPage={handleOpenFullPage}
+        />
+      )}
     </div>
   );
 }
