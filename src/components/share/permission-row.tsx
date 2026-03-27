@@ -32,6 +32,7 @@ export function PermissionRow({ id, user, level, onUpdate, onRemove }: Permissio
         className="flex items-center justify-center rounded-full text-white text-xs font-semibold flex-shrink-0"
         style={{ width: 28, height: 28, backgroundColor: "#9b59b6" }}
       >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         {user.avatarUrl ? (
           <img src={user.avatarUrl} alt={user.name} className="w-full h-full rounded-full object-cover" />
         ) : (

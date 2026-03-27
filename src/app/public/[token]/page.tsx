@@ -54,6 +54,7 @@ export default async function PublicPage({ params }: { params: { token: string }
         {/* Cover */}
         {page.cover && (
           <div className="mb-6 -mx-24 rounded-sm overflow-hidden" style={{ height: "200px" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={page.cover} alt="" className="w-full h-full object-cover" />
           </div>
         )}
@@ -83,12 +84,15 @@ export default async function PublicPage({ params }: { params: { token: string }
 type BlockData = {
   id: string;
   type: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   content: any;
   children?: BlockData[];
 };
 
 function PublicBlock({ block }: { block: BlockData }) {
-  const content = block.content as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const content = (block.content || {}) as Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const text = content?.richText?.map((rt: any) => rt.text || rt.content || "").join("") || content?.text || "";
 
   const renderText = () => {
@@ -154,6 +158,7 @@ function PublicBlock({ block }: { block: BlockData }) {
       case "image":
         return content?.url ? (
           <div className="my-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={content.url} alt={content.caption || ""} className="max-w-full rounded" />
             {content.caption && (
               <p className="text-xs mt-1 text-center" style={{ color: "var(--text-secondary)" }}>{content.caption}</p>

@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import { router, protectedProcedure } from "@/server/trpc/init";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function verifyPageOwnership(db: any, userId: string, pageId: string) {
   const page = await db.page.findUnique({ where: { id: pageId }, select: { workspaceId: true } });
   if (!page) throw new TRPCError({ code: "NOT_FOUND" });

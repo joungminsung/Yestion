@@ -1,6 +1,7 @@
 export type EffectivePermission = "edit" | "comment" | "view" | "none";
 
 export async function getEffectivePermission(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any,
   userId: string,
   pageId: string
