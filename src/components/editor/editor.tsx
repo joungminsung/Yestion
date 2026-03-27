@@ -148,12 +148,17 @@ export const NotionEditor = forwardRef<
   return (
     <div className="relative">
       <EditorContent editor={editor} />
-      <InlineToolbar editor={editor} />
-      <SlashCommand editor={editor} />
-      <DragHandle editor={editor} onMenuOpen={(pos) => {
-        const coords = editor.view.coordsAtPos(pos);
-        setMenuState({ pos, coords: { top: coords.top, left: coords.left - 4 } });
-      }} />
+      {editor.view && (
+        <>
+          <InlineToolbar editor={editor} />
+          <SlashCommand editor={editor} />
+          <DragHandle editor={editor} onMenuOpen={(pos) => {
+            if (!editor.view) return;
+            const coords = editor.view.coordsAtPos(pos);
+            setMenuState({ pos, coords: { top: coords.top, left: coords.left - 4 } });
+          }} />
+        </>
+      )}
       {menuState && <BlockMenu editor={editor} pos={menuState.pos} coords={menuState.coords} onClose={() => setMenuState(null)} />}
     </div>
   );

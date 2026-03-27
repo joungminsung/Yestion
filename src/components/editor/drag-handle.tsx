@@ -11,6 +11,7 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
   const [hoveredPos, setHoveredPos] = useState<number | null>(null);
 
   const handleMouseMove = useCallback((event: MouseEvent) => {
+    if (!editor.view) { setPosition(null); return; }
     const view = editor.view;
     const pos = view.posAtCoords({ left: event.clientX, top: event.clientY });
     if (!pos) { setPosition(null); return; }
@@ -25,6 +26,7 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
   }, [editor]);
 
   useEffect(() => {
+    if (!editor.view) return;
     const dom = editor.view.dom;
     dom.addEventListener("mousemove", handleMouseMove);
     return () => dom.removeEventListener("mousemove", handleMouseMove);

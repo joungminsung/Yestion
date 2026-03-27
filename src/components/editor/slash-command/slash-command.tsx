@@ -20,6 +20,7 @@ export function SlashCommand({ editor }: { editor: Editor }) {
 
   useEffect(() => {
     const updateState = () => {
+      if (!editor.state) return;
       const pluginState = SLASH_COMMAND_KEY.getState(editor.state);
       if (pluginState) {
         setState(pluginState);
@@ -49,6 +50,7 @@ export function SlashCommand({ editor }: { editor: Editor }) {
         .deleteRange({ from: state.from, to: state.to })
         .run();
       item.command(editor);
+      if (!editor.view || !editor.state) return;
       editor.view.dispatch(
         editor.state.tr.setMeta(SLASH_COMMAND_KEY, {
           active: false,
@@ -79,7 +81,7 @@ export function SlashCommand({ editor }: { editor: Editor }) {
     return () => document.removeEventListener("keydown", handleKeyDown, true);
   }, [state.active, filtered, selectedIndex, executeCommand]);
 
-  if (!state.active || filtered.length === 0) return null;
+  if (!state.active || filtered.length === 0 || !editor.view) return null;
 
   const coords = editor.view.coordsAtPos(state.from);
   const categories = Array.from(new Set(filtered.map((i) => i.category)));

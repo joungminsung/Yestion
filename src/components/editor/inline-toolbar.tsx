@@ -36,6 +36,7 @@ export function InlineToolbar({ editor }: { editor: Editor }) {
   const [showColors, setShowColors] = useState(false);
 
   const updatePosition = useCallback(() => {
+    if (!editor.view || !editor.state) { setIsVisible(false); return; }
     const { from, to } = editor.state.selection;
     if (from === to) {
       setIsVisible(false);
