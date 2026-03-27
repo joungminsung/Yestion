@@ -35,6 +35,7 @@ model Workspace {
 
   members WorkspaceMember[]
   pages   Page[]
+  apiKeys ApiKey[]
 }
 
 model WorkspaceMember {
@@ -248,4 +249,18 @@ model Notification {
 
   @@index([userId])
   @@index([userId, read])
+}
+
+model ApiKey {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  key         String   @unique
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([key])
+  @@index([workspaceId])
 }

@@ -1,0 +1,29 @@
+import { db } from "@/server/db/client";
+
+export async function authenticateApiKey(request: Request) {
+  const authHeader = request.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const key = authHeader.slice(7);
+  const apiKey = await db.apiKey.findUnique({
+    where: { key },
+    include: { workspace: true },
+  });
+  if (!apiKey) return null;
+  return { workspaceId: apiKey.workspaceId, apiKeyId: apiKey.id };
+}
+
+export function unauthorized() {
+  return Response.json({ error: "Unauthorized" }, { status: 401 });
+}
+
+export function notFound(message = "Not found") {
+  return Response.json({ error: message }, { status: 404 });
+}
+
+export function badRequest(message = "Bad request") {
+  return Response.json({ error: message }, { status: 400 });
+}
+
+export function forbidden(message = "Forbidden") {
+  return Response.json({ error: message }, { status: 403 });
+}
