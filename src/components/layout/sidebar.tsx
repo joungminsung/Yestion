@@ -12,6 +12,7 @@ import { WorkspaceSwitcher } from "./workspace-switcher";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/server/trpc/client";
 import { Search, Settings, Plus } from "lucide-react";
+import { useSidebarKeyboardNav } from "./sidebar-keyboard-nav";
 
 export function Sidebar() {
   const router = useRouter();
@@ -86,6 +87,8 @@ export function Sidebar() {
       router.push(`/${workspaceId}/${newPage.id}`);
     },
   });
+
+  useSidebarKeyboardNav(pages || [], workspaceId);
 
   const sidebarVisible = isOpen || isHoverExpanded;
 

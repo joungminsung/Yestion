@@ -95,6 +95,8 @@ export function SidebarPageItem({
           color: "var(--text-primary)",
           minHeight: "28px",
           borderLeft: dropPosition === "inside" ? "2px solid #2383e2" : undefined,
+          outline: isActive ? "2px solid rgba(35, 131, 226, 0.5)" : undefined,
+          outlineOffset: "-2px",
         }}
         draggable
         onDragStart={(e) => {

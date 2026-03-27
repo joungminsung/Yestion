@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, usePathname } from "next/navigation";
 import { useSidebarStore } from "@/stores/sidebar";
 import { usePresenceStore, type PresenceUser } from "@/stores/presence";
+import { useNavigationStore } from "@/stores/navigation-history";
 import { trpc } from "@/server/trpc/client";
 import { ShareDialog } from "@/components/share/share-dialog";
 import { CommentPanel } from "@/components/comments/comment-panel";
@@ -56,16 +57,116 @@ function PresenceAvatars({ users }: { users: PresenceUser[] }) {
   );
 }
 
+/* ── Breadcrumb Child Dropdown (2.8) ── */
+function ChildDropdown({
+  pageId,
+  workspaceId,
+  onClose,
+}: {
+  pageId: string;
+  workspaceId: string;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { data: flatPages } = trpc.page.list.useQuery(
+    { workspaceId },
+    { enabled: !!workspaceId }
+  );
+
+  const children = flatPages?.filter((p) => p.parentId === pageId) ?? [];
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={ref}
+      className="absolute left-0 top-full mt-1 rounded-lg overflow-hidden py-1"
+      style={{
+        width: "200px",
+        zIndex: 90,
+        backgroundColor: "var(--bg-primary)",
+        boxShadow: "var(--shadow-popup)",
+        border: "1px solid var(--border-default)",
+      }}
+    >
+      {children.length === 0 ? (
+        <div
+          className="px-3 py-2 text-xs"
+          style={{ color: "var(--text-tertiary)" }}
+        >
+          하위 페이지 없음
+        </div>
+      ) : (
+        children.map((child) => (
+          <Link
+            key={child.id}
+            href={`/${workspaceId}/${child.id}`}
+            onClick={onClose}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-notion-bg-hover text-left"
+            style={{ color: "var(--text-primary)" }}
+          >
+            <span className="flex-shrink-0">
+              {child.icon || "📄"}
+            </span>
+            <span className="truncate">{child.title || "제목 없음"}</span>
+          </Link>
+        ))
+      )}
+    </div>
+  );
+}
+
 export function Topbar() {
+  const router = useRouter();
+  const pathname = usePathname();
   const { isOpen, toggle } = useSidebarStore();
   const presenceUsers = usePresenceStore((s) => s.users);
   const [shareOpen, setShareOpen] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
-  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
   const params = useParams();
   const pageId = params.pageId as string | undefined;
   const workspaceId = params.workspaceId as string | undefined;
+
+  /* ── Navigation history (2.15) ── */
+  const navStore = useNavigationStore();
+
+  // Track page visits
+  useEffect(() => {
+    if (pathname) {
+      navStore.push(pathname);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  // Alt+Arrow keyboard shortcuts for back/forward
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.altKey && e.key === "ArrowLeft") {
+        e.preventDefault();
+        const url = navStore.goBack();
+        if (url) router.push(url);
+      }
+      if (e.altKey && e.key === "ArrowRight") {
+        e.preventDefault();
+        const url = navStore.goForward();
+        if (url) router.push(url);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [navStore, router]);
 
   const { data: user } = trpc.user.me.useQuery();
   const { data: unreadCount } = trpc.notification.count.useQuery(undefined, { refetchInterval: 30000 });
@@ -75,16 +176,117 @@ export function Topbar() {
     { enabled: !!pageId },
   );
 
-  // Full breadcrumb from ancestors (root -> ... -> current page)
+  const { data: currentPage } = trpc.page.get.useQuery(
+    { id: pageId! },
+    { enabled: !!pageId },
+  );
+
   const crumbs: { id: string; title: string | null; icon: string | null }[] =
     ancestors?.map((a) => ({ id: a.id, title: a.title, icon: a.icon })) ?? [];
+
+  /* ── tRPC mutations for More Menu (2.12) ── */
+  const utils = trpc.useUtils();
+
+  const updatePage = trpc.page.update.useMutation({
+    onSuccess: () => utils.page.get.invalidate(),
+  });
+  const duplicatePage = trpc.page.duplicate.useMutation({
+    onSuccess: () => utils.page.list.invalidate(),
+  });
+  const addFavorite = trpc.page.addFavorite.useMutation({
+    onSuccess: () => utils.page.listFavorites.invalidate(),
+  });
+  const removeFavorite = trpc.page.removeFavorite.useMutation({
+    onSuccess: () => utils.page.listFavorites.invalidate(),
+  });
+  const moveToTrash = trpc.page.moveToTrash.useMutation({
+    onSuccess: () => {
+      utils.page.list.invalidate();
+      if (workspaceId) router.push(`/${workspaceId}`);
+    },
+  });
 
   const handleExport = (format: "md" | "html") => {
     if (!pageId) return;
     const url = `/api/export?pageId=${pageId}&format=${format}`;
     window.open(url, "_blank");
-    setExportMenuOpen(false);
+    setShowMoreMenu(false);
   };
+
+  // Click outside to close more menu
+  useEffect(() => {
+    if (!showMoreMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setShowMoreMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showMoreMenu]);
+
+  const isLocked = currentPage?.isLocked ?? false;
+  const isFullWidth = currentPage?.isFullWidth ?? false;
+
+  type MenuItem =
+    | { label: string; action: () => void; danger?: boolean; divider?: false }
+    | { divider: true; label?: never; action?: never; danger?: never };
+
+  const moreMenuItems: MenuItem[] = [
+    {
+      label: `${isLocked ? "🔓 잠금 해제" : "🔒 잠금"}`,
+      action: () => {
+        if (pageId) updatePage.mutate({ id: pageId, isLocked: !isLocked });
+        setShowMoreMenu(false);
+      },
+    },
+    {
+      label: `${isFullWidth ? "↔ 기본 너비" : "↔ 전체 너비"}`,
+      action: () => {
+        if (pageId) updatePage.mutate({ id: pageId, isFullWidth: !isFullWidth });
+        setShowMoreMenu(false);
+      },
+    },
+    {
+      label: "⭐ 즐겨찾기 추가",
+      action: () => {
+        if (pageId) addFavorite.mutate({ pageId });
+        setShowMoreMenu(false);
+      },
+    },
+    {
+      label: "⭐ 즐겨찾기 해제",
+      action: () => {
+        if (pageId) removeFavorite.mutate({ pageId });
+        setShowMoreMenu(false);
+      },
+    },
+    {
+      label: "📋 복제",
+      action: () => {
+        if (pageId) duplicatePage.mutate({ id: pageId });
+        setShowMoreMenu(false);
+      },
+    },
+    { divider: true },
+    {
+      label: "📤 Markdown 내보내기",
+      action: () => handleExport("md"),
+    },
+    {
+      label: "📤 HTML 내보내기",
+      action: () => handleExport("html"),
+    },
+    { divider: true },
+    {
+      label: "🗑 삭제",
+      action: () => {
+        if (pageId) moveToTrash.mutate({ id: pageId });
+        setShowMoreMenu(false);
+      },
+      danger: true,
+    },
+  ];
 
   return (
     <header
@@ -109,10 +311,42 @@ export function Topbar() {
             </svg>
           </button>
         )}
+
+        {/* Back/Forward buttons (2.15) */}
+        <button
+          onClick={() => {
+            const url = navStore.goBack();
+            if (url) router.push(url);
+          }}
+          disabled={!navStore.canGoBack()}
+          className="p-1 rounded hover:bg-notion-bg-hover disabled:opacity-30 flex-shrink-0"
+          style={{ color: "var(--text-secondary)" }}
+          title="뒤로 (Alt+←)"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M10.354 3.354a.5.5 0 00-.708-.708l-5 5a.5.5 0 000 .708l5 5a.5.5 0 00.708-.708L5.707 8l4.647-4.646z" />
+          </svg>
+        </button>
+        <button
+          onClick={() => {
+            const url = navStore.goForward();
+            if (url) router.push(url);
+          }}
+          disabled={!navStore.canGoForward()}
+          className="p-1 rounded hover:bg-notion-bg-hover disabled:opacity-30 flex-shrink-0"
+          style={{ color: "var(--text-secondary)" }}
+          title="앞으로 (Alt+→)"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M5.646 3.354a.5.5 0 01.708-.708l5 5a.5.5 0 010 .708l-5 5a.5.5 0 01-.708-.708L10.293 8 5.646 3.354z" />
+          </svg>
+        </button>
+
+        {/* Breadcrumbs with child dropdown (2.8) */}
         <div className="flex items-center gap-1 px-1 min-w-0">
           {crumbs.length > 0 ? (
             crumbs.map((crumb, i) => (
-              <span key={crumb.id} className="flex items-center gap-1 min-w-0">
+              <span key={crumb.id} className="relative flex items-center gap-0.5 min-w-0">
                 {i > 0 && (
                   <span style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>/</span>
                 )}
@@ -140,6 +374,24 @@ export function Topbar() {
                     {crumb.icon && <span className="mr-1">{crumb.icon}</span>}
                     {crumb.title || "제목 없음"}
                   </span>
+                )}
+                {/* Child dropdown toggle */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenDropdown(crumb.id === openDropdown ? null : crumb.id);
+                  }}
+                  className="flex-shrink-0 p-0.5 rounded hover:bg-notion-bg-hover"
+                  style={{ color: "var(--text-tertiary)", fontSize: "10px", lineHeight: 1 }}
+                >
+                  ▼
+                </button>
+                {openDropdown === crumb.id && workspaceId && (
+                  <ChildDropdown
+                    pageId={crumb.id}
+                    workspaceId={workspaceId}
+                    onClose={() => setOpenDropdown(null)}
+                  />
                 )}
               </span>
             ))
@@ -201,10 +453,10 @@ export function Topbar() {
           </svg>
         </button>
 
-        {/* More menu (with export) */}
-        <div className="relative">
+        {/* More menu (2.12) */}
+        <div className="relative" ref={moreMenuRef}>
           <button
-            onClick={() => setExportMenuOpen(!exportMenuOpen)}
+            onClick={() => setShowMoreMenu(!showMoreMenu)}
             className="p-1.5 rounded hover:bg-notion-bg-hover"
             style={{ color: "var(--text-secondary)" }}
           >
@@ -212,41 +464,44 @@ export function Topbar() {
               <path d="M3 8a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zm4.5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zM12 6.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" />
             </svg>
           </button>
-          {exportMenuOpen && (
+          {showMoreMenu && (
             <>
-              <div className="fixed inset-0" style={{ zIndex: 80 }} onClick={() => setExportMenuOpen(false)} />
+              <div className="fixed inset-0" style={{ zIndex: 80 }} onClick={() => setShowMoreMenu(false)} />
               <div
                 className="absolute right-0 top-full mt-1 rounded-lg overflow-hidden py-1"
                 style={{
-                  width: "220px",
+                  width: "240px",
                   zIndex: 81,
                   backgroundColor: "var(--bg-primary)",
                   boxShadow: "var(--shadow-popup)",
                   border: "1px solid var(--border-default)",
                 }}
               >
-                <button
-                  onClick={() => handleExport("md")}
-                  disabled={!pageId}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-notion-bg-hover text-left"
-                  style={{ color: pageId ? "var(--text-primary)" : "var(--text-tertiary)" }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style={{ flexShrink: 0 }}>
-                    <path d="M3 2a1 1 0 00-1 1v10a1 1 0 001 1h10a1 1 0 001-1V6.414A1 1 0 0013.707 6L10 2.293A1 1 0 009.586 2H3z" />
-                  </svg>
-                  Markdown으로 내보내기
-                </button>
-                <button
-                  onClick={() => handleExport("html")}
-                  disabled={!pageId}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-notion-bg-hover text-left"
-                  style={{ color: pageId ? "var(--text-primary)" : "var(--text-tertiary)" }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style={{ flexShrink: 0 }}>
-                    <path d="M3 2a1 1 0 00-1 1v10a1 1 0 001 1h10a1 1 0 001-1V6.414A1 1 0 0013.707 6L10 2.293A1 1 0 009.586 2H3z" />
-                  </svg>
-                  HTML로 내보내기
-                </button>
+                {moreMenuItems.map((item, idx) =>
+                  item.divider ? (
+                    <div
+                      key={`divider-${idx}`}
+                      className="mx-2 my-1"
+                      style={{ height: "1px", backgroundColor: "var(--border-divider)" }}
+                    />
+                  ) : (
+                    <button
+                      key={item.label}
+                      onClick={item.action}
+                      disabled={!pageId}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-notion-bg-hover text-left"
+                      style={{
+                        color: !pageId
+                          ? "var(--text-tertiary)"
+                          : item.danger
+                            ? "#eb5757"
+                            : "var(--text-primary)",
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  )
+                )}
               </div>
             </>
           )}
