@@ -268,6 +268,43 @@
   border-radius: 4px;
 }
 
+/* Synced Block */
+.notion-synced-block {
+  border-left: 2px solid var(--color-red);
+  padding: 8px 12px;
+  margin: 4px 0;
+  border-radius: 0 4px 4px 0;
+  position: relative;
+}
+
+.notion-synced-block::before {
+  content: "\21BB 동기화됨";
+  position: absolute;
+  top: -8px;
+  left: 8px;
+  font-size: 10px;
+  color: var(--color-red);
+  background: var(--bg-primary);
+  padding: 0 4px;
+}
+
+/* Link to Page */
+.notion-link-to-page {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  margin: 2px 0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.notion-link-to-page:hover {
+  background: var(--bg-hover);
+}
+
 /* Table of Contents */
 .notion-toc {
   padding: 12px 16px;

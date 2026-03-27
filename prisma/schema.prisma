@@ -299,3 +299,13 @@ model ActivityLog {
   @@index([pageId])
   @@index([userId])
 }
+
+model SyncedBlock {
+  id            String   @id @default(cuid())
+  sourceBlockId String
+  sourcePageId  String
+  createdAt     DateTime @default(now())
+
+  @@index([sourceBlockId])
+  @@index([sourcePageId])
+}

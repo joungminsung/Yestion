@@ -6,6 +6,7 @@ import {
   Quote, Minus, Code, Sigma, TableOfContents, Columns2,
   ImageIcon, Table, Link as LinkIcon, Play, MapPin,
   Bookmark, Film, Music, Paperclip, Database, BarChart3,
+  RefreshCw, FileText,
 } from "lucide-react";
 
 export type SlashItem = {
@@ -163,19 +164,44 @@ export const SLASH_ITEMS: SlashItem[] = [
   },
   {
     title: "수식",
-    description: "수학 공식을 추가합니다.",
+    description: "수학 공식을 추가합니다. (라이브 미리보기)",
     icon: <Sigma size={18} />,
     category: "고급 블록",
-    keywords: ["equation", "math", "수식", "공식"],
+    keywords: ["equation", "math", "수식", "공식", "latex", "katex"],
     command: (editor) => {
-      const expr = window.prompt("수식을 입력하세요 (LaTeX):");
-      if (expr) {
-        editor
-          .chain()
-          .focus()
-          .insertContent({ type: "equation", attrs: { expression: expr } })
-          .run();
-      }
+      editor
+        .chain()
+        .focus()
+        .insertContent({ type: "equation", attrs: { expression: "" } })
+        .run();
+    },
+  },
+  {
+    title: "동기화 블록",
+    description: "다른 페이지와 동기화되는 블록을 만듭니다.",
+    icon: <RefreshCw size={18} />,
+    category: "고급 블록",
+    keywords: ["sync", "synced", "동기화", "미러"],
+    command: (editor) => {
+      editor
+        .chain()
+        .focus()
+        .insertContent({ type: "syncedBlock" })
+        .run();
+    },
+  },
+  {
+    title: "페이지 링크",
+    description: "다른 페이지로의 링크를 추가합니다.",
+    icon: <FileText size={18} />,
+    category: "고급 블록",
+    keywords: ["link", "page", "페이지", "링크"],
+    command: (editor) => {
+      editor
+        .chain()
+        .focus()
+        .insertContent({ type: "linkToPage", attrs: { pageId: null, pageTitle: "", pageIcon: "📄" } })
+        .run();
     },
   },
   {

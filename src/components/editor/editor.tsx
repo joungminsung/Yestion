@@ -36,6 +36,8 @@ import { BlockId } from "./extensions/block-id";
 import { ToggleBlock, DetailsSummary, DetailsContent } from "./extensions/toggle";
 import { Callout } from "./extensions/callout";
 import { Equation } from "./extensions/equation";
+import { SyncedBlockNode } from "./extensions/synced-block";
+import { LinkToPage } from "./extensions/link-to-page";
 import { TableOfContents } from "./extensions/table-of-contents";
 import { ColumnList, Column } from "./extensions/column-list";
 import { SlashCommandExtension } from "./extensions/slash-command-ext";
@@ -140,6 +142,8 @@ export const NotionEditor = forwardRef<
       DetailsContent,
       Callout,
       Equation,
+      SyncedBlockNode,
+      LinkToPage,
       TableOfContents,
       ColumnList,
       Column,

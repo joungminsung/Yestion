@@ -1,4 +1,6 @@
 import { Node, mergeAttributes } from "@tiptap/core";
+import { ReactNodeViewRenderer } from "@tiptap/react";
+import { EquationView } from "../media/equation-view";
 
 export const Equation = Node.create({
   name: "equation",
@@ -29,5 +31,9 @@ export const Equation = Node.create({
       }),
       HTMLAttributes["data-expression"] || "",
     ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(EquationView);
   },
 });

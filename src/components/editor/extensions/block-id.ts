@@ -27,6 +27,8 @@ export const BlockId = Extension.create({
           "equation",
           "tableOfContents",
           "columnList",
+          "syncedBlock",
+          "linkToPage",
         ],
         attributes: {
           blockId: {

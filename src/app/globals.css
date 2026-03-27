@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 @import "../styles/notion-tokens.css";
+@import "katex/dist/katex.min.css";
 
 * {
   box-sizing: border-box;
