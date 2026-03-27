@@ -12,6 +12,7 @@ import { commentRouter } from "@/server/routers/comment";
 import { notificationRouter } from "@/server/routers/notification";
 import { exportRouter } from "@/server/routers/export";
 import { apiKeyRouter } from "@/server/routers/apikey";
+import { activityRouter } from "@/server/routers/activity";
 
 export const appRouter = router({
   auth: authRouter,
@@ -27,6 +28,7 @@ export const appRouter = router({
   notification: notificationRouter,
   export: exportRouter,
   apiKey: apiKeyRouter,
+  activity: activityRouter,
 });
 
 export type AppRouter = typeof appRouter;

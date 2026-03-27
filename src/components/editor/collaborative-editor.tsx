@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NotionEditor, type NotionEditorHandle } from "./editor";
 import { createCollaborationProvider, getColorForUser } from "@/lib/collaboration/provider";
 import { usePresenceStore } from "@/stores/presence";
@@ -31,6 +31,8 @@ export function CollaborativeEditor({ pageId, sessionToken, user, isLocked, init
   // C3: Flag to hydrate Yjs doc from blocks when doc is empty
   const [needsHydration, setNeedsHydration] = useState(false);
   const editorRef = useRef<NotionEditorHandle | null>(null);
+  const [typingUsers, setTypingUsers] = useState<{ id: string; name: string; color: string }[]>([]);
+  const typingTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // I7: Cancellation guard to prevent stale state updates
@@ -53,20 +55,25 @@ export function CollaborativeEditor({ pageId, sessionToken, user, isLocked, init
 
     // Set presence
     const color = getColorForUser(user.id);
-    prov.awareness?.setLocalStateField("user", { id: user.id, name: user.name, color });
+    prov.awareness?.setLocalStateField("user", { id: user.id, name: user.name, color, isTyping: false });
 
-    // Track remote users
+    // Track remote users and typing state
     const updatePresence = () => {
       if (!prov.awareness) return;
       const states = prov.awareness.getStates();
       const users: { id: string; name: string; color: string }[] = [];
+      const typing: { id: string; name: string; color: string }[] = [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       states.forEach((state: Record<string, any>, clientId: number) => {
         if (state.user && clientId !== prov.awareness?.clientID) {
           users.push({ id: state.user.id, name: state.user.name, color: state.user.color });
+          if (state.user.isTyping) {
+            typing.push({ id: state.user.id, name: state.user.name, color: state.user.color });
+          }
         }
       });
       usePresenceStore.getState().setUsers(users);
+      setTypingUsers(typing);
     };
     prov.awareness?.on("change", updatePresence);
 
@@ -106,6 +113,17 @@ export function CollaborativeEditor({ pageId, sessionToken, user, isLocked, init
     setNeedsHydration(false);
   }, [needsHydration, initialBlocks, pageId]);
 
+  const handleTyping = useCallback(() => {
+    if (!provider?.awareness) return;
+    const color = getColorForUser(user.id);
+    provider.awareness.setLocalStateField("user", { id: user.id, name: user.name, color, isTyping: true });
+
+    if (typingTimeout.current) clearTimeout(typingTimeout.current);
+    typingTimeout.current = setTimeout(() => {
+      provider.awareness?.setLocalStateField("user", { id: user.id, name: user.name, color, isTyping: false });
+    }, 2000);
+  }, [provider, user.id, user.name]);
+
   if (!provider || !ydoc) {
     return <div className="py-8 text-center" style={{ color: "var(--text-tertiary)" }}>연결 중...</div>;
   }
@@ -121,7 +139,18 @@ export function CollaborativeEditor({ pageId, sessionToken, user, isLocked, init
         ref={editorRef}
         collaboration={{ ydoc, provider, user: { id: user.id, name: user.name, color: getColorForUser(user.id) } }}
         editable={!isLocked}
+        onTyping={handleTyping}
       />
+      {typingUsers.length > 0 && (
+        <div className="px-4 py-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
+          {typingUsers.map((u) => u.name).join(", ")}님이 입력 중
+          <span className="inline-flex gap-0.5 ml-1">
+            <span className="animate-bounce" style={{ animationDelay: "0ms" }}>.</span>
+            <span className="animate-bounce" style={{ animationDelay: "150ms" }}>.</span>
+            <span className="animate-bounce" style={{ animationDelay: "300ms" }}>.</span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }

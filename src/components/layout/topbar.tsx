@@ -10,6 +10,7 @@ import { trpc } from "@/server/trpc/client";
 import { ShareDialog } from "@/components/share/share-dialog";
 import { CommentPanel } from "@/components/comments/comment-panel";
 import { NotificationPanel } from "@/components/notifications/notification-panel";
+import { ActivityPanel } from "@/components/activity/activity-panel";
 
 function getInitials(name: string): string {
   return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
@@ -133,6 +134,7 @@ export function Topbar() {
   const [commentOpen, setCommentOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const params = useParams();
@@ -276,6 +278,14 @@ export function Topbar() {
     {
       label: "📤 HTML 내보내기",
       action: () => handleExport("html"),
+    },
+    { divider: true },
+    {
+      label: "📊 활동",
+      action: () => {
+        setActivityOpen(true);
+        setShowMoreMenu(false);
+      },
     },
     { divider: true },
     {
@@ -515,6 +525,11 @@ export function Topbar() {
           currentUserId={user.id}
           onClose={() => setCommentOpen(false)}
         />
+      )}
+
+      {/* Activity panel */}
+      {activityOpen && pageId && (
+        <ActivityPanel pageId={pageId} onClose={() => setActivityOpen(false)} />
       )}
     </header>
   );

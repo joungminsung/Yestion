@@ -32,11 +32,14 @@ const BG_COLORS = [
   { name: "빨강", value: "red", css: "var(--color-red-bg)" },
 ];
 
-export function InlineToolbar({ editor }: { editor: Editor }) {
+export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddComment?: (content: string, range: { from: number; to: number }) => void }) {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [showColors, setShowColors] = useState(false);
   const [showAiMenu, setShowAiMenu] = useState(false);
+  const [showCommentInput, setShowCommentInput] = useState(false);
+  const [commentRange, setCommentRange] = useState<{ from: number; to: number } | null>(null);
+  const [commentText, setCommentText] = useState("");
 
   const updatePosition = useCallback(() => {
     if (!editor.view || !editor.state) { setIsVisible(false); return; }
@@ -45,6 +48,7 @@ export function InlineToolbar({ editor }: { editor: Editor }) {
       setIsVisible(false);
       setShowColors(false);
       setShowAiMenu(false);
+      setShowCommentInput(false);
       return;
     }
     const start = editor.view.coordsAtPos(from);
@@ -111,9 +115,21 @@ export function InlineToolbar({ editor }: { editor: Editor }) {
       isActive: () => showColors,
     },
     {
+      label: "Comment",
+      icon: "\uD83D\uDCAC",
+      action: () => {
+        const { from, to } = editor.state.selection;
+        setShowCommentInput(true);
+        setCommentRange({ from, to });
+        setShowColors(false);
+        setShowAiMenu(false);
+      },
+      isActive: () => showCommentInput,
+    },
+    {
       label: "AI",
       icon: <Sparkles size={14} />,
-      action: () => { setShowAiMenu((prev) => !prev); setShowColors(false); },
+      action: () => { setShowAiMenu((prev) => !prev); setShowColors(false); setShowCommentInput(false); },
       isActive: () => showAiMenu,
     },
   ];
@@ -241,6 +257,52 @@ export function InlineToolbar({ editor }: { editor: Editor }) {
                 }}
               />
             ))}
+          </div>
+        </div>
+      )}
+      {showCommentInput && commentRange && (
+        <div
+          className="absolute top-full left-0 mt-2 p-3 rounded-lg"
+          style={{
+            backgroundColor: "var(--bg-primary)",
+            boxShadow: "var(--shadow-popup)",
+            width: "280px",
+            zIndex: 1,
+          }}
+        >
+          <textarea
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            placeholder="댓글 작성..."
+            className="w-full rounded px-2 py-1.5 text-sm border resize-none"
+            rows={3}
+            style={{
+              borderColor: "var(--border-default)",
+              backgroundColor: "var(--bg-primary)",
+              color: "var(--text-primary)",
+            }}
+            autoFocus
+          />
+          <div className="flex justify-end gap-2 mt-2">
+            <button
+              onClick={() => { setShowCommentInput(false); setCommentText(""); }}
+              className="px-3 py-1 text-sm rounded hover:bg-notion-bg-hover"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              취소
+            </button>
+            <button
+              onClick={async () => {
+                if (onAddComment) onAddComment(commentText, commentRange);
+                setShowCommentInput(false);
+                setCommentText("");
+              }}
+              className="px-3 py-1 text-sm rounded text-white"
+              style={{ backgroundColor: "#2383e2" }}
+              disabled={!commentText.trim()}
+            >
+              댓글
+            </button>
           </div>
         </div>
       )}

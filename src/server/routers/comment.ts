@@ -49,6 +49,8 @@ export const commentRouter = router({
         blockId: z.string().nullish(),
         parentId: z.string().nullish(),
         content: z.string().min(1),
+        textFrom: z.number().nullish(),
+        textTo: z.number().nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -61,6 +63,8 @@ export const commentRouter = router({
           parentId: input.parentId ?? null,
           content: input.content,
           authorId: ctx.session.user.id,
+          textFrom: input.textFrom ?? null,
+          textTo: input.textTo ?? null,
         },
         include: {
           author: { select: { id: true, name: true, avatarUrl: true } },
@@ -79,6 +83,16 @@ export const commentRouter = router({
           },
         });
       }
+
+      // Log activity
+      await ctx.db.activityLog.create({
+        data: {
+          pageId: input.pageId,
+          userId: ctx.session.user.id,
+          action: "comment",
+          metadata: { commentId: comment.id, parentId: input.parentId ?? null },
+        },
+      });
 
       return comment;
     }),
@@ -142,6 +156,33 @@ export const commentRouter = router({
       return ctx.db.comment.update({
         where: { id: input.id },
         data: { resolved: false },
+      });
+    }),
+
+  addReaction: protectedProcedure
+    .input(z.object({ commentId: z.string(), emoji: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const comment = await ctx.db.comment.findUnique({ where: { id: input.commentId } });
+      if (!comment) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Comment not found" });
+      }
+
+      const reactions = (comment.reactions as Record<string, string[]>) || {};
+      const users = reactions[input.emoji] || [];
+
+      if (users.includes(ctx.session.user.id)) {
+        // Remove reaction (toggle off)
+        const filtered = users.filter((id) => id !== ctx.session.user.id);
+        if (filtered.length === 0) delete reactions[input.emoji];
+        else reactions[input.emoji] = filtered;
+      } else {
+        // Add reaction
+        reactions[input.emoji] = [...users, ctx.session.user.id];
+      }
+
+      return ctx.db.comment.update({
+        where: { id: input.commentId },
+        data: { reactions },
       });
     }),
 });

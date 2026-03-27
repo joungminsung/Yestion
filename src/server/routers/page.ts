@@ -107,7 +107,7 @@ export const pageRouter = router({
       await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, input.workspaceId);
       const position = await getNextPosition(ctx.db, input.workspaceId, input.parentId ?? null);
 
-      return ctx.db.page.create({
+      const page = await ctx.db.page.create({
         data: {
           workspaceId: input.workspaceId,
           title: input.title,
@@ -118,6 +118,17 @@ export const pageRouter = router({
           lastEditedBy: ctx.session.user.id,
         },
       });
+
+      await ctx.db.activityLog.create({
+        data: {
+          pageId: page.id,
+          userId: ctx.session.user.id,
+          action: "create",
+          metadata: { title: input.title },
+        },
+      });
+
+      return page;
     }),
 
   list: protectedProcedure
@@ -210,6 +221,15 @@ export const pageRouter = router({
       });
       // Cascade: trash all descendant pages
       await trashDescendants(ctx.db, input.id, deletedAt);
+
+      await ctx.db.activityLog.create({
+        data: {
+          pageId: input.id,
+          userId: ctx.session.user.id,
+          action: "delete",
+        },
+      });
+
       return result;
     }),
 
@@ -230,6 +250,15 @@ export const pageRouter = router({
       if (trashedAt) {
         await restoreDescendants(ctx.db, input.id, trashedAt);
       }
+
+      await ctx.db.activityLog.create({
+        data: {
+          pageId: input.id,
+          userId: ctx.session.user.id,
+          action: "restore",
+        },
+      });
+
       return result;
     }),
 

@@ -72,6 +72,8 @@ type NotionEditorProps = {
   editable?: boolean;
   collaboration?: CollaborationConfig;
   mentionItems?: MentionItem[];
+  onTyping?: () => void;
+  onAddComment?: (content: string, range: { from: number; to: number }) => void;
 };
 
 export type NotionEditorHandle = { commands: { setContent: (content: unknown) => boolean } };
@@ -85,6 +87,8 @@ export const NotionEditor = forwardRef<
   editable = true,
   collaboration,
   mentionItems = [],
+  onTyping,
+  onAddComment,
 }, ref) {
   const [menuState, setMenuState] = useState<{pos: number; coords: {top: number; left: number}} | null>(null);
   const aiStore = useAiStore();
@@ -164,7 +168,9 @@ export const NotionEditor = forwardRef<
       content: [{ type: "paragraph" }],
     }),
     editable,
-    onUpdate: collaboration ? undefined : ({ editor }) => {
+    onUpdate: collaboration ? () => {
+      onTyping?.();
+    } : ({ editor }) => {
       onUpdate?.(editor.getJSON() as Record<string, unknown>);
     },
     editorProps: {
@@ -270,7 +276,7 @@ export const NotionEditor = forwardRef<
       <EditorContent editor={editor} />
       {editor.view && (
         <>
-          <InlineToolbar editor={editor} />
+          <InlineToolbar editor={editor} onAddComment={onAddComment} />
           <SlashCommand editor={editor} />
           <MentionList editor={editor} items={mentionItems} />
           <BlockContextMenu editor={editor} />

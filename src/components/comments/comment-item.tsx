@@ -14,6 +14,8 @@ interface CommentData {
   content: string;
   authorId: string;
   resolved: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  reactions?: any;
   createdAt: Date;
   author: CommentAuthor;
   replies?: CommentData[];
@@ -52,14 +54,21 @@ export function CommentItem({
   const [editContent, setEditContent] = useState(comment.content);
   const [isReplying, setIsReplying] = useState(false);
   const [replyContent, setReplyContent] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const updateMutation = trpc.comment.update.useMutation({ onSuccess: () => { setIsEditing(false); onRefresh(); } });
   const deleteMutation = trpc.comment.delete.useMutation({ onSuccess: onRefresh });
   const resolveMutation = trpc.comment.resolve.useMutation({ onSuccess: onRefresh });
   const unresolveMutation = trpc.comment.unresolve.useMutation({ onSuccess: onRefresh });
   const createReply = trpc.comment.create.useMutation({ onSuccess: () => { setIsReplying(false); setReplyContent(""); onRefresh(); } });
+  const reactionMutation = trpc.comment.addReaction.useMutation({ onSuccess: onRefresh });
 
   const isOwner = comment.authorId === currentUserId;
+  const reactions = (comment.reactions ?? {}) as Record<string, string[]>;
+
+  const toggleReaction = (commentId: string, emoji: string) => {
+    reactionMutation.mutate({ commentId, emoji });
+  };
 
   return (
     <div
@@ -131,6 +140,46 @@ export function CommentItem({
             <p className="text-sm mt-0.5" style={{ color: "var(--text-primary)", whiteSpace: "pre-wrap" }}>
               {comment.content}
             </p>
+          )}
+
+          {/* Reactions */}
+          {!isEditing && (
+            <div className="flex flex-wrap items-center gap-1 mt-1">
+              {Object.entries(reactions).map(([emoji, userIds]) => (
+                <button
+                  key={emoji}
+                  onClick={() => toggleReaction(comment.id, emoji)}
+                  className="px-1.5 py-0.5 rounded text-xs border"
+                  style={{
+                    fontSize: "13px",
+                    borderColor: (userIds as string[]).includes(currentUserId) ? "#2383e2" : "transparent",
+                    backgroundColor: (userIds as string[]).includes(currentUserId) ? "rgba(35,131,226,0.08)" : undefined,
+                  }}
+                >
+                  {emoji} {(userIds as string[]).length}
+                </button>
+              ))}
+              <button
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className="px-1 py-0.5 rounded text-xs hover:bg-notion-bg-hover"
+                style={{ color: "var(--text-tertiary)" }}
+              >
+                😀+
+              </button>
+            </div>
+          )}
+          {showEmojiPicker && (
+            <div className="flex gap-1 mt-1 p-1 rounded" style={{ backgroundColor: "var(--bg-secondary)" }}>
+              {["👍", "❤️", "😊", "🎉", "😮", "😢"].map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => { toggleReaction(comment.id, emoji); setShowEmojiPicker(false); }}
+                  className="w-7 h-7 flex items-center justify-center rounded hover:bg-notion-bg-hover text-base"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
           )}
 
           {/* Actions */}

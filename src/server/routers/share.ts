@@ -52,6 +52,15 @@ export const shareRouter = router({
         });
       }
 
+      await ctx.db.activityLog.create({
+        data: {
+          pageId: input.pageId,
+          userId: ctx.session.user.id,
+          action: "share",
+          metadata: { email: input.email, level: input.level },
+        },
+      });
+
       return permission;
     }),
 

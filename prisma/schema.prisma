@@ -24,6 +24,7 @@ model User {
   pagePermissions  PagePermission[]
   comments         Comment[]
   notifications    Notification[]
+  activityLogs     ActivityLog[]
 }
 
 model Workspace {
@@ -93,6 +94,7 @@ model Page {
   row               Row?
   permissions       PagePermission[]
   comments          Comment[]
+  activityLogs      ActivityLog[]
   publicAccessToken String?  @unique
   publicAccessLevel String?
 
@@ -222,6 +224,9 @@ model Comment {
   content   String
   authorId  String
   resolved  Boolean  @default(false)
+  reactions Json     @default("{}")
+  textFrom  Int?
+  textTo    Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -263,4 +268,19 @@ model ApiKey {
 
   @@index([key])
   @@index([workspaceId])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  pageId    String
+  userId    String
+  action    String
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([pageId])
+  @@index([userId])
 }
