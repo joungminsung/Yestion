@@ -2,11 +2,13 @@
 
 import { useEffect, useRef } from "react";
 import type { Editor } from "@tiptap/react";
+import { useAiStore } from "@/stores/ai";
 
 type BlockMenuProps = { editor: Editor; pos: number; coords: { top: number; left: number }; onClose: () => void };
 
 export function BlockMenu({ editor, pos, coords, onClose }: BlockMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const aiStore = useAiStore();
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -25,6 +27,12 @@ export function BlockMenu({ editor, pos, coords, onClose }: BlockMenuProps) {
     { label: "글머리 기호 목록", icon: "•", action: () => { editor.chain().focus().setTextSelection(pos + 1).toggleBulletList().run(); onClose(); } },
     { label: "번호 목록", icon: "1.", action: () => { editor.chain().focus().setTextSelection(pos + 1).toggleOrderedList().run(); onClose(); } },
     { label: "할 일", icon: "☑", action: () => { editor.chain().focus().setTextSelection(pos + 1).toggleTaskList().run(); onClose(); } },
+    { label: "AI에게 요청", icon: "✨", action: () => {
+      const node = editor.state.doc.nodeAt(pos);
+      const blockText = node ? node.textContent : "";
+      aiStore.open(blockText, { top: coords.top, left: coords.left + 270 });
+      onClose();
+    } },
   ];
 
   return (
