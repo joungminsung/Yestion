@@ -1,27 +1,31 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, type ReactNode } from "react";
 import type { Editor } from "@tiptap/react";
 import { useAiStore } from "@/stores/ai";
+import {
+  FileText, Pencil, Ruler, Scissors, CheckCircle,
+  Globe, Languages, Briefcase, SmilePlus, Target, ListChecks,
+} from "lucide-react";
 
 type AiMenuItem = {
   label: string;
   action: string;
-  icon: string;
+  icon: ReactNode;
 };
 
 const AI_MENU_ITEMS: AiMenuItem[] = [
-  { label: "요약", action: "summarize", icon: "📝" },
-  { label: "계속 쓰기", action: "continue", icon: "✏️" },
-  { label: "길게 만들기", action: "makeLonger", icon: "📏" },
-  { label: "짧게 만들기", action: "makeShorter", icon: "✂️" },
-  { label: "문법 수정", action: "fixGrammar", icon: "✅" },
-  { label: "번역 (한→영)", action: "translate_en", icon: "🌐" },
-  { label: "번역 (영→한)", action: "translate_ko", icon: "🇰🇷" },
-  { label: "전문적인 톤으로", action: "changeTone_professional", icon: "👔" },
-  { label: "친근한 톤으로", action: "changeTone_casual", icon: "😊" },
-  { label: "핵심 포인트 추출", action: "extractPoints", icon: "🎯" },
-  { label: "할 일 목록으로 변환", action: "makeTodos", icon: "☑️" },
+  { label: "요약", action: "summarize", icon: <FileText size={14} /> },
+  { label: "계속 쓰기", action: "continue", icon: <Pencil size={14} /> },
+  { label: "길게 만들기", action: "makeLonger", icon: <Ruler size={14} /> },
+  { label: "짧게 만들기", action: "makeShorter", icon: <Scissors size={14} /> },
+  { label: "문법 수정", action: "fixGrammar", icon: <CheckCircle size={14} /> },
+  { label: "번역 (한→영)", action: "translate_en", icon: <Globe size={14} /> },
+  { label: "번역 (영→한)", action: "translate_ko", icon: <Languages size={14} /> },
+  { label: "전문적인 톤으로", action: "changeTone_professional", icon: <Briefcase size={14} /> },
+  { label: "친근한 톤으로", action: "changeTone_casual", icon: <SmilePlus size={14} /> },
+  { label: "핵심 포인트 추출", action: "extractPoints", icon: <Target size={14} /> },
+  { label: "할 일 목록으로 변환", action: "makeTodos", icon: <ListChecks size={14} /> },
 ];
 
 type Props = {
@@ -97,7 +101,7 @@ export function AiMenu({ editor, position, onClose }: Props) {
           style={{ color: "var(--text-primary)" }}
           onClick={() => handleAction(item.action)}
         >
-          <span className="w-5 text-center" style={{ fontSize: "13px" }}>
+          <span className="w-5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }}>
             {item.icon}
           </span>
           {item.label}

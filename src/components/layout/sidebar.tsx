@@ -9,6 +9,7 @@ import { SidebarFavorites } from "./sidebar-favorites";
 import { SidebarTrash } from "./sidebar-trash";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/server/trpc/client";
+import { Search, Settings, Plus, LayoutList } from "lucide-react";
 
 export function Sidebar() {
   const router = useRouter();
@@ -72,7 +73,7 @@ export function Sidebar() {
             className="flex items-center px-3 h-[45px] hover:bg-notion-bg-hover cursor-pointer"
             style={{ fontSize: "14px", fontWeight: 500, color: "var(--text-primary)" }}
           >
-            <span className="mr-2 text-lg">{workspace?.icon || "📋"}</span>
+            <span className="mr-2 flex items-center">{workspace?.icon || <LayoutList size={18} />}</span>
             <span className="truncate flex-1">{workspace?.name || "Workspace"}</span>
           </div>
 
@@ -82,7 +83,7 @@ export function Sidebar() {
             className="flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto"
             style={{ fontSize: "14px", color: "var(--text-secondary)" }}
           >
-            <span>🔍</span>
+            <Search size={16} />
             <span>검색</span>
             <span className="ml-auto text-xs opacity-50">⌘K</span>
           </button>
@@ -93,7 +94,7 @@ export function Sidebar() {
             className="flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto"
             style={{ fontSize: "14px", color: "var(--text-secondary)" }}
           >
-            <span>⚙️</span>
+            <Settings size={16} />
             <span>설정</span>
           </button>
 
@@ -137,7 +138,7 @@ export function Sidebar() {
             className="flex items-center gap-2 mx-2 mb-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto"
             style={{ fontSize: "14px", color: "var(--text-secondary)" }}
           >
-            <span>➕</span>
+            <Plus size={16} />
             <span>새 페이지</span>
           </button>
         </div>

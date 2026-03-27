@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { FileText } from "lucide-react";
 
 type SubPage = {
   id: string;
@@ -25,8 +26,8 @@ export function SubPagesList({ pages, workspaceId }: SubPagesListProps) {
           className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-notion-bg-hover transition-colors"
           style={{ color: "var(--text-primary)", fontSize: "14px" }}
         >
-          <span style={{ fontSize: "16px", width: "20px", textAlign: "center" }}>
-            {page.icon || "📄"}
+          <span className="flex items-center justify-center" style={{ width: "20px" }}>
+            {page.icon || <FileText size={16} />}
           </span>
           <span className="truncate">{page.title || "제목 없음"}</span>
         </Link>

@@ -1,23 +1,26 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, type ReactNode } from "react";
 import { getEmbedInfo } from "../extensions/embed-block";
+import {
+  Play, Diamond, CodeXml, Square, MapPin,
+  MessageCircle, GitBranch, Link as LinkIcon, X,
+} from "lucide-react";
 
 type Props = {
   onEmbed: (url: string, provider: string, embedUrl: string) => void;
   onClose: () => void;
 };
 
-const PROVIDER_ICONS: Record<string, string> = {
-  YouTube: "▶",
-  Vimeo: "▶",
-  Figma: "◆",
-  CodePen: "⌨",
-  CodeSandbox: "☐",
-  "Google Maps": "📍",
-  Twitter: "🐦",
-  "GitHub Gist": "🐙",
-  "일반": "🔗",
+const PROVIDER_ICONS: Record<string, ReactNode> = {
+  YouTube: <Play size={14} />,
+  Vimeo: <Play size={14} />,
+  Figma: <Diamond size={14} />,
+  CodePen: <CodeXml size={14} />,
+  CodeSandbox: <Square size={14} />,
+  "Google Maps": <MapPin size={14} />,
+  Twitter: <MessageCircle size={14} />,
+  "GitHub Gist": <GitBranch size={14} />,
 };
 
 export function EmbedInput({ onEmbed, onClose }: Props) {
@@ -52,7 +55,7 @@ export function EmbedInput({ onEmbed, onClose }: Props) {
     <div className="embed-input-popover">
       <div className="embed-input-header">
         <span className="embed-input-title">임베드</span>
-        <button className="embed-input-close" onClick={onClose} title="닫기">✕</button>
+        <button className="embed-input-close" onClick={onClose} title="닫기"><X size={14} /></button>
       </div>
       <div className="embed-input-body">
         <div className="embed-input-field">
@@ -72,7 +75,7 @@ export function EmbedInput({ onEmbed, onClose }: Props) {
         {detectedProvider && (
           <div className="embed-input-provider">
             <span className="embed-input-provider-icon">
-              {PROVIDER_ICONS[detectedProvider] || "🔗"}
+              {PROVIDER_ICONS[detectedProvider] || <LinkIcon size={14} />}
             </span>
             <span className="embed-input-provider-name">{detectedProvider}</span>
           </div>

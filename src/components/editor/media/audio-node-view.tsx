@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { FileUpload } from "./file-upload";
+import { Music } from "lucide-react";
 
 export function AudioNodeView({ node, updateAttributes }: NodeViewProps) {
   const src = node.attrs.src as string;
@@ -29,7 +30,7 @@ export function AudioNodeView({ node, updateAttributes }: NodeViewProps) {
           <FileUpload
             accept="audio/*"
             label="오디오 파일 (MP3, WAV 등)"
-            icon="🎵"
+            icon={<Music size={24} />}
             onFileSelected={handleFileSelected}
             onClose={() => setShowUpload(false)}
           />
@@ -38,7 +39,7 @@ export function AudioNodeView({ node, updateAttributes }: NodeViewProps) {
             className="notion-media-placeholder"
             onClick={() => setShowUpload(true)}
           >
-            <span className="notion-media-placeholder-icon">🎵</span>
+            <span className="notion-media-placeholder-icon"><Music size={24} /></span>
             <span>오디오를 추가하려면 클릭하세요</span>
           </div>
         )}

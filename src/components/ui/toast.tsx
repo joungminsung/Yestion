@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { Toast as ToastType } from "@/stores/toast";
 import { useToastStore } from "@/stores/toast";
+import { Check, X, Info, AlertTriangle } from "lucide-react";
 
-const icons: Record<ToastType["type"], string> = {
-  success: "✓",
-  error: "✕",
-  info: "ℹ",
-  warning: "⚠",
+const icons: Record<ToastType["type"], ReactNode> = {
+  success: <Check size={14} />,
+  error: <X size={14} />,
+  info: <Info size={14} />,
+  warning: <AlertTriangle size={14} />,
 };
 
 export function Toast({ toast }: { toast: ToastType }) {
@@ -57,7 +58,7 @@ export function Toast({ toast }: { toast: ToastType }) {
         </button>
       )}
       <button onClick={handleClose} className="flex-shrink-0 ml-1 opacity-50 hover:opacity-100">
-        ✕
+        <X size={14} />
       </button>
     </div>
   );

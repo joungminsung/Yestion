@@ -1,9 +1,17 @@
+import type { ReactNode } from "react";
 import type { Editor } from "@tiptap/react";
+import {
+  Sparkles, Type, Heading1, Heading2, Heading3,
+  List, ListOrdered, ListChecks, ChevronRight, Lightbulb,
+  Quote, Minus, Code, Sigma, TableOfContents, Columns2,
+  ImageIcon, Table, Link as LinkIcon, Play, MapPin,
+  Bookmark, Film, Music, Paperclip, Database, BarChart3,
+} from "lucide-react";
 
 export type SlashItem = {
   title: string;
   description: string;
-  icon: string;
+  icon: ReactNode;
   category: string;
   keywords: string[];
   command: (editor: Editor) => void;
@@ -13,7 +21,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "AI에게 요청",
     description: "AI가 글을 작성하거나 편집합니다.",
-    icon: "✨",
+    icon: <Sparkles size={18} />,
     category: "AI",
     keywords: ["ai", "gpt", "write", "인공지능"],
     command: (editor) => {
@@ -30,7 +38,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "텍스트",
     description: "일반 텍스트를 입력합니다.",
-    icon: "Aa",
+    icon: <Type size={18} />,
     category: "기본 블록",
     keywords: ["text", "paragraph", "텍스트"],
     command: (editor) => editor.chain().focus().setParagraph().run(),
@@ -38,7 +46,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "제목 1",
     description: "대제목",
-    icon: "H1",
+    icon: <Heading1 size={18} />,
     category: "기본 블록",
     keywords: ["heading", "h1", "제목"],
     command: (editor) =>
@@ -47,7 +55,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "제목 2",
     description: "중제목",
-    icon: "H2",
+    icon: <Heading2 size={18} />,
     category: "기본 블록",
     keywords: ["heading", "h2", "제목"],
     command: (editor) =>
@@ -56,7 +64,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "제목 3",
     description: "소제목",
-    icon: "H3",
+    icon: <Heading3 size={18} />,
     category: "기본 블록",
     keywords: ["heading", "h3", "제목"],
     command: (editor) =>
@@ -65,7 +73,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "글머리 기호 목록",
     description: "글머리 기호로 간단한 목록을 만듭니다.",
-    icon: "•",
+    icon: <List size={18} />,
     category: "기본 블록",
     keywords: ["bullet", "list", "불릿", "목록"],
     command: (editor) => editor.chain().focus().toggleBulletList().run(),
@@ -73,7 +81,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "번호 매기기 목록",
     description: "번호가 있는 목록을 만듭니다.",
-    icon: "1.",
+    icon: <ListOrdered size={18} />,
     category: "기본 블록",
     keywords: ["numbered", "list", "번호", "목록"],
     command: (editor) => editor.chain().focus().toggleOrderedList().run(),
@@ -81,7 +89,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "할 일 목록",
     description: "할 일 목록으로 작업을 추적합니다.",
-    icon: "☑",
+    icon: <ListChecks size={18} />,
     category: "기본 블록",
     keywords: ["todo", "task", "checkbox", "할일"],
     command: (editor) => editor.chain().focus().toggleTaskList().run(),
@@ -89,7 +97,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "토글",
     description: "토글로 콘텐츠를 접거나 펼칩니다.",
-    icon: "▶",
+    icon: <ChevronRight size={18} />,
     category: "기본 블록",
     keywords: ["toggle", "토글", "접기"],
     command: (editor) => {
@@ -115,7 +123,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "콜아웃",
     description: "아이콘이 있는 강조 블록을 추가합니다.",
-    icon: "💡",
+    icon: <Lightbulb size={18} />,
     category: "기본 블록",
     keywords: ["callout", "콜아웃", "강조"],
     command: (editor) => {
@@ -132,7 +140,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "인용",
     description: "인용문을 표시합니다.",
-    icon: "❝",
+    icon: <Quote size={18} />,
     category: "기본 블록",
     keywords: ["quote", "blockquote", "인용"],
     command: (editor) => editor.chain().focus().toggleBlockquote().run(),
@@ -140,7 +148,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "구분선",
     description: "블록 사이에 구분선을 추가합니다.",
-    icon: "—",
+    icon: <Minus size={18} />,
     category: "기본 블록",
     keywords: ["divider", "hr", "구분선"],
     command: (editor) => editor.chain().focus().setHorizontalRule().run(),
@@ -148,7 +156,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "코드",
     description: "코드 블록을 추가합니다.",
-    icon: "<>",
+    icon: <Code size={18} />,
     category: "고급 블록",
     keywords: ["code", "코드"],
     command: (editor) => editor.chain().focus().toggleCodeBlock().run(),
@@ -156,7 +164,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "수식",
     description: "수학 공식을 추가합니다.",
-    icon: "∑",
+    icon: <Sigma size={18} />,
     category: "고급 블록",
     keywords: ["equation", "math", "수식", "공식"],
     command: (editor) => {
@@ -173,7 +181,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "목차",
     description: "페이지의 제목 목록을 표시합니다.",
-    icon: "📑",
+    icon: <TableOfContents size={18} />,
     category: "고급 블록",
     keywords: ["toc", "table of contents", "목차"],
     command: (editor) => {
@@ -183,7 +191,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "2열",
     description: "2개의 열 레이아웃을 추가합니다.",
-    icon: "⬜⬜",
+    icon: <Columns2 size={18} />,
     category: "고급 블록",
     keywords: ["column", "열", "레이아웃"],
     command: (editor) => {
@@ -211,7 +219,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "이미지",
     description: "이미지를 추가합니다.",
-    icon: "🖼",
+    icon: <ImageIcon size={18} />,
     category: "미디어",
     keywords: ["image", "이미지"],
     command: (editor) => {
@@ -222,7 +230,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "테이블",
     description: "테이블을 추가합니다.",
-    icon: "▦",
+    icon: <Table size={18} />,
     category: "고급 블록",
     keywords: ["table", "테이블"],
     command: (editor) =>
@@ -235,7 +243,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "임베드",
     description: "외부 콘텐츠를 임베드합니다.",
-    icon: "🔗",
+    icon: <LinkIcon size={18} />,
     category: "미디어",
     keywords: ["embed", "임베드", "유튜브", "비메오"],
     command: (editor) => {
@@ -245,7 +253,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "YouTube",
     description: "YouTube 동영상을 임베드합니다.",
-    icon: "▶",
+    icon: <Play size={18} />,
     category: "미디어",
     keywords: ["youtube", "유튜브", "video", "동영상"],
     command: (editor) => {
@@ -255,7 +263,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "Google Maps",
     description: "Google 지도를 임베드합니다.",
-    icon: "📍",
+    icon: <MapPin size={18} />,
     category: "미디어",
     keywords: ["google", "maps", "지도", "구글"],
     command: (editor) => {
@@ -265,7 +273,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "북마크",
     description: "웹 링크를 미리보기 카드로 표시합니다.",
-    icon: "🔖",
+    icon: <Bookmark size={18} />,
     category: "미디어",
     keywords: ["bookmark", "북마크", "링크", "link"],
     command: (editor) => {
@@ -275,7 +283,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "동영상",
     description: "동영상을 추가합니다.",
-    icon: "🎬",
+    icon: <Film size={18} />,
     category: "미디어",
     keywords: ["video", "동영상", "영상"],
     command: (editor) => editor.chain().focus().insertContent({ type: "videoBlock", attrs: { src: "" } }).run(),
@@ -283,7 +291,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "오디오",
     description: "오디오를 추가합니다.",
-    icon: "🎵",
+    icon: <Music size={18} />,
     category: "미디어",
     keywords: ["audio", "오디오", "음악"],
     command: (editor) => editor.chain().focus().insertContent({ type: "audioBlock", attrs: { src: "" } }).run(),
@@ -291,7 +299,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "파일",
     description: "파일을 첨부합니다.",
-    icon: "📎",
+    icon: <Paperclip size={18} />,
     category: "미디어",
     keywords: ["file", "파일", "첨부"],
     command: (editor) => editor.chain().focus().insertContent({ type: "fileBlock", attrs: { src: "" } }).run(),
@@ -299,7 +307,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "데이터베이스 - 인라인",
     description: "페이지 내에 인라인 데이터베이스를 추가합니다.",
-    icon: "▦",
+    icon: <Database size={18} />,
     category: "데이터베이스",
     keywords: ["database", "inline", "데이터베이스", "인라인", "DB"],
     command: (editor) => {
@@ -312,7 +320,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     title: "데이터베이스 - 풀페이지",
     description: "새로운 데이터베이스 페이지를 만듭니다.",
-    icon: "📊",
+    icon: <BarChart3 size={18} />,
     category: "데이터베이스",
     keywords: ["database", "full", "page", "데이터베이스", "풀페이지", "DB"],
     command: (editor) => {

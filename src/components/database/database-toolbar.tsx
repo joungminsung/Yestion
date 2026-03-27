@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import { trpc } from "@/server/trpc/client";
 import { useDatabaseStore } from "@/stores/database";
 import { Button } from "@/components/ui/button";
@@ -8,16 +8,17 @@ import { DatabaseFilter } from "./database-filter";
 import { DatabaseSort } from "./database-sort";
 import { propertyTypeIcon } from "./property-type-icon";
 import type { ViewConfig, ViewType, FilterGroup, SortRule, GroupRule, DatabaseData } from "@/types/database";
+import { Table, Kanban, List, LayoutGrid, Calendar, ArrowRight } from "lucide-react";
 
 const GROUPABLE_TYPES = new Set(["select", "multi_select", "status", "person"]);
 
-const VIEW_TYPE_OPTIONS: { type: ViewType; label: string; icon: string }[] = [
-  { type: "table", label: "Table", icon: "\u2630" },
-  { type: "board", label: "Board", icon: "\u25A6" },
-  { type: "list", label: "List", icon: "\u2261" },
-  { type: "gallery", label: "Gallery", icon: "\u25A3" },
-  { type: "calendar", label: "Calendar", icon: "\uD83D\uDCC5" },
-  { type: "timeline", label: "Timeline", icon: "\u2192" },
+const VIEW_TYPE_OPTIONS: { type: ViewType; label: string; icon: ReactNode }[] = [
+  { type: "table", label: "Table", icon: <Table size={14} /> },
+  { type: "board", label: "Board", icon: <Kanban size={14} /> },
+  { type: "list", label: "List", icon: <List size={14} /> },
+  { type: "gallery", label: "Gallery", icon: <LayoutGrid size={14} /> },
+  { type: "calendar", label: "Calendar", icon: <Calendar size={14} /> },
+  { type: "timeline", label: "Timeline", icon: <ArrowRight size={14} /> },
 ];
 
 type DatabaseToolbarProps = {

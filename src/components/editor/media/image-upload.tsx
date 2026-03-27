@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { uploadFile } from "@/lib/upload";
+import { ImageIcon } from "lucide-react";
 
 type Props = {
   onImageSelected: (url: string) => void;
@@ -126,7 +127,7 @@ export function ImageUpload({ onImageSelected, onClose }: Props) {
             </div>
           ) : (
             <>
-              <div className="image-upload-icon">🖼</div>
+              <div className="image-upload-icon"><ImageIcon size={24} /></div>
               <p className="image-upload-hint">
                 클릭하거나 이미지를 드래그하세요
               </p>

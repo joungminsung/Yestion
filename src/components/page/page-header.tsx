@@ -5,6 +5,7 @@ import { trpc } from "@/server/trpc/client";
 import { PageCover } from "./page-cover";
 import { PageIconPicker } from "./page-icon-picker";
 import { PageTitle } from "@/components/editor/page-title";
+import { Smile, ImageIcon } from "lucide-react";
 
 type PageHeaderProps = {
   page: {
@@ -100,7 +101,7 @@ export function PageHeader({ page }: PageHeaderProps) {
                 className="flex items-center gap-1 px-1.5 py-1 rounded text-xs hover:bg-notion-bg-hover"
                 style={{ color: "var(--text-tertiary)" }}
               >
-                😀 아이콘 추가
+                <Smile size={14} /> 아이콘 추가
               </button>
             )}
             {!page.cover && (
@@ -109,7 +110,7 @@ export function PageHeader({ page }: PageHeaderProps) {
                 className="flex items-center gap-1 px-1.5 py-1 rounded text-xs hover:bg-notion-bg-hover"
                 style={{ color: "var(--text-tertiary)" }}
               >
-                🖼️ 커버 추가
+                <ImageIcon size={14} /> 커버 추가
               </button>
             )}
           </div>

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { usePageTreeStore } from "@/stores/page-tree";
 import { trpc } from "@/server/trpc/client";
 import { useToastStore } from "@/stores/toast";
+import { FileText, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
 
 type Page = { id: string; title: string; icon: string | null; children?: Page[] };
 
@@ -25,7 +26,6 @@ export function SidebarPageItem({
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close context menu on click outside
   useEffect(() => {
     if (!showMenu) return;
     const handleClickOutside = (e: MouseEvent) => {
@@ -95,24 +95,22 @@ export function SidebarPageItem({
       >
         <button
           className="w-5 h-5 flex items-center justify-center rounded hover:bg-notion-bg-active flex-shrink-0"
-          style={{ color: "var(--text-tertiary)", fontSize: "10px" }}
+          style={{ color: "var(--text-tertiary)" }}
           onClick={(e) => {
             e.stopPropagation();
             toggleExpanded(page.id);
           }}
         >
-          <span
+          <ChevronRight
+            size={12}
             style={{
               transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
               transition: "transform 0.15s",
-              display: "inline-block",
             }}
-          >
-            ▶
-          </span>
+          />
         </button>
-        <span className="flex-shrink-0 text-sm" style={{ width: "20px", textAlign: "center" }}>
-          {page.icon || "📄"}
+        <span className="flex-shrink-0 text-sm flex items-center justify-center" style={{ width: "20px" }}>
+          {page.icon || <FileText size={16} />}
         </span>
         <span
           className="truncate flex-1"
@@ -123,23 +121,23 @@ export function SidebarPageItem({
         <div className="hidden group-hover:flex items-center gap-0.5 flex-shrink-0">
           <button
             className="w-5 h-5 flex items-center justify-center rounded hover:bg-notion-bg-active"
-            style={{ color: "var(--text-tertiary)", fontSize: "14px" }}
+            style={{ color: "var(--text-tertiary)" }}
             onClick={(e) => {
               e.stopPropagation();
               setShowMenu(!showMenu);
             }}
           >
-            ···
+            <MoreHorizontal size={14} />
           </button>
           <button
             className="w-5 h-5 flex items-center justify-center rounded hover:bg-notion-bg-active"
-            style={{ color: "var(--text-tertiary)", fontSize: "14px" }}
+            style={{ color: "var(--text-tertiary)" }}
             onClick={(e) => {
               e.stopPropagation();
               createSubPage.mutate({ workspaceId, title: "", parentId: page.id });
             }}
           >
-            +
+            <Plus size={14} />
           </button>
         </div>
       </div>

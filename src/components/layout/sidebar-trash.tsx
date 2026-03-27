@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { trpc } from "@/server/trpc/client";
 import { useToastStore } from "@/stores/toast";
+import { Trash2, FileText, X } from "lucide-react";
 
 export function SidebarTrash({ workspaceId }: { workspaceId: string }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -34,7 +35,7 @@ export function SidebarTrash({ workspaceId }: { workspaceId: string }) {
         className="flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto"
         style={{ fontSize: "14px", color: "var(--text-secondary)" }}
       >
-        <span>🗑</span>
+        <Trash2 size={16} />
         <span>휴지통</span>
       </button>
 
@@ -67,7 +68,7 @@ export function SidebarTrash({ workspaceId }: { workspaceId: string }) {
                 className="p-1 rounded hover:bg-notion-bg-hover"
                 style={{ color: "var(--text-tertiary)" }}
               >
-                ✕
+                <X size={14} />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -86,7 +87,7 @@ export function SidebarTrash({ workspaceId }: { workspaceId: string }) {
                     style={{ fontSize: "14px" }}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <span>{page.icon || "📄"}</span>
+                      <span>{page.icon || <FileText size={16} />}</span>
                       <span style={{ color: "var(--text-primary)" }}>
                         {page.title || "제목 없음"}
                       </span>

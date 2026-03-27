@@ -1,5 +1,6 @@
 import { db } from "@/server/db/client";
 import { notFound } from "next/navigation";
+import { Paperclip } from "lucide-react";
 
 export default async function PublicPage({ params }: { params: { token: string } }) {
   const page = await db.page.findUnique({
@@ -190,7 +191,7 @@ function PublicBlock({ block }: { block: BlockData }) {
               className="inline-flex items-center gap-2 px-3 py-2 rounded text-sm"
               style={{ backgroundColor: "var(--bg-secondary)", color: "var(--text-primary)" }}
             >
-              📎 {content.name || content.url}
+              <Paperclip size={14} /> {content.name || content.url}
             </a>
           </div>
         ) : null;

@@ -9,6 +9,7 @@ import {
 } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { ImageUpload } from "./image-upload";
+import { ImageIcon, AlignLeft, AlignCenter, AlignRight, X } from "lucide-react";
 
 export function ImageNodeView({ node, updateAttributes, selected, editor }: NodeViewProps) {
   const src = node.attrs.src as string;
@@ -100,7 +101,7 @@ export function ImageNodeView({ node, updateAttributes, selected, editor }: Node
             className="notion-image-placeholder"
             onClick={() => setShowUpload(true)}
           >
-            <span className="notion-image-placeholder-icon">🖼</span>
+            <span className="notion-image-placeholder-icon"><ImageIcon size={24} /></span>
             <span>이미지를 추가하려면 클릭하세요</span>
           </div>
         )}
@@ -166,7 +167,7 @@ export function ImageNodeView({ node, updateAttributes, selected, editor }: Node
                   }}
                   title={align === "left" ? "왼쪽" : align === "center" ? "가운데" : "오른쪽"}
                 >
-                  {align === "left" ? "⬅" : align === "center" ? "⬛" : "➡"}
+                  {align === "left" ? <AlignLeft size={14} /> : align === "center" ? <AlignCenter size={14} /> : <AlignRight size={14} />}
                 </button>
               ))}
               <button
@@ -182,7 +183,7 @@ export function ImageNodeView({ node, updateAttributes, selected, editor }: Node
                 }}
                 title="삭제"
               >
-                ✕
+                <X size={14} />
               </button>
             </div>
           )}

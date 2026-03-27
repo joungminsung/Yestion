@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { Sparkles } from "lucide-react";
 
 type AiAction =
   | "write"
@@ -132,7 +133,7 @@ export function AiPrompt({ context, onInsert, onReplace, onClose }: Props) {
       {/* Input area */}
       <div className="p-3">
         <div className="flex items-center gap-2 mb-2">
-          <span style={{ fontSize: "16px" }}>✨</span>
+          <Sparkles size={16} style={{ color: "#a855f7" }} />
           <input
             ref={inputRef}
             type="text"

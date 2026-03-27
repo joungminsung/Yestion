@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { FileUpload } from "./file-upload";
+import { Paperclip, FileText } from "lucide-react";
 
 function formatFileSize(bytes: number): string {
   if (!bytes || bytes === 0) return "";
@@ -43,7 +44,7 @@ export function FileNodeView({ node, updateAttributes }: NodeViewProps) {
           <FileUpload
             accept="*/*"
             label="모든 파일 형식"
-            icon="📎"
+            icon={<Paperclip size={24} />}
             onFileSelected={handleFileSelected}
             onClose={() => setShowUpload(false)}
           />
@@ -52,7 +53,7 @@ export function FileNodeView({ node, updateAttributes }: NodeViewProps) {
             className="notion-media-placeholder"
             onClick={() => setShowUpload(true)}
           >
-            <span className="notion-media-placeholder-icon">📎</span>
+            <span className="notion-media-placeholder-icon"><Paperclip size={24} /></span>
             <span>파일을 첨부하려면 클릭하세요</span>
           </div>
         )}
@@ -65,7 +66,7 @@ export function FileNodeView({ node, updateAttributes }: NodeViewProps) {
   return (
     <NodeViewWrapper>
       <div className="notion-file-block">
-        <div className="notion-file-icon">📄</div>
+        <div className="notion-file-icon"><FileText size={20} /></div>
         <div className="notion-file-info">
           <span className="notion-file-name">{name}</span>
           {(sizeLabel || type) && (

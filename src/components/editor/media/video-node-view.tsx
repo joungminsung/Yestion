@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { FileUpload } from "./file-upload";
+import { Film } from "lucide-react";
 
 export function VideoNodeView({ node, updateAttributes }: NodeViewProps) {
   const src = node.attrs.src as string;
@@ -29,7 +30,7 @@ export function VideoNodeView({ node, updateAttributes }: NodeViewProps) {
           <FileUpload
             accept="video/*"
             label="동영상 파일 (MP4, WebM 등)"
-            icon="🎬"
+            icon={<Film size={24} />}
             onFileSelected={handleFileSelected}
             onClose={() => setShowUpload(false)}
           />
@@ -38,7 +39,7 @@ export function VideoNodeView({ node, updateAttributes }: NodeViewProps) {
             className="notion-media-placeholder"
             onClick={() => setShowUpload(true)}
           >
-            <span className="notion-media-placeholder-icon">🎬</span>
+            <span className="notion-media-placeholder-icon"><Film size={24} /></span>
             <span>동영상을 추가하려면 클릭하세요</span>
           </div>
         )}

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, type ReactNode } from "react";
 import { uploadFile } from "@/lib/upload";
 
 type Props = {
   accept: string;
   label: string;
-  icon: string;
+  icon: ReactNode;
   onFileSelected: (result: { url: string; name: string; size: number; type: string }) => void;
   onClose: () => void;
 };

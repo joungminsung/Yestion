@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { trpc } from "@/server/trpc/client";
 import { usePageTreeStore } from "@/stores/page-tree";
+import { FileText } from "lucide-react";
 
 export function SidebarFavorites({ workspaceId }: { workspaceId: string }) {
   const router = useRouter();
@@ -38,7 +39,7 @@ export function SidebarFavorites({ workspaceId }: { workspaceId: string }) {
             router.push(`/${workspaceId}/${fav.page.id}`);
           }}
         >
-          <span className="text-sm">{fav.page.icon || "📄"}</span>
+          <span className="text-sm flex items-center">{fav.page.icon || <FileText size={16} />}</span>
           <span className="truncate">{fav.page.title || "제목 없음"}</span>
         </div>
       ))}

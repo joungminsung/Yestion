@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { Editor } from "@tiptap/react";
 import { cn } from "@/lib/utils";
 import { AiMenu } from "./ai/ai-menu";
+import { Link as LinkIcon, Sparkles } from "lucide-react";
 
 const TEXT_COLORS = [
   { name: "기본", value: "default", css: "var(--text-primary)" },
@@ -62,7 +63,7 @@ export function InlineToolbar({ editor }: { editor: Editor }) {
     };
   }, [editor, updatePosition]);
 
-  const buttons = [
+  const buttons: { label: string; icon: ReactNode; action: () => void; isActive: () => boolean }[] = [
     {
       label: "Bold",
       icon: "B",
@@ -95,7 +96,7 @@ export function InlineToolbar({ editor }: { editor: Editor }) {
     },
     {
       label: "Link",
-      icon: "\uD83D\uDD17",
+      icon: <LinkIcon size={14} />,
       action: () => {
         const url = window.prompt("URL:");
         if (url) editor.chain().focus().setLink({ href: url }).run();
@@ -111,7 +112,7 @@ export function InlineToolbar({ editor }: { editor: Editor }) {
     },
     {
       label: "AI",
-      icon: "✨",
+      icon: <Sparkles size={14} />,
       action: () => { setShowAiMenu((prev) => !prev); setShowColors(false); },
       isActive: () => showAiMenu,
     },

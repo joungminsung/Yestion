@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { EmbedInput } from "./embed-input";
 import { isValidEmbedUrl } from "../extensions/embed-block";
+import { Link as LinkIcon, X } from "lucide-react";
 
 export function EmbedNodeView({ node, updateAttributes, selected, editor }: NodeViewProps) {
   const url = node.attrs.url as string;
@@ -39,7 +40,7 @@ export function EmbedNodeView({ node, updateAttributes, selected, editor }: Node
             className="notion-embed-placeholder"
             onClick={() => setShowInput(true)}
           >
-            <span className="notion-embed-placeholder-icon">🔗</span>
+            <span className="notion-embed-placeholder-icon"><LinkIcon size={24} /></span>
             <span>임베드를 추가하려면 클릭하세요</span>
           </div>
         )}
@@ -55,7 +56,7 @@ export function EmbedNodeView({ node, updateAttributes, selected, editor }: Node
         <div className="notion-embed-block" style={{ padding: "1em", color: "red" }}>
           Invalid embed URL: only http and https protocols are allowed.
           {selected && (
-            <button className="notion-embed-delete" onClick={handleDelete} title="삭제" style={{ marginLeft: 8 }}>✕</button>
+            <button className="notion-embed-delete" onClick={handleDelete} title="삭제" style={{ marginLeft: 8 }}><X size={14} /></button>
           )}
         </div>
       </NodeViewWrapper>
@@ -72,7 +73,7 @@ export function EmbedNodeView({ node, updateAttributes, selected, editor }: Node
             <span className="notion-embed-link-url">{url}</span>
           </a>
           {selected && (
-            <button className="notion-embed-delete" onClick={handleDelete} title="삭제">✕</button>
+            <button className="notion-embed-delete" onClick={handleDelete} title="삭제"><X size={14} /></button>
           )}
         </div>
       </NodeViewWrapper>
@@ -108,14 +109,14 @@ export function EmbedNodeView({ node, updateAttributes, selected, editor }: Node
               title="URL 변경"
               className="notion-embed-toolbar-btn"
             >
-              🔗
+              <LinkIcon size={14} />
             </button>
             <button
               onClick={handleDelete}
               title="삭제"
               className="notion-embed-toolbar-btn danger"
             >
-              ✕
+              <X size={14} />
             </button>
           </div>
         )}

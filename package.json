@@ -49,6 +49,7 @@
     "highlight.js": "^11.11.1",
     "katex": "^0.16.43",
     "lowlight": "^3.3.0",
+    "lucide-react": "^1.7.0",
     "next": "14.2.35",
     "next-intl": "^4.8.3",
     "open-graph-scraper": "^6.11.0",

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { trpc } from "@/server/trpc/client";
+import { Link as LinkIcon, X } from "lucide-react";
 
 export function BookmarkNodeView({ node, updateAttributes, selected, editor }: NodeViewProps) {
   const url = node.attrs.url as string;
@@ -166,7 +167,7 @@ export function BookmarkNodeView({ node, updateAttributes, selected, editor }: N
               className="notion-bookmark-toolbar-btn"
               title="URL 변경"
             >
-              🔗
+              <LinkIcon size={14} />
             </button>
             <button
               onClick={(e) => {
@@ -177,7 +178,7 @@ export function BookmarkNodeView({ node, updateAttributes, selected, editor }: N
               className="notion-bookmark-toolbar-btn danger"
               title="삭제"
             >
-              ✕
+              <X size={14} />
             </button>
           </div>
         )}

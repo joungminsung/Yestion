@@ -1,7 +1,9 @@
 "use client";
 
+import { type ReactNode } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { trpc } from "@/server/trpc/client";
+import { AtSign, MessageCircle, Hand, Link, Bell } from "lucide-react";
 
 function formatTime(date: Date): string {
   const d = new Date(date);
@@ -17,13 +19,13 @@ function formatTime(date: Date): string {
   return d.toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
 }
 
-function getTypeIcon(type: string): string {
+function getTypeIcon(type: string): ReactNode {
   switch (type) {
-    case "mention": return "@";
-    case "comment": return "💬";
-    case "invite": return "👋";
-    case "share": return "🔗";
-    default: return "🔔";
+    case "mention": return <AtSign size={16} />;
+    case "comment": return <MessageCircle size={16} />;
+    case "invite": return <Hand size={16} />;
+    case "share": return <Link size={16} />;
+    default: return <Bell size={16} />;
   }
 }
 
@@ -115,7 +117,7 @@ export function NotificationPanel({ onClose }: { onClose: () => void }) {
                   backgroundColor: notification.read ? "transparent" : "var(--bg-secondary)",
                 }}
               >
-                <span className="flex-shrink-0 text-base mt-0.5">
+                <span className="flex-shrink-0 mt-0.5">
                   {getTypeIcon(notification.type)}
                 </span>
                 <div className="flex-1 min-w-0">

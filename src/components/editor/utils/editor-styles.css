@@ -287,3 +287,18 @@
   flex: 1;
   min-width: 0;
 }
+
+/* Block selection (Notion-style) */
+.notion-block-selected {
+  background-color: rgba(35, 131, 226, 0.14) !important;
+  border-radius: 3px;
+  position: relative;
+}
+
+.notion-block-selected::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 3px;
+}
