@@ -40,10 +40,15 @@ import { TableOfContents } from "./extensions/table-of-contents";
 import { ColumnList, Column } from "./extensions/column-list";
 import { SlashCommandExtension } from "./extensions/slash-command-ext";
 import { BlockSelection } from "./extensions/block-selection";
+import { MarkdownPaste } from "./extensions/markdown-paste";
+import { ClipboardImage } from "./extensions/clipboard-image";
+import { FileDrop } from "./extensions/file-drop";
 import { SlashCommand } from "./slash-command/slash-command";
+import { FindReplace } from "./find-replace";
 import { InlineToolbar } from "./inline-toolbar";
 import { DragHandle } from "./drag-handle";
 import { BlockMenu } from "./block-menu";
+import { BlockContextMenu } from "./block-context-menu";
 import { AiPrompt } from "./ai/ai-prompt";
 import { useAiStore } from "@/stores/ai";
 import "./utils/editor-styles.css";
@@ -133,6 +138,9 @@ export const NotionEditor = forwardRef<
       Highlight.configure({ multicolor: true }),
       BlockId,
       BlockSelection,
+      MarkdownPaste,
+      ClipboardImage,
+      FileDrop,
       SlashCommandExtension,
       ...(collaboration ? [
         Collaboration.configure({ document: collaboration.ydoc }),
@@ -227,11 +235,13 @@ export const NotionEditor = forwardRef<
 
   return (
     <div className="relative">
+      <FindReplace editor={editor} />
       <EditorContent editor={editor} />
       {editor.view && (
         <>
           <InlineToolbar editor={editor} />
           <SlashCommand editor={editor} />
+          <BlockContextMenu editor={editor} />
           <DragHandle editor={editor} onMenuOpen={(pos) => {
             if (!editor.view) return;
             const coords = editor.view.coordsAtPos(pos);

@@ -288,6 +288,27 @@
   min-width: 0;
 }
 
+/* File drop zone */
+.notion-file-dropzone {
+  position: relative;
+}
+.notion-file-dropzone::after {
+  content: "파일을 여기에 놓으세요";
+  position: absolute;
+  inset: 0;
+  background: rgba(35, 131, 226, 0.08);
+  border: 2px dashed rgba(35, 131, 226, 0.4);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-blue);
+  font-size: 16px;
+  font-weight: 500;
+  pointer-events: none;
+  z-index: 10;
+}
+
 /* Block selection (Notion-style) */
 .notion-block-selected {
   background-color: rgba(35, 131, 226, 0.14) !important;
