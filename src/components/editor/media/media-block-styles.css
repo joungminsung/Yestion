@@ -1,0 +1,257 @@
+/* ===== Shared media placeholder ===== */
+.notion-media-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin: 4px 0;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  user-select: none;
+  width: 100%;
+}
+
+.notion-media-placeholder:hover {
+  background: var(--bg-tertiary, rgba(0, 0, 0, 0.06));
+}
+
+.notion-media-placeholder-icon {
+  font-size: 18px;
+  opacity: 0.6;
+}
+
+/* ===== File upload popover (shared) ===== */
+.file-upload-popover {
+  width: 340px;
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-divider, #e0e0e0);
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  z-index: 50;
+}
+
+.file-upload-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-divider, #e0e0e0);
+}
+
+.file-upload-tab {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--text-secondary, #999);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.file-upload-tab:hover {
+  color: var(--text-primary, #333);
+}
+
+.file-upload-tab.active {
+  color: var(--text-primary, #333);
+  border-bottom-color: var(--text-primary, #333);
+}
+
+.file-upload-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.file-upload-dropzone:hover,
+.file-upload-dropzone.dragover {
+  background: var(--bg-secondary, #f5f5f5);
+}
+
+.file-upload-icon {
+  font-size: 36px;
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
+
+.file-upload-hint {
+  font-size: 13px;
+  color: var(--text-secondary, #999);
+  margin: 0;
+}
+
+.file-upload-subhint {
+  font-size: 11px;
+  color: var(--text-tertiary, #bbb);
+  margin: 4px 0 0;
+}
+
+.file-upload-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary, #999);
+  font-size: 13px;
+}
+
+.file-upload-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border-divider, #e0e0e0);
+  border-top-color: var(--text-primary, #333);
+  border-radius: 50%;
+  animation: file-upload-spin 0.6s linear infinite;
+}
+
+@keyframes file-upload-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.file-upload-url-form {
+  display: flex;
+  gap: 8px;
+  padding: 16px;
+}
+
+.file-upload-url-input {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border-divider, #e0e0e0);
+  border-radius: 4px;
+  outline: none;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #333);
+}
+
+.file-upload-url-input:focus {
+  border-color: rgba(35, 131, 226, 0.5);
+  box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.15);
+}
+
+.file-upload-url-submit {
+  padding: 6px 14px;
+  font-size: 13px;
+  background: #2383e2;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.file-upload-url-submit:hover {
+  background: #1b6ec2;
+}
+
+.file-upload-url-submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.file-upload-error {
+  font-size: 12px;
+  color: var(--color-red, #e03e3e);
+  padding: 0 16px 12px;
+  margin: 0;
+}
+
+/* ===== Video block ===== */
+.notion-video-block {
+  margin: 8px 0;
+  border-radius: 4px;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.notion-video-block video {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  border-radius: 4px;
+  background: #000;
+}
+
+/* ===== Audio block ===== */
+.notion-audio-block {
+  margin: 8px 0;
+  padding: 8px 0;
+  width: 100%;
+}
+
+.notion-audio-block audio {
+  width: 100%;
+  border-radius: 4px;
+}
+
+/* ===== File block (download card) ===== */
+.notion-file-block {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin: 4px 0;
+  background: var(--bg-secondary, #f5f5f5);
+  border: 1px solid var(--border-divider, #e0e0e0);
+  border-radius: 6px;
+  cursor: default;
+  transition: background 0.15s ease;
+}
+
+.notion-file-block:hover {
+  background: var(--bg-tertiary, rgba(0, 0, 0, 0.06));
+}
+
+.notion-file-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.notion-file-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notion-file-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #333);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notion-file-meta {
+  font-size: 12px;
+  color: var(--text-tertiary, #999);
+}
+
+.notion-file-download {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  font-size: 13px;
+  color: var(--text-secondary, #666);
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-divider, #e0e0e0);
+  border-radius: 4px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.notion-file-download:hover {
+  background: var(--bg-secondary, #f5f5f5);
+  color: var(--text-primary, #333);
+}

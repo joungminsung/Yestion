@@ -12,9 +12,13 @@ import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { ImageBlock } from "./extensions/image-block";
 import { EmbedBlock } from "./extensions/embed-block";
 import { BookmarkBlock } from "./extensions/bookmark-block";
+import { VideoBlock } from "./extensions/video-block";
+import { AudioBlock } from "./extensions/audio-block";
+import { FileBlock } from "./extensions/file-block";
 import "./media/image-block-styles.css";
 import "./media/embed-block-styles.css";
 import "./media/bookmark-block-styles.css";
+import "./media/media-block-styles.css";
 import HorizontalRule from "@tiptap/extension-horizontal-rule";
 import { TextStyle } from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
@@ -105,6 +109,9 @@ export const NotionEditor = forwardRef<
       ImageBlock.configure({ allowBase64: true }),
       EmbedBlock,
       BookmarkBlock,
+      VideoBlock,
+      AudioBlock,
+      FileBlock,
       HorizontalRule,
       Table.configure({ resizable: true }),
       TableRow,
