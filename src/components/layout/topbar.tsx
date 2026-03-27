@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useSidebarStore } from "@/stores/sidebar";
 import { usePresenceStore, type PresenceUser } from "@/stores/presence";
 import { trpc } from "@/server/trpc/client";
+import { ShareDialog } from "@/components/share/share-dialog";
 
 function getInitials(name: string): string {
   return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
@@ -55,6 +57,7 @@ function PresenceAvatars({ users }: { users: PresenceUser[] }) {
 export function Topbar() {
   const { isOpen, toggle } = useSidebarStore();
   const presenceUsers = usePresenceStore((s) => s.users);
+  const [shareOpen, setShareOpen] = useState(false);
   const params = useParams();
   const pageId = params.pageId as string | undefined;
   const workspaceId = params.workspaceId as string | undefined;
@@ -134,9 +137,17 @@ export function Topbar() {
       </div>
       <div className="flex items-center gap-0.5">
         <PresenceAvatars users={presenceUsers} />
-        <button className="px-3 py-1 rounded hover:bg-notion-bg-hover text-sm" style={{ color: "var(--text-secondary)" }}>
+        <button
+          onClick={() => pageId && setShareOpen(true)}
+          className="px-3 py-1 rounded hover:bg-notion-bg-hover text-sm"
+          style={{ color: "var(--text-secondary)" }}
+          disabled={!pageId}
+        >
           공유
         </button>
+        {shareOpen && pageId && (
+          <ShareDialog pageId={pageId} onClose={() => setShareOpen(false)} />
+        )}
         <button className="p-1.5 rounded hover:bg-notion-bg-hover" style={{ color: "var(--text-secondary)" }}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M4.32 15.424l4.644-2.432a.5.5 0 01.235-.059h3.3A2.5 2.5 0 0015 10.433V5.5A2.5 2.5 0 0012.5 3h-9A2.5 2.5 0 001 5.5v4.933a2.5 2.5 0 002.5 2.5h.32a.5.5 0 01.5.5v1.991z" />
