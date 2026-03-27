@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useCommandPaletteStore } from "@/stores/command-palette";
 import { trpc } from "@/server/trpc/client";
+import { useTranslations } from "next-intl";
 
 export function CommandPalette() {
+  const t = useTranslations("commandPalette");
   const { isOpen, query, close, setQuery } = useCommandPaletteStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -82,7 +84,7 @@ export function CommandPalette() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="검색..."
+            placeholder={t("searchPlaceholder")}
             className="flex-1 ml-3 bg-transparent outline-none"
             style={{ fontSize: "16px", color: "var(--text-primary)", fontFamily: "var(--notion-font-family)" }}
           />
@@ -95,7 +97,7 @@ export function CommandPalette() {
         </div>
         <div className="max-h-[60vh] overflow-y-auto py-1" style={{ fontSize: "14px" }}>
           <div className="px-4 py-2" style={{ fontSize: "12px", color: "var(--text-tertiary)", fontWeight: 500 }}>
-            {isSearching ? "검색 결과" : "최근 방문"}
+            {isSearching ? t("searchResults") : t("recentVisits")}
           </div>
           {results && results.length > 0 ? (
             results.map((page) => (
@@ -124,7 +126,7 @@ export function CommandPalette() {
             ))
           ) : (
             <div className="px-4 py-3 text-center" style={{ color: "var(--text-tertiary)" }}>
-              {isSearching && isSearchLoading ? "검색 중..." : "결과가 없습니다"}
+              {isSearching && isSearchLoading ? t("searching") : t("noResults")}
             </div>
           )}
         </div>

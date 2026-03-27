@@ -34,7 +34,24 @@
     "favorites": "Favorites",
     "private": "Private",
     "shared": "Shared",
-    "trash": "Trash"
+    "trash": "Trash",
+    "noPages": "No pages",
+    "blankPage": "Blank page",
+    "fromTemplate": "Start from template"
+  },
+  "topbar": {
+    "share": "Share",
+    "openSidebar": "Open sidebar",
+    "back": "Back",
+    "forward": "Forward",
+    "moreMenu": "More menu"
+  },
+  "commandPalette": {
+    "searchPlaceholder": "Search...",
+    "searchResults": "Search results",
+    "recentVisits": "Recent visits",
+    "searching": "Searching...",
+    "noResults": "No results"
   },
   "settings": {
     "title": "Settings",

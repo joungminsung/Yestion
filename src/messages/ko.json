@@ -34,7 +34,24 @@
     "favorites": "즐겨찾기",
     "private": "개인 페이지",
     "shared": "공유됨",
-    "trash": "휴지통"
+    "trash": "휴지통",
+    "noPages": "페이지가 없습니다",
+    "blankPage": "빈 페이지",
+    "fromTemplate": "템플릿에서 시작"
+  },
+  "topbar": {
+    "share": "공유",
+    "openSidebar": "사이드바 열기",
+    "back": "이전 페이지",
+    "forward": "다음 페이지",
+    "moreMenu": "더보기 메뉴"
+  },
+  "commandPalette": {
+    "searchPlaceholder": "검색...",
+    "searchResults": "검색 결과",
+    "recentVisits": "최근 방문",
+    "searching": "검색 중...",
+    "noResults": "결과가 없습니다"
   },
   "settings": {
     "title": "설정",

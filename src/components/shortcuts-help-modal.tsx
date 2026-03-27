@@ -107,6 +107,9 @@ export function ShortcutsHelpModal() {
 
       {/* Modal */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="단축키 도움말"
         className="fixed left-1/2 -translate-x-1/2 w-full max-w-[520px] rounded-lg overflow-hidden"
         style={{
           top: "max(10vh, 60px)",

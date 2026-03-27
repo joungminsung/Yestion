@@ -180,7 +180,7 @@ export const NotionEditor = forwardRef<
       onUpdate?.(editor.getJSON() as Record<string, unknown>);
     },
     editorProps: {
-      attributes: { class: "notion-editor" },
+      attributes: { class: "notion-editor", role: "textbox", "aria-multiline": "true", "aria-label": "페이지 에디터" },
       handleKeyDown(_view, event) {
         // Tab: indent (sink list item or insert spaces in code block)
         if (event.key === "Tab" && !event.shiftKey) {

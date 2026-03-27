@@ -116,7 +116,7 @@ export function ShareDialog({ pageId, onClose }: ShareDialogProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]" role="dialog" aria-modal="true" aria-label="공유">
       <div className="fixed inset-0 modal-backdrop-enter" style={{ backgroundColor: "rgba(0,0,0,0.2)" }} />
       <div
         ref={dialogRef}

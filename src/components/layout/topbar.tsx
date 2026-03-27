@@ -14,6 +14,7 @@ import { ActivityPanel } from "@/components/activity/activity-panel";
 import { HistoryPanel } from "@/components/page/history-panel";
 import { markdownToBlocks } from "@/lib/markdown-import";
 import { useToastStore } from "@/stores/toast";
+import { useTranslations } from "next-intl";
 
 function getInitials(name: string): string {
   return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
@@ -129,6 +130,7 @@ function ChildDropdown({
 }
 
 export function Topbar() {
+  const t = useTranslations("topbar");
   const router = useRouter();
   const pathname = usePathname();
   const { isOpen, toggle } = useSidebarStore();
@@ -353,6 +355,8 @@ export function Topbar() {
 
   return (
     <header
+      role="banner"
+      aria-label="페이지 탑바"
       className="sticky top-0 flex items-center justify-between px-3"
       style={{
         height: "var(--topbar-height)",
@@ -367,6 +371,7 @@ export function Topbar() {
             onClick={toggle}
             className="p-1 rounded hover:bg-notion-bg-hover flex-shrink-0"
             style={{ color: "var(--text-secondary)" }}
+            aria-label="사이드바 열기"
             title="Open sidebar"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -384,6 +389,7 @@ export function Topbar() {
           disabled={!navStore.canGoBack()}
           className="p-1 rounded hover:bg-notion-bg-hover disabled:opacity-30 flex-shrink-0"
           style={{ color: "var(--text-secondary)" }}
+          aria-label="이전 페이지"
           title="뒤로 (Alt+←)"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -398,6 +404,7 @@ export function Topbar() {
           disabled={!navStore.canGoForward()}
           className="p-1 rounded hover:bg-notion-bg-hover disabled:opacity-30 flex-shrink-0"
           style={{ color: "var(--text-secondary)" }}
+          aria-label="다음 페이지"
           title="앞으로 (Alt+→)"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -498,7 +505,7 @@ export function Topbar() {
           style={{ color: "var(--text-secondary)" }}
           disabled={!pageId}
         >
-          공유
+          {t("share")}
         </button>
         {shareOpen && pageId && (
           <ShareDialog pageId={pageId} onClose={() => setShareOpen(false)} />
@@ -522,6 +529,7 @@ export function Topbar() {
             onClick={() => setShowMoreMenu(!showMoreMenu)}
             className="p-1.5 rounded hover:bg-notion-bg-hover"
             style={{ color: "var(--text-secondary)" }}
+            aria-label="더보기 메뉴"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
               <path d="M3 8a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zm4.5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zM12 6.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" />

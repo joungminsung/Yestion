@@ -11,7 +11,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
   return (
     <div className="flex h-screen" style={{ backgroundColor: "var(--bg-primary)" }}>
       <Sidebar />
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main id="main-content" role="main" aria-label="페이지 콘텐츠" className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Topbar />
         <div className="flex-1 overflow-y-auto">{children}</div>
       </main>

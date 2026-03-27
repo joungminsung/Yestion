@@ -14,8 +14,10 @@ import { trpc } from "@/server/trpc/client";
 import { Search, Settings, Plus, FileText, LayoutTemplate } from "lucide-react";
 import { useSidebarKeyboardNav } from "./sidebar-keyboard-nav";
 import { PageTemplatePicker } from "@/components/page/page-template-picker";
+import { useTranslations } from "next-intl";
 
 export function Sidebar() {
+  const t = useTranslations("sidebar");
   const router = useRouter();
   const params = useParams();
   const workspaceId = params.workspaceId as string;
@@ -133,6 +135,8 @@ export function Sidebar() {
       )}
 
       <aside
+        role="navigation"
+        aria-label="페이지 네비게이션"
         className={cn(
           "fixed top-0 left-0 bottom-0 flex flex-col bg-notion-bg-sidebar",
           !isResizing && "transition-all duration-300 ease-in-out"
@@ -157,7 +161,7 @@ export function Sidebar() {
             style={{ fontSize: "14px", color: "var(--text-secondary)" }}
           >
             <Search size={16} />
-            <span>검색</span>
+            <span>{t("search")}</span>
             <span className="ml-auto text-xs opacity-50">⌘K</span>
           </button>
 
@@ -168,7 +172,7 @@ export function Sidebar() {
             style={{ fontSize: "14px", color: "var(--text-secondary)" }}
           >
             <Settings size={16} />
-            <span>설정</span>
+            <span>{t("settings")}</span>
           </button>
 
           {/* Divider */}
@@ -190,14 +194,14 @@ export function Sidebar() {
                 letterSpacing: "0.02em",
               }}
             >
-              개인 페이지
+              {t("private")}
             </div>
             {pages?.map((page) => (
               <SidebarPageItem key={page.id} page={page} workspaceId={workspaceId} />
             ))}
             {(!pages || pages.length === 0) && (
               <div className="px-3 py-2 text-xs" style={{ color: "var(--text-tertiary)" }}>
-                페이지가 없습니다
+                {t("noPages")}
               </div>
             )}
           </div>
@@ -213,7 +217,7 @@ export function Sidebar() {
               style={{ fontSize: "14px", color: "var(--text-secondary)" }}
             >
               <Plus size={16} />
-              <span>새 페이지</span>
+              <span>{t("newPage")}</span>
             </button>
 
             {showNewPageMenu && (
@@ -237,7 +241,7 @@ export function Sidebar() {
                     style={{ fontSize: "13px", color: "var(--text-primary)" }}
                   >
                     <FileText size={15} style={{ color: "var(--text-tertiary)" }} />
-                    <span>빈 페이지</span>
+                    <span>{t("blankPage")}</span>
                   </button>
                   <button
                     onClick={() => {
@@ -248,7 +252,7 @@ export function Sidebar() {
                     style={{ fontSize: "13px", color: "var(--text-primary)" }}
                   >
                     <LayoutTemplate size={15} style={{ color: "var(--text-tertiary)" }} />
-                    <span>템플릿에서 시작</span>
+                    <span>{t("fromTemplate")}</span>
                   </button>
                 </div>
               </>
