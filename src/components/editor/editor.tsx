@@ -9,7 +9,8 @@ import Link from "@tiptap/extension-link";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
-import Image from "@tiptap/extension-image";
+import { ImageBlock } from "./extensions/image-block";
+import "./media/image-block-styles.css";
 import HorizontalRule from "@tiptap/extension-horizontal-rule";
 import { TextStyle } from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
@@ -30,6 +31,7 @@ import { Equation } from "./extensions/equation";
 import { TableOfContents } from "./extensions/table-of-contents";
 import { ColumnList, Column } from "./extensions/column-list";
 import { SlashCommandExtension } from "./extensions/slash-command-ext";
+import { BlockSelection } from "./extensions/block-selection";
 import { SlashCommand } from "./slash-command/slash-command";
 import { InlineToolbar } from "./inline-toolbar";
 import { DragHandle } from "./drag-handle";
@@ -96,7 +98,7 @@ export const NotionEditor = forwardRef<
       TaskList,
       TaskItem.configure({ nested: true }),
       CodeBlockLowlight.configure({ lowlight }),
-      Image.configure({ allowBase64: true }),
+      ImageBlock.configure({ allowBase64: true }),
       HorizontalRule,
       Table.configure({ resizable: true }),
       TableRow,
@@ -114,6 +116,7 @@ export const NotionEditor = forwardRef<
       Color,
       Highlight.configure({ multicolor: true }),
       BlockId,
+      BlockSelection,
       SlashCommandExtension,
       ...(collaboration ? [
         Collaboration.configure({ document: collaboration.ydoc }),

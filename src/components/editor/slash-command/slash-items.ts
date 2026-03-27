@@ -198,8 +198,8 @@ export const SLASH_ITEMS: SlashItem[] = [
     category: "미디어",
     keywords: ["image", "이미지"],
     command: (editor) => {
-      const url = window.prompt("이미지 URL:");
-      if (url) editor.chain().focus().setImage({ src: url }).run();
+      // Insert image with empty src to trigger the upload UI
+      editor.chain().focus().setImage({ src: "" }).run();
     },
   },
   {
