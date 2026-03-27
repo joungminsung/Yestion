@@ -11,6 +11,23 @@ export type SlashItem = {
 
 export const SLASH_ITEMS: SlashItem[] = [
   {
+    title: "AI에게 요청",
+    description: "AI가 글을 작성하거나 편집합니다.",
+    icon: "✨",
+    category: "AI",
+    keywords: ["ai", "gpt", "write", "인공지능"],
+    command: (editor) => {
+      // Insert a paragraph and dispatch event to trigger AI prompt overlay
+      editor.chain().focus().insertContent({ type: "paragraph" }).run();
+      const coords = editor.view.coordsAtPos(editor.state.selection.from);
+      window.dispatchEvent(
+        new CustomEvent("ai-open", {
+          detail: { context: "", position: { top: coords.top + 24, left: coords.left } },
+        })
+      );
+    },
+  },
+  {
     title: "텍스트",
     description: "일반 텍스트를 입력합니다.",
     icon: "Aa",

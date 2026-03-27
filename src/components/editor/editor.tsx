@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, forwardRef, useImperativeHandle } from "react";
+import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -44,6 +44,8 @@ import { SlashCommand } from "./slash-command/slash-command";
 import { InlineToolbar } from "./inline-toolbar";
 import { DragHandle } from "./drag-handle";
 import { BlockMenu } from "./block-menu";
+import { AiPrompt } from "./ai/ai-prompt";
+import { useAiStore } from "@/stores/ai";
 import "./utils/editor-styles.css";
 import "./cursor-styles.css";
 
@@ -74,6 +76,7 @@ export const NotionEditor = forwardRef<
   collaboration,
 }, ref) {
   const [menuState, setMenuState] = useState<{pos: number; coords: {top: number; left: number}} | null>(null);
+  const aiStore = useAiStore();
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -159,6 +162,31 @@ export const NotionEditor = forwardRef<
     return { commands: { setContent: (content: unknown) => editor.commands.setContent(content as any) } };
   }, [editor]);
 
+  // Listen for AI open events from slash command
+  useEffect(() => {
+    const handleAiOpen = (e: Event) => {
+      const { context, position } = (e as CustomEvent).detail;
+      aiStore.open(context || "", position);
+    };
+    window.addEventListener("ai-open", handleAiOpen);
+    return () => window.removeEventListener("ai-open", handleAiOpen);
+  }, [aiStore]);
+
+  const handleAiInsert = useCallback((text: string) => {
+    if (!editor) return;
+    editor.chain().focus().insertContent(text).run();
+  }, [editor]);
+
+  const handleAiReplace = useCallback((text: string) => {
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    if (from !== to) {
+      editor.chain().focus().deleteRange({ from, to }).insertContent(text).run();
+    } else {
+      editor.chain().focus().insertContent(text).run();
+    }
+  }, [editor]);
+
   if (!editor) return null;
 
   return (
@@ -176,6 +204,23 @@ export const NotionEditor = forwardRef<
         </>
       )}
       {menuState && <BlockMenu editor={editor} pos={menuState.pos} coords={menuState.coords} onClose={() => setMenuState(null)} />}
+      {aiStore.isOpen && aiStore.position && (
+        <div
+          className="fixed"
+          style={{
+            top: `${aiStore.position.top}px`,
+            left: `${aiStore.position.left}px`,
+            zIndex: "var(--z-modal)",
+          }}
+        >
+          <AiPrompt
+            context={aiStore.context || undefined}
+            onInsert={handleAiInsert}
+            onReplace={handleAiReplace}
+            onClose={aiStore.close}
+          />
+        </div>
+      )}
     </div>
   );
 });

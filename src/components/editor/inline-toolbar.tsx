@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { cn } from "@/lib/utils";
+import { AiMenu } from "./ai/ai-menu";
 
 const TEXT_COLORS = [
   { name: "기본", value: "default", css: "var(--text-primary)" },
@@ -34,6 +35,7 @@ export function InlineToolbar({ editor }: { editor: Editor }) {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [showColors, setShowColors] = useState(false);
+  const [showAiMenu, setShowAiMenu] = useState(false);
 
   const updatePosition = useCallback(() => {
     if (!editor.view || !editor.state) { setIsVisible(false); return; }
@@ -41,6 +43,7 @@ export function InlineToolbar({ editor }: { editor: Editor }) {
     if (from === to) {
       setIsVisible(false);
       setShowColors(false);
+      setShowAiMenu(false);
       return;
     }
     const start = editor.view.coordsAtPos(from);
@@ -103,8 +106,14 @@ export function InlineToolbar({ editor }: { editor: Editor }) {
     {
       label: "Color",
       icon: "A",
-      action: () => setShowColors((prev) => !prev),
+      action: () => { setShowColors((prev) => !prev); setShowAiMenu(false); },
       isActive: () => showColors,
+    },
+    {
+      label: "AI",
+      icon: "✨",
+      action: () => { setShowAiMenu((prev) => !prev); setShowColors(false); },
+      isActive: () => showAiMenu,
     },
   ];
 
@@ -157,6 +166,13 @@ export function InlineToolbar({ editor }: { editor: Editor }) {
           </button>
         ))}
       </div>
+      {showAiMenu && (
+        <AiMenu
+          editor={editor}
+          position={{ top: position.top + 44, left: position.left }}
+          onClose={() => setShowAiMenu(false)}
+        />
+      )}
       {showColors && (
         <div
           className="absolute top-full left-0 mt-1 p-2 rounded-lg"
