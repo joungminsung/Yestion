@@ -27,11 +27,18 @@ export const SlashCommandExtension = Extension.create({
             const meta = tr.getMeta(SLASH_COMMAND_KEY);
             if (meta) return meta;
             if (!prev.active) return prev;
-            const { from } = tr.selection;
-            const text = tr.doc.textBetween(prev.from, from, "\n");
-            if (!text.startsWith("/"))
+            try {
+              const { from } = tr.selection;
+              if (prev.from < 0 || prev.from > tr.doc.content.size || from < prev.from) {
+                return { active: false, query: "", from: 0, to: 0 };
+              }
+              const text = tr.doc.textBetween(prev.from, from, "\n");
+              if (!text.startsWith("/"))
+                return { active: false, query: "", from: 0, to: 0 };
+              return { active: true, query: text.slice(1), from: prev.from, to: from };
+            } catch {
               return { active: false, query: "", from: 0, to: 0 };
-            return { active: true, query: text.slice(1), from: prev.from, to: from };
+            }
           },
         },
         props: {
