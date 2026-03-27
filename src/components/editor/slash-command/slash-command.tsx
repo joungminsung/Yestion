@@ -86,18 +86,41 @@ export function SlashCommand({ editor }: { editor: Editor }) {
   const coords = editor.view.coordsAtPos(state.from);
   const categories = Array.from(new Set(filtered.map((i) => i.category)));
 
+  // Viewport boundary check
+  const menuHeight = 400;
+  const menuWidth = 320;
+  const viewportHeight = window.innerHeight;
+  const viewportWidth = window.innerWidth;
+
+  let menuTop = coords.bottom + 8;
+  let menuLeft = coords.left;
+
+  // Flip to above if near bottom
+  if (menuTop + menuHeight > viewportHeight - 20) {
+    menuTop = coords.top - menuHeight - 8;
+  }
+
+  // Shift left if near right edge
+  if (menuLeft + menuWidth > viewportWidth - 20) {
+    menuLeft = viewportWidth - menuWidth - 20;
+  }
+
+  // Ensure not negative
+  menuTop = Math.max(8, menuTop);
+  menuLeft = Math.max(8, menuLeft);
+
   return (
     <div
       ref={menuRef}
       className="fixed rounded-lg overflow-hidden"
       style={{
-        top: `${coords.bottom + 8}px`,
-        left: `${coords.left}px`,
+        top: `${menuTop}px`,
+        left: `${menuLeft}px`,
         zIndex: "var(--z-dropdown)",
         backgroundColor: "var(--bg-primary)",
         boxShadow: "var(--shadow-popup)",
         width: "320px",
-        maxHeight: "400px",
+        maxHeight: "min(400px, calc(100vh - 100px))",
         overflowY: "auto",
       }}
     >

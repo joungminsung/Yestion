@@ -152,6 +152,42 @@ export const NotionEditor = forwardRef<
     },
     editorProps: {
       attributes: { class: "notion-editor" },
+      handleKeyDown(_view, event) {
+        // Tab: indent (sink list item or insert spaces in code block)
+        if (event.key === "Tab" && !event.shiftKey) {
+          if (editor?.isActive("listItem") || editor?.isActive("taskItem")) {
+            event.preventDefault();
+            const sunkList = editor!.chain().focus().sinkListItem("listItem").run();
+            if (!sunkList) {
+              editor!.chain().focus().sinkListItem("taskItem").run();
+            }
+            return true;
+          }
+          if (editor?.isActive("codeBlock")) {
+            event.preventDefault();
+            editor!.chain().focus().insertContent("  ").run();
+            return true;
+          }
+          event.preventDefault();
+          return true;
+        }
+
+        // Shift+Tab: outdent (lift list item)
+        if (event.key === "Tab" && event.shiftKey) {
+          if (editor?.isActive("listItem") || editor?.isActive("taskItem")) {
+            event.preventDefault();
+            const liftedList = editor!.chain().focus().liftListItem("listItem").run();
+            if (!liftedList) {
+              editor!.chain().focus().liftListItem("taskItem").run();
+            }
+            return true;
+          }
+          event.preventDefault();
+          return true;
+        }
+
+        return false;
+      },
     },
   });
 
