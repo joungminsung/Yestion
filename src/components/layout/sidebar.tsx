@@ -1,22 +1,58 @@
 "use client";
 
 import { useRouter, useParams } from "next/navigation";
+import { useRef, useCallback } from "react";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useCommandPaletteStore } from "@/stores/command-palette";
 import { SidebarResizer } from "./sidebar-resizer";
 import { SidebarPageItem } from "./sidebar-page-item";
 import { SidebarFavorites } from "./sidebar-favorites";
 import { SidebarTrash } from "./sidebar-trash";
+import { WorkspaceSwitcher } from "./workspace-switcher";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/server/trpc/client";
-import { Search, Settings, Plus, LayoutList } from "lucide-react";
+import { Search, Settings, Plus } from "lucide-react";
 
 export function Sidebar() {
   const router = useRouter();
   const params = useParams();
   const workspaceId = params.workspaceId as string;
-  const { isOpen, width, isResizing } = useSidebarStore();
+  const { isOpen, width, isResizing, isHoverExpanded } = useSidebarStore();
   const openPalette = useCommandPaletteStore((s) => s.open);
+  const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const leaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleHoverZoneEnter = useCallback(() => {
+    if (leaveTimeout.current) {
+      clearTimeout(leaveTimeout.current);
+      leaveTimeout.current = null;
+    }
+    hoverTimeout.current = setTimeout(() => {
+      useSidebarStore.getState().setHoverExpanded(true);
+    }, 200);
+  }, []);
+
+  const handleHoverZoneLeave = useCallback(() => {
+    if (hoverTimeout.current) {
+      clearTimeout(hoverTimeout.current);
+      hoverTimeout.current = null;
+    }
+  }, []);
+
+  const handleSidebarMouseLeave = useCallback(() => {
+    if (isHoverExpanded && !isOpen) {
+      leaveTimeout.current = setTimeout(() => {
+        useSidebarStore.getState().setHoverExpanded(false);
+      }, 500);
+    }
+  }, [isHoverExpanded, isOpen]);
+
+  const handleSidebarMouseEnter = useCallback(() => {
+    if (leaveTimeout.current) {
+      clearTimeout(leaveTimeout.current);
+      leaveTimeout.current = null;
+    }
+  }, []);
 
   const { data: flatPages } = trpc.page.list.useQuery(
     { workspaceId },
@@ -43,9 +79,6 @@ export function Sidebar() {
     }
     return roots;
   })();
-  const { data: memberships } = trpc.workspace.list.useQuery();
-  const workspace = memberships?.find((m) => m.workspaceId === workspaceId)?.workspace;
-
   const utils = trpc.useUtils();
   const createPage = trpc.page.create.useMutation({
     onSuccess: (newPage) => {
@@ -54,28 +87,36 @@ export function Sidebar() {
     },
   });
 
+  const sidebarVisible = isOpen || isHoverExpanded;
+
   return (
     <>
+      {/* Hover zone: invisible strip on the left edge when sidebar is collapsed */}
+      {!isOpen && !isHoverExpanded && (
+        <div
+          className="fixed top-0 left-0 bottom-0 w-2 z-[99]"
+          onMouseEnter={handleHoverZoneEnter}
+          onMouseLeave={handleHoverZoneLeave}
+        />
+      )}
+
       <aside
         className={cn(
           "fixed top-0 left-0 bottom-0 flex flex-col bg-notion-bg-sidebar",
           !isResizing && "transition-all duration-300 ease-in-out"
         )}
         style={{
-          width: isOpen ? `${width}px` : "0px",
-          zIndex: "var(--z-sidebar)",
+          width: sidebarVisible ? `${width}px` : "0px",
+          zIndex: isHoverExpanded && !isOpen ? 100 : "var(--z-sidebar)",
           overflow: "hidden",
+          boxShadow: isHoverExpanded && !isOpen ? "var(--shadow-popup)" : undefined,
         }}
+        onMouseLeave={handleSidebarMouseLeave}
+        onMouseEnter={handleSidebarMouseEnter}
       >
         <div className="flex flex-col h-full" style={{ width: `${width}px` }}>
           {/* Workspace Switcher */}
-          <div
-            className="flex items-center px-3 h-[45px] hover:bg-notion-bg-hover cursor-pointer"
-            style={{ fontSize: "14px", fontWeight: 500, color: "var(--text-primary)" }}
-          >
-            <span className="mr-2 flex items-center">{workspace?.icon || <LayoutList size={18} />}</span>
-            <span className="truncate flex-1">{workspace?.name || "Workspace"}</span>
-          </div>
+          <WorkspaceSwitcher currentWorkspaceId={workspaceId} />
 
           {/* Search */}
           <button

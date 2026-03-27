@@ -9,10 +9,12 @@ type SidebarStore = {
   isOpen: boolean;
   width: number;
   isResizing: boolean;
+  isHoverExpanded: boolean;
   toggle: () => void;
   setOpen: (open: boolean) => void;
   setWidth: (width: number) => void;
   setResizing: (resizing: boolean) => void;
+  setHoverExpanded: (v: boolean) => void;
 };
 
 export const useSidebarStore = create<SidebarStore>()(
@@ -21,11 +23,13 @@ export const useSidebarStore = create<SidebarStore>()(
       isOpen: true,
       width: SIDEBAR_DEFAULT_WIDTH,
       isResizing: false,
+      isHoverExpanded: false,
       toggle: () => set((s) => ({ isOpen: !s.isOpen })),
       setOpen: (open) => set({ isOpen: open }),
       setWidth: (width) =>
         set({ width: Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, width)) }),
       setResizing: (resizing) => set({ isResizing: resizing }),
+      setHoverExpanded: (v) => set({ isHoverExpanded: v }),
     }),
     {
       name: "notion-sidebar",

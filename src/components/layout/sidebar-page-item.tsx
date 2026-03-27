@@ -8,7 +8,7 @@ import { trpc } from "@/server/trpc/client";
 import { useToastStore } from "@/stores/toast";
 import { FileText, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
 
-type Page = { id: string; title: string; icon: string | null; children?: Page[] };
+type Page = { id: string; title: string; icon: string | null; parentId?: string | null; children?: Page[] };
 
 export function SidebarPageItem({
   page,
@@ -24,7 +24,10 @@ export function SidebarPageItem({
     usePageTreeStore();
   const addToast = useToastStore((s) => s.addToast);
   const [showMenu, setShowMenu] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dropPosition, setDropPosition] = useState<"before" | "after" | "inside" | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const hoverExpandTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -74,25 +77,99 @@ export function SidebarPageItem({
       utils.page.listFavorites.invalidate();
     },
   });
+  const movePage = trpc.page.move.useMutation({
+    onSuccess: () => utils.page.list.invalidate(),
+  });
 
   return (
     <div>
       <div
         className={cn(
-          "group flex items-center gap-1 py-[2px] pr-2 rounded-sm cursor-pointer hover:bg-notion-bg-hover",
-          isActive && "bg-notion-bg-active"
+          "group relative flex items-center gap-1 py-[2px] pr-2 rounded-sm cursor-pointer hover:bg-notion-bg-hover",
+          isActive && "bg-notion-bg-active",
+          isDragging && "opacity-40"
         )}
         style={{
           paddingLeft: `${12 + depth * 16}px`,
           fontSize: "14px",
           color: "var(--text-primary)",
           minHeight: "28px",
+          borderLeft: dropPosition === "inside" ? "2px solid #2383e2" : undefined,
+        }}
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData("text/plain", page.id);
+          e.dataTransfer.effectAllowed = "move";
+          setIsDragging(true);
+        }}
+        onDragEnd={() => {
+          setIsDragging(false);
+          setDropPosition(null);
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          const rect = e.currentTarget.getBoundingClientRect();
+          const y = e.clientY - rect.top;
+          const height = rect.height;
+          if (y < height * 0.25) setDropPosition("before");
+          else if (y > height * 0.75) setDropPosition("after");
+          else setDropPosition("inside");
+
+          // Auto-expand children after hovering 300ms over "inside" zone
+          if (y >= height * 0.25 && y <= height * 0.75 && !isExpanded && hasChildren) {
+            if (!hoverExpandTimeout.current) {
+              hoverExpandTimeout.current = setTimeout(() => {
+                setExpanded(page.id, true);
+                hoverExpandTimeout.current = null;
+              }, 300);
+            }
+          } else {
+            if (hoverExpandTimeout.current) {
+              clearTimeout(hoverExpandTimeout.current);
+              hoverExpandTimeout.current = null;
+            }
+          }
+        }}
+        onDragLeave={() => {
+          setDropPosition(null);
+          if (hoverExpandTimeout.current) {
+            clearTimeout(hoverExpandTimeout.current);
+            hoverExpandTimeout.current = null;
+          }
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          const draggedId = e.dataTransfer.getData("text/plain");
+          if (draggedId === page.id) {
+            setDropPosition(null);
+            return;
+          }
+
+          if (dropPosition === "inside") {
+            movePage.mutate({ id: draggedId, parentId: page.id });
+          } else {
+            // Move to same parent as this page (before/after reorder)
+            movePage.mutate({ id: draggedId, parentId: page.parentId ?? null });
+          }
+          setDropPosition(null);
+          if (hoverExpandTimeout.current) {
+            clearTimeout(hoverExpandTimeout.current);
+            hoverExpandTimeout.current = null;
+          }
         }}
         onClick={() => {
           setActivePage(page.id);
           router.push(`/${workspaceId}/${page.id}`);
         }}
       >
+        {/* Drop indicators */}
+        {dropPosition === "before" && (
+          <div className="absolute top-0 left-3 right-0 h-[2px] bg-[#2383e2] pointer-events-none" />
+        )}
+        {dropPosition === "after" && (
+          <div className="absolute bottom-0 left-3 right-0 h-[2px] bg-[#2383e2] pointer-events-none" />
+        )}
         <button
           className="w-5 h-5 flex items-center justify-center rounded hover:bg-notion-bg-active flex-shrink-0"
           style={{ color: "var(--text-tertiary)" }}
