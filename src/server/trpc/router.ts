@@ -7,6 +7,10 @@ import { pageRouter } from "@/server/routers/page";
 import { databaseRouter } from "@/server/routers/database";
 import { mediaRouter } from "@/server/routers/media";
 import { shareRouter } from "@/server/routers/share";
+import { searchRouter } from "@/server/routers/search";
+import { commentRouter } from "@/server/routers/comment";
+import { notificationRouter } from "@/server/routers/notification";
+import { exportRouter } from "@/server/routers/export";
 
 export const appRouter = router({
   auth: authRouter,
@@ -17,6 +21,10 @@ export const appRouter = router({
   database: databaseRouter,
   media: mediaRouter,
   share: shareRouter,
+  search: searchRouter,
+  comment: commentRouter,
+  notification: notificationRouter,
+  export: exportRouter,
 });
 
 export type AppRouter = typeof appRouter;

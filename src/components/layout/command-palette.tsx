@@ -1,14 +1,31 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useCommandPaletteStore } from "@/stores/command-palette";
+import { trpc } from "@/server/trpc/client";
 
 export function CommandPalette() {
   const { isOpen, query, close, setQuery } = useCommandPaletteStore();
   const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  const params = useParams();
+  const workspaceId = params.workspaceId as string | undefined;
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+
+  // Debounce the search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   useEffect(() => {
-    if (isOpen) inputRef.current?.focus();
+    if (isOpen) {
+      inputRef.current?.focus();
+      setDebouncedQuery("");
+    }
   }, [isOpen]);
 
   useEffect(() => {
@@ -18,6 +35,25 @@ export function CommandPalette() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, close]);
+
+  const isSearching = debouncedQuery.length > 0;
+
+  const { data: searchResults, isLoading: isSearchLoading } = trpc.search.search.useQuery(
+    { query: debouncedQuery, workspaceId: workspaceId! },
+    { enabled: isOpen && isSearching && !!workspaceId },
+  );
+
+  const { data: recentPages } = trpc.search.recent.useQuery(
+    { workspaceId: workspaceId! },
+    { enabled: isOpen && !isSearching && !!workspaceId },
+  );
+
+  const results = isSearching ? searchResults : recentPages;
+
+  const handleSelect = (pageId: string) => {
+    close();
+    router.push(`/${workspaceId}/${pageId}`);
+  };
 
   if (!isOpen) return null;
 
@@ -50,14 +86,47 @@ export function CommandPalette() {
             className="flex-1 ml-3 bg-transparent outline-none"
             style={{ fontSize: "16px", color: "var(--text-primary)", fontFamily: "var(--notion-font-family)" }}
           />
+          {isSearchLoading && isSearching && (
+            <div
+              className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin"
+              style={{ borderColor: "var(--text-tertiary)", borderTopColor: "transparent" }}
+            />
+          )}
         </div>
         <div className="max-h-[60vh] overflow-y-auto py-1" style={{ fontSize: "14px" }}>
           <div className="px-4 py-2" style={{ fontSize: "12px", color: "var(--text-tertiary)", fontWeight: 500 }}>
-            최근 방문
+            {isSearching ? "검색 결과" : "최근 방문"}
           </div>
-          <div className="px-4 py-3 text-center" style={{ color: "var(--text-tertiary)" }}>
-            결과가 없습니다
-          </div>
+          {results && results.length > 0 ? (
+            results.map((page) => (
+              <button
+                key={page.id}
+                onClick={() => handleSelect(page.id)}
+                className="w-full flex items-center gap-3 px-4 py-2 hover:bg-notion-bg-hover text-left"
+                style={{ color: "var(--text-primary)" }}
+              >
+                <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center" style={{ fontSize: "14px" }}>
+                  {page.icon || (
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style={{ color: "var(--text-tertiary)" }}>
+                      <path d="M4.35 2.67h7.3c.93 0 1.68.75 1.68 1.68v7.3c0 .93-.75 1.68-1.68 1.68h-7.3c-.93 0-1.68-.75-1.68-1.68v-7.3c0-.93.75-1.68 1.68-1.68z" />
+                    </svg>
+                  )}
+                </span>
+                <span className="truncate flex-1">
+                  {page.title || "제목 없음"}
+                </span>
+                {page.updatedAt && (
+                  <span className="flex-shrink-0 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                    {new Date(page.updatedAt).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
+                  </span>
+                )}
+              </button>
+            ))
+          ) : (
+            <div className="px-4 py-3 text-center" style={{ color: "var(--text-tertiary)" }}>
+              {isSearching && isSearchLoading ? "검색 중..." : "결과가 없습니다"}
+            </div>
+          )}
         </div>
       </div>
     </>
