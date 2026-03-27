@@ -1,19 +1,33 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { useDatabaseStore } from "@/stores/database";
 import { Button } from "@/components/ui/button";
-import type { ViewConfig } from "@/types/database";
+import { DatabaseFilter } from "./database-filter";
+import { DatabaseSort } from "./database-sort";
+import type { ViewConfig, FilterGroup, SortRule, DatabaseData } from "@/types/database";
 
 type DatabaseToolbarProps = {
   activeViewConfig: ViewConfig | null;
+  activeViewId?: string | null;
+  properties: DatabaseData["properties"];
+  onUpdateViewConfig?: (config: Partial<ViewConfig>) => void;
 };
 
-export function DatabaseToolbar({ activeViewConfig }: DatabaseToolbarProps) {
-  const { localFilters, localSorts } = useDatabaseStore();
+export function DatabaseToolbar({
+  activeViewConfig,
+  properties,
+  onUpdateViewConfig,
+}: DatabaseToolbarProps) {
+  const { localFilters, localSorts, setLocalFilters, setLocalSorts } = useDatabaseStore();
 
-  const effectiveFilter = localFilters ?? activeViewConfig?.filter;
-  const effectiveSorts = localSorts ?? activeViewConfig?.sorts;
+  const [showFilter, setShowFilter] = useState(false);
+  const [showSort, setShowSort] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
+  const sortRef = useRef<HTMLDivElement>(null);
+
+  const effectiveFilter = localFilters ?? activeViewConfig?.filter ?? null;
+  const effectiveSorts = localSorts ?? activeViewConfig?.sorts ?? null;
 
   const filterCount = useMemo(() => {
     if (!effectiveFilter) return 0;
@@ -26,24 +40,86 @@ export function DatabaseToolbar({ activeViewConfig }: DatabaseToolbarProps) {
 
   const hasGroup = !!activeViewConfig?.group;
 
+  // Close panels on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (showFilter && filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setShowFilter(false);
+      }
+      if (showSort && sortRef.current && !sortRef.current.contains(e.target as Node)) {
+        setShowSort(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showFilter, showSort]);
+
+  const handleFilterChange = (filter: FilterGroup | null) => {
+    setLocalFilters(filter);
+    if (onUpdateViewConfig) {
+      onUpdateViewConfig({ filter: filter ?? undefined });
+    }
+  };
+
+  const handleSortChange = (sorts: SortRule[] | null) => {
+    setLocalSorts(sorts);
+    if (onUpdateViewConfig) {
+      onUpdateViewConfig({ sorts: sorts ?? undefined });
+    }
+  };
+
   return (
     <div
-      className="flex items-center gap-1 border-b px-2 py-1"
+      className="relative flex items-center gap-1 border-b px-2 py-1"
       style={{ borderColor: "var(--border-default)" }}
     >
       {/* Filter button */}
-      <Button variant="ghost" size="sm" className="gap-1">
-        <FilterIcon />
-        Filter
-        {filterCount > 0 && <Badge count={filterCount} />}
-      </Button>
+      <div className="relative" ref={filterRef}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1"
+          onClick={() => { setShowFilter(!showFilter); setShowSort(false); }}
+        >
+          <FilterIcon />
+          Filter
+          {filterCount > 0 && <Badge count={filterCount} />}
+        </Button>
+        {showFilter && (
+          <div className="absolute left-0 top-full z-50 mt-1">
+            <DatabaseFilter
+              properties={properties}
+              filter={effectiveFilter}
+              onFilterChange={handleFilterChange}
+              onClose={() => setShowFilter(false)}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Sort button */}
-      <Button variant="ghost" size="sm" className="gap-1">
-        <SortIcon />
-        Sort
-        {sortCount > 0 && <Badge count={sortCount} />}
-      </Button>
+      <div className="relative" ref={sortRef}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1"
+          onClick={() => { setShowSort(!showSort); setShowFilter(false); }}
+        >
+          <SortIcon />
+          Sort
+          {sortCount > 0 && <Badge count={sortCount} />}
+        </Button>
+        {showSort && (
+          <div className="absolute left-0 top-full z-50 mt-1">
+            <DatabaseSort
+              properties={properties}
+              sorts={effectiveSorts}
+              onSortChange={handleSortChange}
+              onClose={() => setShowSort(false)}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Group button */}
       <Button variant="ghost" size="sm" className="gap-1">

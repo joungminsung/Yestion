@@ -215,4 +215,30 @@ export const SLASH_ITEMS: SlashItem[] = [
         .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
         .run(),
   },
+  {
+    title: "데이터베이스 - 인라인",
+    description: "페이지 내에 인라인 데이터베이스를 추가합니다.",
+    icon: "▦",
+    category: "데이터베이스",
+    keywords: ["database", "inline", "데이터베이스", "인라인", "DB"],
+    command: (editor) => {
+      editor.chain().focus().insertContent({
+        type: "paragraph",
+        content: [{ type: "text", text: "[인라인 데이터베이스 — 페이지에서 생성]" }],
+      }).run();
+    },
+  },
+  {
+    title: "데이터베이스 - 풀페이지",
+    description: "새로운 데이터베이스 페이지를 만듭니다.",
+    icon: "📊",
+    category: "데이터베이스",
+    keywords: ["database", "full", "page", "데이터베이스", "풀페이지", "DB"],
+    command: (editor) => {
+      editor.chain().focus().insertContent({
+        type: "paragraph",
+        content: [{ type: "text", text: "[풀페이지 데이터베이스 — 사이드바에서 생성]" }],
+      }).run();
+    },
+  },
 ];

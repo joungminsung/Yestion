@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useCallback } from "react";
 import { trpc } from "@/server/trpc/client";
 import { useDatabaseStore } from "@/stores/database";
 import { filterRows } from "@/lib/database/filter-engine";
 import { sortRows } from "@/lib/database/sort-engine";
 import { DatabaseToolbar } from "./database-toolbar";
-import type { ViewConfig, FilterGroup, SortRule } from "@/types/database";
+import type { ViewConfig, FilterGroup, SortRule, DatabaseData } from "@/types/database";
 
 type DatabaseViewProps = {
   databaseId: string;
@@ -20,6 +20,7 @@ function asViewConfig(config: unknown): ViewConfig {
 
 export function DatabaseView({ databaseId }: DatabaseViewProps) {
   const { data, isLoading, error } = trpc.database.get.useQuery({ databaseId });
+  const updateViewMutation = trpc.database.updateView.useMutation();
 
   const {
     activeViewId,
@@ -65,6 +66,15 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
     localFilters ?? activeViewConfig?.filter;
   const effectiveSorts: SortRule[] | undefined =
     localSorts ?? activeViewConfig?.sorts;
+
+  // Persist view config changes via tRPC
+  const handleUpdateViewConfig = useCallback(
+    (configPatch: Partial<ViewConfig>) => {
+      if (!activeView) return;
+      updateViewMutation.mutate({ id: activeView.id, config: configPatch });
+    },
+    [activeView, updateViewMutation],
+  );
 
   // Apply filter + sort
   const processedRows = useMemo(() => {
@@ -118,7 +128,12 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
       </div>
 
       {/* Toolbar */}
-      <DatabaseToolbar activeViewConfig={activeViewConfig ?? null} />
+      <DatabaseToolbar
+        activeViewConfig={activeViewConfig ?? null}
+        activeViewId={activeView?.id ?? null}
+        properties={data.properties as DatabaseData["properties"]}
+        onUpdateViewConfig={handleUpdateViewConfig}
+      />
 
       {/* Active view placeholder */}
       <div className="min-h-[200px] p-2">
