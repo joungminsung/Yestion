@@ -1,0 +1,231 @@
+/* Embed block */
+.notion-embed-block {
+  margin: 8px 0;
+  position: relative;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.notion-embed-block.selected {
+  box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.6);
+}
+
+.notion-embed-provider {
+  font-size: 11px;
+  color: var(--text-tertiary, #999);
+  padding: 4px 8px;
+  background: var(--bg-secondary, #f5f5f5);
+  border-bottom: 1px solid var(--border-divider, #e0e0e0);
+}
+
+.notion-embed-toolbar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-divider, #e0e0e0);
+  border-radius: 6px;
+  padding: 2px 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 20;
+}
+
+.notion-embed-toolbar-btn {
+  padding: 4px 8px;
+  font-size: 12px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-primary, #333);
+}
+
+.notion-embed-toolbar-btn:hover {
+  background: var(--bg-secondary, #f5f5f5);
+}
+
+.notion-embed-toolbar-btn.danger {
+  color: var(--color-red, #e03e3e);
+}
+
+/* Embed placeholder */
+.notion-embed-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin: 4px 0;
+  background: var(--bg-secondary, #f5f5f5);
+  border-radius: 4px;
+  color: var(--text-tertiary, #999);
+  cursor: pointer;
+  user-select: none;
+  width: 100%;
+}
+
+.notion-embed-placeholder:hover {
+  background: var(--bg-tertiary, rgba(0, 0, 0, 0.06));
+}
+
+.notion-embed-placeholder-icon {
+  font-size: 18px;
+  opacity: 0.6;
+}
+
+/* Embed link card (Twitter, Gist) */
+.notion-embed-link-card {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  margin: 4px 0;
+  background: var(--bg-secondary, #f5f5f5);
+  border: 1px solid var(--border-divider, #e0e0e0);
+  border-radius: 4px;
+  position: relative;
+}
+
+.notion-embed-link {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-decoration: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.notion-embed-link-provider {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+
+.notion-embed-link-url {
+  font-size: 12px;
+  color: var(--text-tertiary, #999);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notion-embed-delete {
+  padding: 4px 8px;
+  font-size: 12px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--color-red, #e03e3e);
+}
+
+/* Embed input popover */
+.embed-input-popover {
+  width: 400px;
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-divider, #e0e0e0);
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  z-index: 50;
+}
+
+.embed-input-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-divider, #e0e0e0);
+}
+
+.embed-input-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+
+.embed-input-close {
+  background: none;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--text-tertiary, #999);
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.embed-input-close:hover {
+  background: var(--bg-secondary, #f5f5f5);
+}
+
+.embed-input-body {
+  padding: 14px;
+}
+
+.embed-input-field {
+  margin-bottom: 8px;
+}
+
+.embed-input-url {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border-divider, #e0e0e0);
+  border-radius: 4px;
+  outline: none;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #333);
+  box-sizing: border-box;
+}
+
+.embed-input-url:focus {
+  border-color: rgba(35, 131, 226, 0.5);
+  box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.15);
+}
+
+.embed-input-provider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  background: var(--bg-secondary, #f5f5f5);
+  border-radius: 4px;
+}
+
+.embed-input-provider-icon {
+  font-size: 14px;
+}
+
+.embed-input-provider-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary, #333);
+}
+
+.embed-input-hint {
+  font-size: 11px;
+  color: var(--text-tertiary, #999);
+  margin: 0 0 12px;
+}
+
+.embed-input-submit {
+  width: 100%;
+  padding: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  background: #2383e2;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.embed-input-submit:hover {
+  background: #1b6ec2;
+}
+
+.embed-input-submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

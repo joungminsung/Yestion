@@ -216,6 +216,46 @@ export const SLASH_ITEMS: SlashItem[] = [
         .run(),
   },
   {
+    title: "임베드",
+    description: "외부 콘텐츠를 임베드합니다.",
+    icon: "🔗",
+    category: "미디어",
+    keywords: ["embed", "임베드", "유튜브", "비메오"],
+    command: (editor) => {
+      editor.chain().focus().insertContent({ type: "embed", attrs: { url: "" } }).run();
+    },
+  },
+  {
+    title: "YouTube",
+    description: "YouTube 동영상을 임베드합니다.",
+    icon: "▶",
+    category: "미디어",
+    keywords: ["youtube", "유튜브", "video", "동영상"],
+    command: (editor) => {
+      editor.chain().focus().insertContent({ type: "embed", attrs: { url: "", provider: "YouTube" } }).run();
+    },
+  },
+  {
+    title: "Google Maps",
+    description: "Google 지도를 임베드합니다.",
+    icon: "📍",
+    category: "미디어",
+    keywords: ["google", "maps", "지도", "구글"],
+    command: (editor) => {
+      editor.chain().focus().insertContent({ type: "embed", attrs: { url: "", provider: "Google Maps" } }).run();
+    },
+  },
+  {
+    title: "북마크",
+    description: "웹 링크를 미리보기 카드로 표시합니다.",
+    icon: "🔖",
+    category: "미디어",
+    keywords: ["bookmark", "북마크", "링크", "link"],
+    command: (editor) => {
+      editor.chain().focus().insertContent({ type: "bookmark", attrs: { url: "" } }).run();
+    },
+  },
+  {
     title: "데이터베이스 - 인라인",
     description: "페이지 내에 인라인 데이터베이스를 추가합니다.",
     icon: "▦",

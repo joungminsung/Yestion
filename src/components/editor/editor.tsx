@@ -10,7 +10,11 @@ import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { ImageBlock } from "./extensions/image-block";
+import { EmbedBlock } from "./extensions/embed-block";
+import { BookmarkBlock } from "./extensions/bookmark-block";
 import "./media/image-block-styles.css";
+import "./media/embed-block-styles.css";
+import "./media/bookmark-block-styles.css";
 import HorizontalRule from "@tiptap/extension-horizontal-rule";
 import { TextStyle } from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
@@ -99,6 +103,8 @@ export const NotionEditor = forwardRef<
       TaskItem.configure({ nested: true }),
       CodeBlockLowlight.configure({ lowlight }),
       ImageBlock.configure({ allowBase64: true }),
+      EmbedBlock,
+      BookmarkBlock,
       HorizontalRule,
       Table.configure({ resizable: true }),
       TableRow,
