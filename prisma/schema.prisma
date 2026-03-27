@@ -18,9 +18,10 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  memberships WorkspaceMember[]
-  sessions    Session[]
-  favorites   Favorite[]
+  memberships      WorkspaceMember[]
+  sessions         Session[]
+  favorites        Favorite[]
+  pagePermissions  PagePermission[]
 }
 
 model Workspace {
@@ -83,10 +84,13 @@ model Page {
   workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   parent    Page?      @relation("PageTree", fields: [parentId], references: [id], onDelete: SetNull)
   children  Page[]     @relation("PageTree")
-  favorites Favorite[]
-  blocks    Block[]
-  database  Database?
-  row       Row?
+  favorites         Favorite[]
+  blocks            Block[]
+  database          Database?
+  row               Row?
+  permissions       PagePermission[]
+  publicAccessToken String?  @unique
+  publicAccessLevel String?
 
   @@index([workspaceId])
   @@index([parentId])
@@ -189,4 +193,19 @@ model Row {
 
   @@index([databaseId])
   @@index([pageId])
+}
+
+model PagePermission {
+  id         String   @id @default(cuid())
+  pageId     String
+  userId     String
+  level      String   @default("view") // "edit" | "comment" | "view"
+  createdAt  DateTime @default(now())
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pageId, userId])
+  @@index([pageId])
+  @@index([userId])
 }

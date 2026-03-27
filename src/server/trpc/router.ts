@@ -6,6 +6,7 @@ import { blockRouter } from "@/server/routers/block";
 import { pageRouter } from "@/server/routers/page";
 import { databaseRouter } from "@/server/routers/database";
 import { mediaRouter } from "@/server/routers/media";
+import { shareRouter } from "@/server/routers/share";
 
 export const appRouter = router({
   auth: authRouter,
@@ -15,6 +16,7 @@ export const appRouter = router({
   page: pageRouter,
   database: databaseRouter,
   media: mediaRouter,
+  share: shareRouter,
 });
 
 export type AppRouter = typeof appRouter;
