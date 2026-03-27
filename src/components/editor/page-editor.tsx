@@ -35,7 +35,9 @@ export function PageEditor({ pageId, initialBlocks, isLocked = false, sessionTok
     }, 1000);
   }, [pageId, bulkSave, isLocked]);
 
-  if (sessionToken && user) {
+  // Only use collaborative editor if collab server URL is explicitly configured
+  const collabUrl = typeof window !== "undefined" ? process.env.NEXT_PUBLIC_COLLAB_URL : undefined;
+  if (collabUrl && sessionToken && user) {
     return (
       <CollaborativeEditor
         pageId={pageId}
