@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { trpc } from "@/server/trpc/client";
 import type { PropertyType, PropertyConfig, SelectOption } from "@/types/database";
 
 type CellEditorProps = {
@@ -78,6 +79,16 @@ export function CellEditor({ value, type, config, onChange, onClose, onNavigate 
       return (
         <CheckboxCellEditor
           value={value === true}
+          onChange={onChange}
+          onClose={onClose}
+        />
+      );
+
+    case "relation":
+      return (
+        <RelationCellEditor
+          value={value}
+          config={config}
           onChange={onChange}
           onClose={onClose}
         />
@@ -431,6 +442,119 @@ function CheckboxCellEditor({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return null;
+}
+
+// ── Relation Editor ─────────────────────────────────────────
+
+function RelationCellEditor({
+  value,
+  config,
+  onChange,
+  onClose,
+}: {
+  value: unknown;
+  config: PropertyConfig;
+  onChange: (v: unknown) => void;
+  onClose: () => void;
+}) {
+  const targetDbId = config?.relationDbId || config?.relatedDatabaseId;
+  const { data: targetDb } = trpc.database.get.useQuery(
+    { databaseId: targetDbId! },
+    { enabled: !!targetDbId },
+  );
+  const [selected, setSelected] = useState<string[]>(
+    Array.isArray(value) ? value : [],
+  );
+  const [search, setSearch] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const filteredRows =
+    targetDb?.rows?.filter((row) => {
+      const titleProp = targetDb.properties.find((p) => p.type === "title");
+      const vals = (row.values ?? {}) as Record<string, unknown>;
+      const title = titleProp
+        ? String(vals[titleProp.id] || "")
+        : "";
+      return title.toLowerCase().includes(search.toLowerCase());
+    }) || [];
+
+  return (
+    <div
+      className="rounded border shadow-lg"
+      style={{
+        backgroundColor: "var(--bg-primary)",
+        borderColor: "var(--border-default)",
+        minWidth: "250px",
+      }}
+    >
+      <input
+        ref={inputRef}
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="검색..."
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onClose();
+        }}
+        className="w-full border-b px-2 py-1.5 text-sm outline-none"
+        style={{
+          backgroundColor: "transparent",
+          borderColor: "var(--border-default)",
+          color: "var(--text-primary)",
+        }}
+      />
+      <div className="max-h-[200px] overflow-y-auto py-1">
+        {!targetDbId && (
+          <div className="px-2 py-1.5 text-xs" style={{ color: "var(--text-tertiary)" }}>
+            대상 데이터베이스가 설정되지 않았습니다.
+          </div>
+        )}
+        {targetDbId && filteredRows.length === 0 && (
+          <div className="px-2 py-1.5 text-xs" style={{ color: "var(--text-tertiary)" }}>
+            {search ? "검색 결과가 없습니다." : "행이 없습니다."}
+          </div>
+        )}
+        {filteredRows.map((row) => {
+          const titleProp = targetDb!.properties.find((p) => p.type === "title");
+          const rowVals = (row.values ?? {}) as Record<string, unknown>;
+          const title = titleProp
+            ? String(rowVals[titleProp.id] || "제목 없음")
+            : "제목 없음";
+          const isSelected = selected.includes(row.id);
+          return (
+            <button
+              key={row.id}
+              onClick={() => {
+                const next = isSelected
+                  ? selected.filter((id) => id !== row.id)
+                  : [...selected, row.id];
+                setSelected(next);
+                onChange(next);
+              }}
+              className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-[var(--bg-hover)]"
+            >
+              <span
+                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] ${
+                  isSelected
+                    ? "bg-[#2383e2] border-[#2383e2] text-white"
+                    : ""
+                }`}
+                style={!isSelected ? { borderColor: "var(--border-default)" } : undefined}
+              >
+                {isSelected && "\u2713"}
+              </span>
+              <span className="truncate" style={{ color: "var(--text-primary)" }}>
+                {title}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 // ── Shared Components ───────────────────────────────────────

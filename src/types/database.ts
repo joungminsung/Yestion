@@ -51,7 +51,10 @@ export type PropertyConfig = {
   formula?: string;
   // relation
   relatedDatabaseId?: string;
+  relationDbId?: string;  // alias used by cell editors
   // rollup
+  relationPropertyId?: string;    // which relation property to use
+  targetPropertyId?: string;      // which property from target DB to aggregate
   rollupPropertyId?: string;
   rollupFunction?: "count" | "sum" | "average" | "min" | "max" | "show_original";
   // date

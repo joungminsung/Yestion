@@ -146,6 +146,27 @@ function renderByType(
       );
     }
 
+    case "relation": {
+      const ids = Array.isArray(value) ? value : [];
+      if (ids.length === 0) return <span style={{ color: "var(--text-placeholder)" }}>&mdash;</span>;
+      return (
+        <div className="flex flex-wrap gap-1">
+          {ids.map((id: string) => (
+            <span
+              key={id}
+              className="px-1.5 py-0.5 rounded text-xs"
+              style={{ backgroundColor: "var(--bg-secondary)" }}
+            >
+              {id.slice(0, 8)}
+            </span>
+          ))}
+        </div>
+      );
+    }
+
+    case "rollup":
+      return <span style={{ color: "var(--text-tertiary)" }}>Rollup</span>;
+
     default:
       return <span className="truncate">{String(value)}</span>;
   }

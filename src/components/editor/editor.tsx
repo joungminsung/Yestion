@@ -38,6 +38,7 @@ import { Callout } from "./extensions/callout";
 import { Equation } from "./extensions/equation";
 import { SyncedBlockNode } from "./extensions/synced-block";
 import { LinkToPage } from "./extensions/link-to-page";
+import { DatabaseBlock } from "./extensions/database-block";
 import { TableOfContents } from "./extensions/table-of-contents";
 import { ColumnList, Column } from "./extensions/column-list";
 import { SlashCommandExtension } from "./extensions/slash-command-ext";
@@ -144,6 +145,7 @@ export const NotionEditor = forwardRef<
       Equation,
       SyncedBlockNode,
       LinkToPage,
+      DatabaseBlock,
       TableOfContents,
       ColumnList,
       Column,

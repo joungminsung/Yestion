@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { DatabaseFilter } from "./database-filter";
 import { DatabaseSort } from "./database-sort";
 import { propertyTypeIcon } from "./property-type-icon";
+import { parseCSV, detectPropertyType } from "@/lib/csv-import";
 import type { ViewConfig, ViewType, FilterGroup, SortRule, GroupRule, DatabaseData } from "@/types/database";
 import { Table, Kanban, List, LayoutGrid, Calendar, ArrowRight } from "lucide-react";
 
@@ -48,12 +49,20 @@ export function DatabaseToolbar({
       if (databaseId) utils.database.get.invalidate({ databaseId });
     },
   });
+  const importCSVMutation = trpc.database.importCSV.useMutation({
+    onSuccess: () => {
+      if (databaseId) utils.database.get.invalidate({ databaseId });
+      setCsvPreview(null);
+    },
+  });
 
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const [showGroup, setShowGroup] = useState(false);
   const [showProperties, setShowProperties] = useState(false);
   const [showNewView, setShowNewView] = useState(false);
+  const [csvPreview, setCsvPreview] = useState<{ headers: string[]; rows: string[][]; propertyTypes: Record<string, string> } | null>(null);
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
   const filterRef = useRef<HTMLDivElement>(null);
   const sortRef = useRef<HTMLDivElement>(null);
@@ -159,6 +168,42 @@ export function DatabaseToolbar({
     },
     [databaseId, addViewMutation],
   );
+
+  const handleCSVFile = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string;
+        if (!text) return;
+        const { headers, rows } = parseCSV(text);
+        if (headers.length === 0) return;
+        // Auto-detect types
+        const propertyTypes: Record<string, string> = {};
+        headers.forEach((h, i) => {
+          if (i === 0) return; // title column
+          const colValues = rows.map((r) => r[i] ?? "");
+          propertyTypes[h] = detectPropertyType(colValues);
+        });
+        setCsvPreview({ headers, rows, propertyTypes });
+      };
+      reader.readAsText(file);
+      // Reset input so same file can be selected again
+      e.target.value = "";
+    },
+    [],
+  );
+
+  const handleCSVImport = useCallback(() => {
+    if (!databaseId || !csvPreview) return;
+    importCSVMutation.mutate({
+      databaseId,
+      headers: csvPreview.headers,
+      rows: csvPreview.rows,
+      propertyTypes: csvPreview.propertyTypes,
+    });
+  }, [databaseId, csvPreview, importCSVMutation]);
 
   const closeAllExcept = (panel: string) => {
     if (panel !== "filter") setShowFilter(false);
@@ -282,6 +327,94 @@ export function DatabaseToolbar({
                 </button>
               ))
             )}
+          </div>
+        )}
+      </div>
+
+      {/* CSV Import */}
+      <div className="relative">
+        <input
+          ref={csvInputRef}
+          type="file"
+          accept=".csv"
+          className="hidden"
+          onChange={handleCSVFile}
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => csvInputRef.current?.click()}
+        >
+          CSV 가져오기
+        </Button>
+        {csvPreview && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+            onClick={() => setCsvPreview(null)}
+          >
+            <div
+              className="w-[560px] max-h-[80vh] overflow-auto rounded-lg border p-4 shadow-xl"
+              style={{ backgroundColor: "var(--bg-primary)", borderColor: "var(--border-default)" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
+                CSV 가져오기 미리보기
+              </h3>
+              <div className="overflow-x-auto mb-3">
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr>
+                      {csvPreview.headers.map((h, i) => (
+                        <th
+                          key={i}
+                          className="border px-2 py-1 text-left font-medium"
+                          style={{ borderColor: "var(--border-default)", color: "var(--text-secondary)" }}
+                        >
+                          <div>{h}</div>
+                          <div className="font-normal opacity-60">
+                            {i === 0 ? "title" : csvPreview.propertyTypes[h] || "text"}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {csvPreview.rows.slice(0, 5).map((row, ri) => (
+                      <tr key={ri}>
+                        {csvPreview.headers.map((_, ci) => (
+                          <td
+                            key={ci}
+                            className="border px-2 py-1"
+                            style={{ borderColor: "var(--border-default)", color: "var(--text-primary)" }}
+                          >
+                            {row[ci] ?? ""}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {csvPreview.rows.length > 5 && (
+                  <p className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                    ... 외 {csvPreview.rows.length - 5}개 행
+                  </p>
+                )}
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setCsvPreview(null)}>
+                  취소
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleCSVImport}
+                  disabled={importCSVMutation.isPending}
+                  className="bg-[#2383e2] text-white hover:bg-[#0b6ec5]"
+                >
+                  {importCSVMutation.isPending ? "가져오는 중..." : `가져오기 (${csvPreview.rows.length}행)`}
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </div>

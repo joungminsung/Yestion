@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "@/server/trpc/init";
 import type { Context } from "@/server/trpc/init";
@@ -408,6 +409,134 @@ export const databaseRouter = router({
       });
 
       return { success: true };
+    }),
+
+  // ── Linked Database ────────────────────────────────────────
+
+  createLinkedView: protectedProcedure
+    .input(
+      z.object({
+        sourceDatabaseId: z.string(),
+        pageId: z.string(),
+        name: z.string().default("링크된 데이터베이스"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const sourceDb = await ctx.db.database.findUnique({
+        where: { id: input.sourceDatabaseId },
+        include: { page: { select: { workspaceId: true } } },
+      });
+      if (!sourceDb) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Source database not found" });
+      }
+      await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, sourceDb.page.workspaceId);
+
+      // Linked DB = new view on the same database
+      const last = await ctx.db.databaseView.findFirst({
+        where: { databaseId: input.sourceDatabaseId },
+        orderBy: { position: "desc" },
+        select: { position: true },
+      });
+      const position = (last?.position ?? -1) + 1;
+
+      const view = await ctx.db.databaseView.create({
+        data: {
+          databaseId: input.sourceDatabaseId,
+          name: input.name,
+          type: "table",
+          config: {},
+          position,
+        },
+      });
+
+      return { databaseId: input.sourceDatabaseId, viewId: view.id };
+    }),
+
+  // ── CSV Import ────────────────────────────────────────────
+
+  importCSV: protectedProcedure
+    .input(
+      z.object({
+        databaseId: z.string(),
+        headers: z.array(z.string()),
+        rows: z.array(z.array(z.string())),
+        propertyTypes: z.record(z.string(), z.string()),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const database = await verifyDatabaseAccess(ctx.db, ctx.session.user.id, input.databaseId);
+
+      // Create properties for each header (skip first column = title)
+      const properties = [];
+      for (let i = 1; i < input.headers.length; i++) {
+        const name = input.headers[i]!;
+        const type = input.propertyTypes[name] || "text";
+
+        const lastProp = await ctx.db.property.findFirst({
+          where: { databaseId: input.databaseId },
+          orderBy: { position: "desc" },
+          select: { position: true },
+        });
+        const position = (lastProp?.position ?? -1) + 1;
+
+        const prop = await ctx.db.property.create({
+          data: {
+            databaseId: input.databaseId,
+            name,
+            type,
+            position,
+          },
+        });
+        properties.push(prop);
+      }
+
+      // Create rows
+      let rowCount = 0;
+      for (const row of input.rows) {
+        const pageTitle = row[0] || "";
+        const page = await ctx.db.page.create({
+          data: {
+            workspaceId: database.page.workspaceId,
+            title: pageTitle,
+            parentId: database.pageId,
+            createdBy: ctx.session.user.id,
+            lastEditedBy: ctx.session.user.id,
+          },
+        });
+
+        const values: Record<string, unknown> = {};
+
+        // Set title property value
+        const titleProp = await ctx.db.property.findFirst({
+          where: { databaseId: input.databaseId, type: "title" },
+        });
+        if (titleProp) {
+          values[titleProp.id] = pageTitle;
+        }
+
+        // Set other property values
+        properties.forEach((prop, i) => {
+          const val = row[i + 1] ?? "";
+          if (prop.type === "number") {
+            values[prop.id] = Number(val) || 0;
+          } else if (prop.type === "checkbox") {
+            values[prop.id] = val === "true";
+          } else {
+            values[prop.id] = val;
+          }
+        });
+
+        await ctx.db.row.create({
+          data: {
+            databaseId: input.databaseId,
+            pageId: page.id,
+            values: values as Prisma.InputJsonValue,
+          },
+        });
+        rowCount++;
+      }
+
+      return { success: true, rowCount, propertyCount: properties.length };
     }),
 
   queryRows: protectedProcedure

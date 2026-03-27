@@ -430,3 +430,22 @@
 .notion-editor-empty-state button:hover {
   background: var(--bg-hover);
 }
+
+/* Database Block */
+.notion-database-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  margin: 4px 0;
+  border-radius: 4px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-secondary);
+  transition: background 120ms ease-in;
+}
+.notion-database-block:hover {
+  background: var(--bg-hover);
+}
