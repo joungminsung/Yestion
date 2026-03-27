@@ -45,18 +45,30 @@ export function SidebarPageItem({
   const hasChildren = page.children && page.children.length > 0;
 
   const utils = trpc.useUtils();
+  const restorePage = trpc.page.restore.useMutation({
+    onSuccess: () => utils.page.list.invalidate(),
+  });
   const moveToTrash = trpc.page.moveToTrash.useMutation({
+    onMutate: async () => {
+      await utils.page.list.cancel();
+      const prev = utils.page.list.getData({ workspaceId });
+      utils.page.list.setData({ workspaceId }, (old) =>
+        old?.filter((p) => p.id !== page.id) ?? []
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) utils.page.list.setData({ workspaceId }, context.prev);
+      addToast({ message: "삭제에 실패했습니다", type: "error" });
+    },
+    onSettled: () => utils.page.list.invalidate(),
     onSuccess: () => {
       addToast({
         message: "휴지통으로 이동됨",
         type: "info",
         undo: () => restorePage.mutate({ id: page.id }),
       });
-      utils.page.list.invalidate();
     },
-  });
-  const restorePage = trpc.page.restore.useMutation({
-    onSuccess: () => utils.page.list.invalidate(),
   });
   const createSubPage = trpc.page.create.useMutation({
     onSuccess: (newPage) => {
@@ -72,9 +84,18 @@ export function SidebarPageItem({
     },
   });
   const addFavorite = trpc.page.addFavorite.useMutation({
+    onMutate: async () => {
+      await utils.page.listFavorites.cancel();
+      const prev = utils.page.listFavorites.getData({ workspaceId });
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) utils.page.listFavorites.setData({ workspaceId }, context.prev);
+      addToast({ message: "즐겨찾기 추가에 실패했습니다", type: "error" });
+    },
+    onSettled: () => utils.page.listFavorites.invalidate(),
     onSuccess: () => {
       addToast({ message: "즐겨찾기에 추가됨", type: "success" });
-      utils.page.listFavorites.invalidate();
     },
   });
   const movePage = trpc.page.move.useMutation({

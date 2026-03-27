@@ -97,10 +97,25 @@ model Page {
   activityLogs      ActivityLog[]
   publicAccessToken String?  @unique
   publicAccessLevel String?
+  snapshots         PageSnapshot[]
 
   @@index([workspaceId])
   @@index([parentId])
   @@index([isDeleted])
+}
+
+model PageSnapshot {
+  id        String   @id @default(cuid())
+  pageId    String
+  blocks    Json     @default("[]")
+  title     String   @default("")
+  createdBy String
+  createdAt DateTime @default(now())
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId])
+  @@index([pageId, createdAt])
 }
 
 model Block {

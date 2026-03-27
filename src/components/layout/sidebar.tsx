@@ -83,8 +83,32 @@ export function Sidebar() {
   })();
   const utils = trpc.useUtils();
   const createPage = trpc.page.create.useMutation({
+    onMutate: async (input) => {
+      await utils.page.list.cancel();
+      const prev = utils.page.list.getData({ workspaceId });
+      const tempId = `temp-${Date.now()}`;
+      utils.page.list.setData({ workspaceId }, (old) => [
+        ...(old ?? []),
+        {
+          id: tempId,
+          title: input.title ?? "",
+          icon: null,
+          parentId: input.parentId ?? null,
+          workspaceId,
+          isDeleted: false,
+          position: (old?.length ?? 0),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
+      ]);
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) utils.page.list.setData({ workspaceId }, context.prev);
+    },
+    onSettled: () => utils.page.list.invalidate(),
     onSuccess: (newPage) => {
-      utils.page.list.invalidate();
       router.push(`/${workspaceId}/${newPage.id}`);
     },
   });

@@ -11,6 +11,9 @@ import { ShareDialog } from "@/components/share/share-dialog";
 import { CommentPanel } from "@/components/comments/comment-panel";
 import { NotificationPanel } from "@/components/notifications/notification-panel";
 import { ActivityPanel } from "@/components/activity/activity-panel";
+import { HistoryPanel } from "@/components/page/history-panel";
+import { markdownToBlocks } from "@/lib/markdown-import";
+import { useToastStore } from "@/stores/toast";
 
 function getInitials(name: string): string {
   return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
@@ -135,6 +138,8 @@ export function Topbar() {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const addToast = useToastStore((s) => s.addToast);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const params = useParams();
@@ -215,6 +220,43 @@ export function Topbar() {
     setShowMoreMenu(false);
   };
 
+  const importBlocks = trpc.block.bulkSave.useMutation({
+    onSuccess: () => {
+      addToast({ message: "Markdown 가져오기 완료", type: "success" });
+      utils.block.list.invalidate();
+      utils.page.get.invalidate();
+    },
+    onError: () => {
+      addToast({ message: "가져오기에 실패했습니다", type: "error" });
+    },
+  });
+
+  const handleMarkdownImport = () => {
+    if (!pageId) return;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".md,.markdown,.txt";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      const blocks = markdownToBlocks(text);
+      // Convert to the format bulkSave expects
+      const blockData = blocks.map((block, idx) => ({
+        id: `import-${Date.now()}-${idx}`,
+        type: block.type,
+        content: {
+          ...block,
+        },
+        position: idx,
+        parentId: null,
+      }));
+      importBlocks.mutate({ pageId, blocks: blockData });
+    };
+    input.click();
+    setShowMoreMenu(false);
+  };
+
   // Click outside to close more menu
   useEffect(() => {
     if (!showMoreMenu) return;
@@ -279,7 +321,18 @@ export function Topbar() {
       label: "📤 HTML 내보내기",
       action: () => handleExport("html"),
     },
+    {
+      label: "📥 Markdown 가져오기",
+      action: handleMarkdownImport,
+    },
     { divider: true },
+    {
+      label: "🕐 히스토리",
+      action: () => {
+        setHistoryOpen(true);
+        setShowMoreMenu(false);
+      },
+    },
     {
       label: "📊 활동",
       action: () => {
@@ -530,6 +583,11 @@ export function Topbar() {
       {/* Activity panel */}
       {activityOpen && pageId && (
         <ActivityPanel pageId={pageId} onClose={() => setActivityOpen(false)} />
+      )}
+
+      {/* History panel */}
+      {historyOpen && pageId && (
+        <HistoryPanel pageId={pageId} onClose={() => setHistoryOpen(false)} />
       )}
     </header>
   );
