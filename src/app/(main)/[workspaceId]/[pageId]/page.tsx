@@ -5,6 +5,7 @@ import { getServerSession } from "@/server/auth/session";
 import { PageEditor } from "@/components/editor/page-editor";
 import { PageHeader } from "@/components/page/page-header";
 import { SubPagesList } from "@/components/page/sub-pages-list";
+import { getEffectivePermission } from "@/lib/permissions";
 
 export default async function PageView({ params }: { params: { workspaceId: string; pageId: string } }) {
   const session = await getServerSession();
@@ -42,6 +43,11 @@ export default async function PageView({ params }: { params: { workspaceId: stri
 
   if (!page || page.isDeleted || page.workspaceId !== params.workspaceId) notFound();
 
+  const effectivePermission = await getEffectivePermission(db, session.user.id, page.id);
+  if (effectivePermission === "none") notFound();
+
+  const isReadOnly = effectivePermission === "view" || effectivePermission === "comment";
+
   return (
     <div>
       <PageHeader page={{ id: page.id, title: page.title, icon: page.icon, cover: page.cover }} />
@@ -63,7 +69,7 @@ export default async function PageView({ params }: { params: { workspaceId: stri
             position: b.position,
             parentId: b.parentId,
           }))}
-          isLocked={page.isLocked}
+          isLocked={page.isLocked || isReadOnly}
           sessionToken={sessionToken}
           user={{ id: session.user.id, name: session.user.name }}
         />
