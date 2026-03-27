@@ -23,7 +23,11 @@ export const useThemeStore = create<ThemeStore>()(
       resolvedTheme: "light",
       setTheme: (theme: Theme) => {
         const resolved = theme === "system" ? getSystemTheme() : theme;
+        document.documentElement.setAttribute("data-transitioning", "");
         document.documentElement.setAttribute("data-theme", resolved);
+        setTimeout(() => {
+          document.documentElement.removeAttribute("data-transitioning");
+        }, 300);
         set({ theme, resolvedTheme: resolved });
       },
     }),

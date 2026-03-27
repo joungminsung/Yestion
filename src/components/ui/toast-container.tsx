@@ -8,10 +8,10 @@ export function ToastContainer() {
   if (toasts.length === 0) return null;
   return (
     <div
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 flex flex-col gap-2"
+      className="fixed bottom-4 left-1/2 -translate-x-1/2 flex flex-col-reverse gap-2"
       style={{ zIndex: "var(--z-toast)" }}
     >
-      {toasts.map((toast) => (
+      {toasts.slice(0, 3).map((toast) => (
         <Toast key={toast.id} toast={toast} />
       ))}
     </div>

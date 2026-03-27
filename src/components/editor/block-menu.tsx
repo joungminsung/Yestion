@@ -37,7 +37,7 @@ export function BlockMenu({ editor, pos, coords, onClose }: BlockMenuProps) {
   ];
 
   return (
-    <div ref={menuRef} className="fixed rounded-lg overflow-hidden py-1" style={{
+    <div ref={menuRef} className="fixed rounded-lg overflow-hidden py-1 dropdown-enter" style={{
       top: `${coords.top}px`, left: `${coords.left}px`,
       zIndex: "var(--z-dropdown)", backgroundColor: "var(--bg-primary)",
       boxShadow: "var(--shadow-popup)", width: "260px", maxHeight: "400px", overflowY: "auto",

@@ -88,7 +88,7 @@ function ChildDropdown({
   return (
     <div
       ref={ref}
-      className="absolute left-0 top-full mt-1 rounded-lg overflow-hidden py-1"
+      className="absolute left-0 top-full mt-1 rounded-lg overflow-hidden py-1 dropdown-enter"
       style={{
         width: "200px",
         zIndex: 90,
@@ -468,7 +468,7 @@ export function Topbar() {
             <>
               <div className="fixed inset-0" style={{ zIndex: 80 }} onClick={() => setShowMoreMenu(false)} />
               <div
-                className="absolute right-0 top-full mt-1 rounded-lg overflow-hidden py-1"
+                className="absolute right-0 top-full mt-1 rounded-lg overflow-hidden py-1 dropdown-enter"
                 style={{
                   width: "240px",
                   zIndex: 81,

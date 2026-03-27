@@ -117,10 +117,10 @@ export function ShareDialog({ pageId, onClose }: ShareDialogProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]">
-      <div className="fixed inset-0" style={{ backgroundColor: "rgba(0,0,0,0.2)" }} />
+      <div className="fixed inset-0 modal-backdrop-enter" style={{ backgroundColor: "rgba(0,0,0,0.2)" }} />
       <div
         ref={dialogRef}
-        className="relative rounded-lg shadow-xl w-full max-w-md"
+        className="relative rounded-lg shadow-xl w-full max-w-md modal-content-enter"
         style={{
           backgroundColor: "var(--bg-primary)",
           border: "1px solid var(--border-default)",

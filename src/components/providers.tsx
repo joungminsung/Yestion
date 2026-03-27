@@ -7,6 +7,7 @@ import { trpc } from "@/server/trpc/client";
 import superjson from "superjson";
 import { ToastContainer } from "@/components/ui/toast-container";
 import { ShortcutsProvider } from "@/components/shortcuts-provider";
+import { ScrollToTop } from "@/components/ui/scroll-to-top";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
@@ -26,6 +27,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <ShortcutsProvider>{children}</ShortcutsProvider>
         <ToastContainer />
+        <ScrollToTop />
       </QueryClientProvider>
     </trpc.Provider>
   );

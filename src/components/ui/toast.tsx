@@ -35,8 +35,10 @@ export function Toast({ toast }: { toast: ToastType }) {
     <div
       className={cn(
         "flex items-center gap-2 rounded-lg px-4 py-3 text-sm shadow-lg",
-        "transition-all duration-200",
-        isExiting ? "translate-y-2 opacity-0" : "translate-y-0 opacity-100",
+        "transition-all duration-300",
+        isExiting
+          ? "translate-y-4 opacity-0 scale-95"
+          : "translate-y-0 opacity-100 scale-100",
         "bg-notion-bg-primary border border-notion-border"
       )}
       style={{

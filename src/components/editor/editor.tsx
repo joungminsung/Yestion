@@ -39,7 +39,8 @@ import { Equation } from "./extensions/equation";
 import { TableOfContents } from "./extensions/table-of-contents";
 import { ColumnList, Column } from "./extensions/column-list";
 import { SlashCommandExtension } from "./extensions/slash-command-ext";
-import { BlockSelection } from "./extensions/block-selection";
+import { BlockSelection, BLOCK_SELECTION_KEY } from "./extensions/block-selection";
+import { MicroInteractions } from "./extensions/micro-interactions";
 import { MarkdownPaste } from "./extensions/markdown-paste";
 import { ClipboardImage } from "./extensions/clipboard-image";
 import { FileDrop } from "./extensions/file-drop";
@@ -142,6 +143,7 @@ export const NotionEditor = forwardRef<
       ClipboardImage,
       FileDrop,
       SlashCommandExtension,
+      MicroInteractions,
       ...(collaboration ? [
         Collaboration.configure({ document: collaboration.ydoc }),
         CollaborationCursor.configure({
@@ -191,6 +193,28 @@ export const NotionEditor = forwardRef<
             return true;
           }
           event.preventDefault();
+          return true;
+        }
+
+        // 7.10 ESC hierarchy
+        if (event.key === "Escape") {
+          // Level 1: Close any open menu (slash, block menu, context menu, AI)
+          // These components handle their own ESC
+
+          // Level 2: Deselect blocks
+          const blockState = BLOCK_SELECTION_KEY.getState(editor!.state);
+          if (blockState && blockState.selectedBlocks.length > 0) {
+            editor!.view.dispatch(
+              editor!.state.tr.setMeta(BLOCK_SELECTION_KEY, {
+                selectedBlocks: [],
+                anchorBlock: null,
+              })
+            );
+            return true;
+          }
+
+          // Level 3: Blur editor
+          editor!.commands.blur();
           return true;
         }
 

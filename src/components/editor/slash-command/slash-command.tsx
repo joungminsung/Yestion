@@ -112,7 +112,7 @@ export function SlashCommand({ editor }: { editor: Editor }) {
   return (
     <div
       ref={menuRef}
-      className="fixed rounded-lg overflow-hidden"
+      className="fixed rounded-lg overflow-hidden dropdown-enter"
       style={{
         top: `${menuTop}px`,
         left: `${menuLeft}px`,

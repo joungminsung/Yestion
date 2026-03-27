@@ -41,3 +41,89 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background-color: var(--text-tertiary);
 }
+
+/* 5.1 Page transition */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.page-transition-enter {
+  animation: fadeInUp 150ms ease-out;
+}
+
+/* 5.2 Sidebar motion */
+.sidebar-tree-enter {
+  animation: slideDown 200ms ease-out;
+}
+
+@keyframes slideDown {
+  from { max-height: 0; opacity: 0; }
+  to { max-height: 500px; opacity: 1; }
+}
+
+/* 5.4 Modal transitions */
+.modal-backdrop-enter {
+  animation: fadeIn 200ms ease-out;
+}
+
+.modal-content-enter {
+  animation: scaleIn 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* 5.5 Dropdown/popover animation */
+.dropdown-enter {
+  animation: dropdownIn 150ms ease-out;
+  transform-origin: top;
+}
+
+@keyframes dropdownIn {
+  from { opacity: 0; transform: scaleY(0.96); }
+  to { opacity: 1; transform: scaleY(1); }
+}
+
+/* 5.7 Selection animation */
+.notion-block-selected {
+  transition: background-color 150ms ease;
+}
+
+/* 5.10 Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* 5.11 Cursor feedback */
+.cursor-grab { cursor: grab; }
+.cursor-grab:active { cursor: grabbing; }
+
+/* 5.12 Hover consistency */
+.hover-bg:hover {
+  background-color: var(--bg-hover);
+  transition: background-color 100ms ease;
+}
+
+/* 5.13 Focus ring (keyboard only) */
+*:focus-visible {
+  outline: 2px solid #2383e2;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* 5.14 Dark mode transition */
+html[data-transitioning] * {
+  transition: background-color 300ms ease, color 300ms ease, border-color 300ms ease !important;
+}

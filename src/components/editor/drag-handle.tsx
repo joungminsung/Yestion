@@ -14,8 +14,10 @@ type DragHandleProps = { editor: Editor; onMenuOpen: (pos: number) => void };
 export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const [hoveredPos, setHoveredPos] = useState<number | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<{ top: number; left: number; width: number } | null>(null);
   const showTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoScrollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleMouseMove = useCallback((event: MouseEvent) => {
     if (!editor.view) { setPosition(null); return; }
@@ -83,87 +85,201 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
     };
   }, [editor, handleMouseMove, handleMouseLeave]);
 
+  /** Find the nearest block boundary Y position for a given clientY */
+  const findDropTarget = useCallback((clientY: number): { top: number; blockPos: number } | null => {
+    if (!editor.view) return null;
+    const view = editor.view;
+    const doc = view.state.doc;
+    let closestTop = 0;
+    let closestBlockPos = 0;
+    let closestDist = Infinity;
+    let found = false;
+
+    doc.forEach((node, offset) => {
+      const dom = view.nodeDOM(offset);
+      if (!dom || !(dom instanceof HTMLElement)) return;
+      const rect = dom.getBoundingClientRect();
+
+      // Check top edge
+      const topDist = Math.abs(clientY - rect.top);
+      if (topDist < closestDist) {
+        closestTop = rect.top;
+        closestBlockPos = offset;
+        closestDist = topDist;
+        found = true;
+      }
+
+      // Check bottom edge (insert after this block)
+      const bottomDist = Math.abs(clientY - rect.bottom);
+      if (bottomDist < closestDist) {
+        closestTop = rect.bottom;
+        closestBlockPos = offset + node.nodeSize;
+        closestDist = bottomDist;
+        found = true;
+      }
+    });
+
+    return found ? { top: closestTop, blockPos: closestBlockPos } : null;
+  }, [editor]);
+
   if (!position) return null;
 
   return (
-    <div className="fixed flex items-center gap-0.5 opacity-0 hover:opacity-100 transition-opacity" style={{ top: `${position.top}px`, left: `${position.left}px` }}>
-      <button className="w-6 h-6 flex items-center justify-center rounded hover:bg-notion-bg-hover"
-        style={{ color: "var(--text-tertiary)", fontSize: "18px" }}
-        onClick={() => { if (hoveredPos !== null) editor.chain().focus().insertContentAt(hoveredPos, { type: "paragraph" }).run(); }}
-        title="블록 추가">+</button>
-      <button
-        className="w-6 h-6 flex items-center justify-center rounded hover:bg-notion-bg-hover cursor-grab active:cursor-grabbing"
-        style={{ color: "var(--text-tertiary)", fontSize: "12px" }}
-        draggable
-        onMouseDown={(e) => {
-          if (hoveredPos === null || !editor.view) return;
-          e.preventDefault();
+    <>
+      <div className="fixed flex items-center gap-0.5 opacity-0 hover:opacity-100 transition-opacity" style={{ top: `${position.top}px`, left: `${position.left}px` }}>
+        <button className="w-6 h-6 flex items-center justify-center rounded hover:bg-notion-bg-hover"
+          style={{ color: "var(--text-tertiary)", fontSize: "18px" }}
+          onClick={() => { if (hoveredPos !== null) editor.chain().focus().insertContentAt(hoveredPos, { type: "paragraph" }).run(); }}
+          title="블록 추가">+</button>
+        <button
+          className="w-6 h-6 flex items-center justify-center rounded hover:bg-notion-bg-hover cursor-grab active:cursor-grabbing"
+          style={{ color: "var(--text-tertiary)", fontSize: "12px" }}
+          draggable
+          onMouseDown={(e) => {
+            if (hoveredPos === null || !editor.view) return;
+            e.preventDefault();
 
-          const startPos = hoveredPos;
+            const startPos = hoveredPos;
 
-          // Handle shift+click for range selection
-          if (e.shiftKey) {
-            const currentState = BLOCK_SELECTION_KEY.getState(editor.state);
-            if (currentState?.anchorBlock !== null) {
-              selectBlockRange(editor, currentState.anchorBlock, startPos);
-            } else {
-              selectBlock(editor, startPos);
+            // Handle shift+click for range selection
+            if (e.shiftKey) {
+              const currentState = BLOCK_SELECTION_KEY.getState(editor.state);
+              if (currentState?.anchorBlock !== null) {
+                selectBlockRange(editor, currentState.anchorBlock, startPos);
+              } else {
+                selectBlock(editor, startPos);
+              }
+              return;
             }
-            return;
-          }
 
-          // Select the single block immediately
-          selectBlock(editor, startPos);
+            // Select the single block immediately
+            selectBlock(editor, startPos);
 
-          // Also set ProseMirror NodeSelection so native drag works
-          try {
-            const tr = editor.state.tr.setSelection(
-              NodeSelection.create(editor.state.doc, startPos)
-            );
-            tr.setMeta(BLOCK_SELECTION_KEY, {
-              selectedBlocks: [startPos],
-              anchorBlock: startPos,
-            });
-            editor.view.dispatch(tr);
-          } catch {
-            // NodeSelection may fail for some node types
-          }
-
-          // Drag-to-select: track mouse movement
-          const handleMouseMoveForDrag = (moveEvent: MouseEvent) => {
-            const coords = editor.view.posAtCoords({
-              left: moveEvent.clientX,
-              top: moveEvent.clientY,
-            });
-            if (!coords) return;
+            // Also set ProseMirror NodeSelection so native drag works
             try {
-              const resolved = editor.state.doc.resolve(coords.pos);
-              const endBlockPos = resolved.before(1);
-              selectBlockRange(editor, startPos, endBlockPos);
+              const tr = editor.state.tr.setSelection(
+                NodeSelection.create(editor.state.doc, startPos)
+              );
+              tr.setMeta(BLOCK_SELECTION_KEY, {
+                selectedBlocks: [startPos],
+                anchorBlock: startPos,
+              });
+              editor.view.dispatch(tr);
             } catch {
-              // ignore resolve errors
+              // NodeSelection may fail for some node types
             }
-          };
 
-          const handleMouseUpForDrag = () => {
-            document.removeEventListener("mousemove", handleMouseMoveForDrag);
-            document.removeEventListener("mouseup", handleMouseUpForDrag);
-          };
+            let isDragging = false;
+            let dropTargetPos: number | null = null;
 
-          document.addEventListener("mousemove", handleMouseMoveForDrag);
-          document.addEventListener("mouseup", handleMouseUpForDrag);
-        }}
-        onClick={(e) => {
-          if (hoveredPos === null) return;
-          // Open menu on click (but not on shift-click)
-          if (!e.shiftKey) {
-            onMenuOpen(hoveredPos);
-          }
-        }}
-        title="드래그하여 이동 / 클릭하여 메뉴"
-      >
-        ⋮⋮
-      </button>
-    </div>
+            // Drag-to-select: track mouse movement
+            const handleMouseMoveForDrag = (moveEvent: MouseEvent) => {
+              isDragging = true;
+
+              // Auto-scroll when near edges
+              const editorRect = editor.view.dom.getBoundingClientRect();
+              if (autoScrollRef.current) {
+                clearInterval(autoScrollRef.current);
+                autoScrollRef.current = null;
+              }
+
+              if (moveEvent.clientY < editorRect.top + 50) {
+                const speed = Math.max(1, Math.round((50 - (moveEvent.clientY - editorRect.top)) / 5));
+                autoScrollRef.current = setInterval(() => window.scrollBy(0, -speed), 16);
+              } else if (moveEvent.clientY > editorRect.bottom - 50) {
+                const speed = Math.max(1, Math.round((50 - (editorRect.bottom - moveEvent.clientY)) / 5));
+                autoScrollRef.current = setInterval(() => window.scrollBy(0, speed), 16);
+              }
+
+              // Find nearest block boundary for drop indicator
+              const target = findDropTarget(moveEvent.clientY);
+              if (target) {
+                dropTargetPos = target.blockPos;
+                setDropIndicator({
+                  top: target.top,
+                  left: editorRect.left,
+                  width: editorRect.width,
+                });
+              }
+
+              // Also update block range selection visual
+              const coords = editor.view.posAtCoords({
+                left: moveEvent.clientX,
+                top: moveEvent.clientY,
+              });
+              if (!coords) return;
+              try {
+                const resolved = editor.state.doc.resolve(coords.pos);
+                const endBlockPos = resolved.before(1);
+                selectBlockRange(editor, startPos, endBlockPos);
+              } catch {
+                // ignore resolve errors
+              }
+            };
+
+            const handleMouseUpForDrag = () => {
+              // Clear auto-scroll
+              if (autoScrollRef.current) {
+                clearInterval(autoScrollRef.current);
+                autoScrollRef.current = null;
+              }
+
+              // Perform the actual block move if we were dragging
+              if (isDragging && dropTargetPos !== null && dropTargetPos !== startPos) {
+                try {
+                  const node = editor.state.doc.nodeAt(startPos);
+                  if (node) {
+                    const tr = editor.state.tr;
+                    // Adjust target position if it's after the source
+                    let insertAt = dropTargetPos;
+                    if (insertAt > startPos) {
+                      insertAt = insertAt - node.nodeSize;
+                    }
+                    tr.delete(startPos, startPos + node.nodeSize);
+                    insertAt = Math.min(insertAt, tr.doc.content.size);
+                    insertAt = Math.max(0, insertAt);
+                    tr.insert(insertAt, node);
+                    editor.view.dispatch(tr);
+                  }
+                } catch {
+                  // ignore move errors
+                }
+              }
+
+              setDropIndicator(null);
+              document.removeEventListener("mousemove", handleMouseMoveForDrag);
+              document.removeEventListener("mouseup", handleMouseUpForDrag);
+            };
+
+            document.addEventListener("mousemove", handleMouseMoveForDrag);
+            document.addEventListener("mouseup", handleMouseUpForDrag);
+          }}
+          onClick={(e) => {
+            if (hoveredPos === null) return;
+            // Open menu on click (but not on shift-click)
+            if (!e.shiftKey) {
+              onMenuOpen(hoveredPos);
+            }
+          }}
+          title="드래그하여 이동 / 클릭하여 메뉴"
+        >
+          ⋮⋮
+        </button>
+      </div>
+
+      {/* Drop indicator line */}
+      {dropIndicator && (
+        <div
+          className="fixed h-[2px] pointer-events-none"
+          style={{
+            top: `${dropIndicator.top}px`,
+            left: `${dropIndicator.left}px`,
+            width: `${dropIndicator.width}px`,
+            backgroundColor: "#2383e2",
+            zIndex: 1000,
+          }}
+        />
+      )}
+    </>
   );
 }

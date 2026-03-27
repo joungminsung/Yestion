@@ -323,3 +323,43 @@
   pointer-events: none;
   border-radius: 3px;
 }
+
+/* 7.3 Drag handle tooltips */
+.notion-handle-tooltip {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  background-color: var(--text-primary);
+  color: var(--bg-primary);
+}
+
+/* 7.4 Empty page guidance */
+.notion-editor-empty-state {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  opacity: 0.6;
+}
+
+.notion-editor-empty-state button {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+  background: var(--bg-primary);
+  cursor: pointer;
+}
+
+.notion-editor-empty-state button:hover {
+  background: var(--bg-hover);
+}

@@ -49,7 +49,7 @@ export default async function PageView({ params }: { params: { workspaceId: stri
   const isReadOnly = effectivePermission === "view" || effectivePermission === "comment";
 
   return (
-    <div>
+    <div className="page-transition-enter">
       <PageHeader page={{ id: page.id, title: page.title, icon: page.icon, cover: page.cover }} />
       <div
         className="mx-auto"

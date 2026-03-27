@@ -35,7 +35,7 @@ export function PageIconPicker({ currentIcon, onSelect, onClose }: PageIconPicke
   return (
     <div
       ref={ref}
-      className="absolute z-50 rounded-lg p-3"
+      className="absolute z-50 rounded-lg p-3 dropdown-enter"
       style={{
         backgroundColor: "var(--bg-primary)",
         boxShadow: "var(--shadow-popup)",

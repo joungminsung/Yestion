@@ -42,12 +42,12 @@ export function SidebarTrash({ workspaceId }: { workspaceId: string }) {
       {isOpen && (
         <>
           <div
-            className="fixed inset-0"
+            className="fixed inset-0 modal-backdrop-enter"
             style={{ zIndex: "var(--z-modal)", backgroundColor: "rgba(15,15,15,0.6)" }}
             onClick={() => setIsOpen(false)}
           />
           <div
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] max-h-[70vh] rounded-lg overflow-hidden flex flex-col"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] max-h-[70vh] rounded-lg overflow-hidden flex flex-col modal-content-enter"
             style={{
               zIndex: "calc(var(--z-modal) + 1)",
               backgroundColor: "var(--bg-primary)",
