@@ -220,7 +220,7 @@ function OptionsList({
   const addOption = () => {
     if (!newName.trim()) return;
     const id = `opt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const color = OPTION_COLORS[options.length % OPTION_COLORS.length];
+    const color = OPTION_COLORS[options.length % OPTION_COLORS.length] ?? "default";
     onChange([...options, { id, name: newName.trim(), color }]);
     setNewName("");
   };

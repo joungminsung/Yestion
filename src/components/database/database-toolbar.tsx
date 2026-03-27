@@ -3,18 +3,17 @@
 import { useMemo } from "react";
 import { useDatabaseStore } from "@/stores/database";
 import { Button } from "@/components/ui/button";
-import type { DatabaseData } from "@/types/database";
+import type { ViewConfig } from "@/types/database";
 
 type DatabaseToolbarProps = {
-  database: DatabaseData;
-  activeView: DatabaseData["views"][number] | null;
+  activeViewConfig: ViewConfig | null;
 };
 
-export function DatabaseToolbar({ database, activeView }: DatabaseToolbarProps) {
+export function DatabaseToolbar({ activeViewConfig }: DatabaseToolbarProps) {
   const { localFilters, localSorts } = useDatabaseStore();
 
-  const effectiveFilter = localFilters ?? activeView?.config.filter;
-  const effectiveSorts = localSorts ?? activeView?.config.sorts;
+  const effectiveFilter = localFilters ?? activeViewConfig?.filter;
+  const effectiveSorts = localSorts ?? activeViewConfig?.sorts;
 
   const filterCount = useMemo(() => {
     if (!effectiveFilter) return 0;
@@ -25,7 +24,7 @@ export function DatabaseToolbar({ database, activeView }: DatabaseToolbarProps) 
     return effectiveSorts?.length ?? 0;
   }, [effectiveSorts]);
 
-  const hasGroup = !!(activeView?.config.group);
+  const hasGroup = !!activeViewConfig?.group;
 
   return (
     <div
@@ -80,8 +79,6 @@ function Badge({ count }: { count: number }) {
     </span>
   );
 }
-
-// Inline SVG icons (no external icon lib dependency)
 
 function FilterIcon() {
   return (

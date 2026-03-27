@@ -192,11 +192,11 @@ const COLOR_MAP: Record<string, { bg: string; text: string }> = {
 };
 
 function colorToBg(color: string): string {
-  return COLOR_MAP[color]?.bg ?? COLOR_MAP.default.bg;
+  return COLOR_MAP[color]?.bg ?? "#e3e2e0";
 }
 
 function colorToText(color: string): string {
-  return COLOR_MAP[color]?.text ?? COLOR_MAP.default.text;
+  return COLOR_MAP[color]?.text ?? "#37352f";
 }
 
 function formatNumber(n: number, config: PropertyConfig): string {

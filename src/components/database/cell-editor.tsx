@@ -433,11 +433,11 @@ function OptionBadge({
   option: SelectOption;
   onRemove?: () => void;
 }) {
-  const colors = COLOR_MAP[option.color] ?? COLOR_MAP.default;
+  const colors = COLOR_MAP[option.color] ?? COLOR_MAP.default!;
   return (
     <span
       className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-medium"
-      style={{ backgroundColor: colors.bg, color: colors.text }}
+      style={{ backgroundColor: colors!.bg, color: colors!.text }}
     >
       {option.name}
       {onRemove && (

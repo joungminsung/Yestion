@@ -6,11 +6,17 @@ import { useDatabaseStore } from "@/stores/database";
 import { filterRows } from "@/lib/database/filter-engine";
 import { sortRows } from "@/lib/database/sort-engine";
 import { DatabaseToolbar } from "./database-toolbar";
-import type { DatabaseData } from "@/types/database";
+import type { ViewConfig, FilterGroup, SortRule } from "@/types/database";
 
 type DatabaseViewProps = {
   databaseId: string;
 };
+
+/** Safely cast Prisma JSON config to ViewConfig */
+function asViewConfig(config: unknown): ViewConfig {
+  if (config && typeof config === "object") return config as ViewConfig;
+  return {};
+}
 
 export function DatabaseView({ databaseId }: DatabaseViewProps) {
   const { data, isLoading, error } = trpc.database.get.useQuery({ databaseId });
@@ -25,8 +31,9 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
 
   // Auto-select first view
   useEffect(() => {
-    if (data && data.views.length > 0 && !activeViewId) {
-      setActiveView(data.views[0].id);
+    const firstView = data?.views[0];
+    if (firstView && !activeViewId) {
+      setActiveView(firstView.id);
     }
   }, [data, activeViewId, setActiveView]);
 
@@ -40,6 +47,11 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
     [data, activeViewId],
   );
 
+  const activeViewConfig = useMemo(
+    () => (activeView ? asViewConfig(activeView.config) : undefined),
+    [activeView],
+  );
+
   // Build property type map for sort engine
   const propertyTypes = useMemo(() => {
     if (!data) return {};
@@ -49,13 +61,22 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
   }, [data]);
 
   // Effective filter/sort (local overrides > view config)
-  const effectiveFilter = localFilters ?? activeView?.config.filter;
-  const effectiveSorts = localSorts ?? activeView?.config.sorts;
+  const effectiveFilter: FilterGroup | undefined =
+    localFilters ?? activeViewConfig?.filter;
+  const effectiveSorts: SortRule[] | undefined =
+    localSorts ?? activeViewConfig?.sorts;
 
   // Apply filter + sort
   const processedRows = useMemo(() => {
     if (!data) return [];
-    const filtered = filterRows(data.rows, effectiveFilter);
+    // Cast rows: Prisma values field is JsonValue; treat as Record<string, unknown>
+    const rows = data.rows.map((r) => ({
+      ...r,
+      values: (r.values && typeof r.values === "object" && !Array.isArray(r.values)
+        ? r.values
+        : {}) as Record<string, unknown>,
+    }));
+    const filtered = filterRows(rows, effectiveFilter);
     return sortRows(filtered, effectiveSorts, propertyTypes);
   }, [data, effectiveFilter, effectiveSorts, propertyTypes]);
 
@@ -97,39 +118,22 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
       </div>
 
       {/* Toolbar */}
-      <DatabaseToolbar database={data} activeView={activeView ?? null} />
+      <DatabaseToolbar activeViewConfig={activeViewConfig ?? null} />
 
       {/* Active view placeholder */}
       <div className="min-h-[200px] p-2">
-        <ActiveViewContent
-          database={data}
-          viewType={activeView?.type ?? "table"}
-          rows={processedRows}
-        />
+        <div className="text-sm text-[var(--text-secondary)]">
+          <p className="mb-2 font-medium text-[var(--text-primary)]">
+            {(activeView?.type ?? "table").charAt(0).toUpperCase() +
+              (activeView?.type ?? "table").slice(1)}{" "}
+            view
+          </p>
+          <p>
+            {processedRows.length} row{processedRows.length !== 1 ? "s" : ""} |{" "}
+            {data.properties.length} properties
+          </p>
+        </div>
       </div>
-    </div>
-  );
-}
-
-// Placeholder for view-specific components (table, board, etc.)
-function ActiveViewContent({
-  database,
-  viewType,
-  rows,
-}: {
-  database: DatabaseData;
-  viewType: string;
-  rows: DatabaseData["rows"];
-}) {
-  return (
-    <div className="text-sm text-[var(--text-secondary)]">
-      <p className="mb-2 font-medium text-[var(--text-primary)]">
-        {viewType.charAt(0).toUpperCase() + viewType.slice(1)} view
-      </p>
-      <p>
-        {rows.length} row{rows.length !== 1 ? "s" : ""} |{" "}
-        {database.properties.length} properties
-      </p>
     </div>
   );
 }
