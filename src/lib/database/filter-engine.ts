@@ -64,12 +64,16 @@ function matchCondition(row: RowData, condition: FilterCondition): boolean {
     case "less_than_or_equal":
       return Number(value) <= Number(target);
     case "before":
+      if (value == null || value === "") return false;
       return new Date(String(value)).getTime() < new Date(String(target)).getTime();
     case "after":
+      if (value == null || value === "") return false;
       return new Date(String(value)).getTime() > new Date(String(target)).getTime();
     case "on_or_before":
+      if (value == null || value === "") return false;
       return new Date(String(value)).getTime() <= new Date(String(target)).getTime();
     case "on_or_after":
+      if (value == null || value === "") return false;
       return new Date(String(value)).getTime() >= new Date(String(target)).getTime();
     default:
       return true;

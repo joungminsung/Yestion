@@ -2,7 +2,8 @@
 
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import type { DatabaseData, SortRule, PropertyType } from "@/types/database";
+import { propertyTypeIcon } from "./property-type-icon";
+import type { DatabaseData, SortRule } from "@/types/database";
 
 type DatabaseSortProps = {
   properties: DatabaseData["properties"];
@@ -10,32 +11,6 @@ type DatabaseSortProps = {
   onSortChange: (sorts: SortRule[] | null) => void;
   onClose: () => void;
 };
-
-function propertyTypeIcon(type: PropertyType): string {
-  switch (type) {
-    case "title": return "Aa";
-    case "text": return "T";
-    case "number": return "#";
-    case "select": return "\u25BD";
-    case "multi_select": return "\u25BD\u25BD";
-    case "date": return "\uD83D\uDCC5";
-    case "person": return "\uD83D\uDC64";
-    case "file": return "\uD83D\uDCCE";
-    case "checkbox": return "\u2611";
-    case "url": return "\uD83D\uDD17";
-    case "email": return "\u2709";
-    case "phone": return "\uD83D\uDCDE";
-    case "formula": return "\u0192";
-    case "relation": return "\u2194";
-    case "rollup": return "\u2211";
-    case "created_time": return "\uD83D\uDD52";
-    case "created_by": return "\uD83D\uDC64";
-    case "last_edited_time": return "\uD83D\uDD52";
-    case "last_edited_by": return "\uD83D\uDC64";
-    case "status": return "\u25CF";
-    default: return "?";
-  }
-}
 
 export function DatabaseSort({
   properties,

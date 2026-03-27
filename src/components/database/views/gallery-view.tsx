@@ -67,9 +67,17 @@ export function GalleryView({
       {rows.map((row) => {
         const title = row.page?.title ?? "Untitled";
         const icon = row.page?.icon;
-        const coverValue =
+        const rawCoverValue =
           coverPropertyId && coverPropertyId !== "__cover"
             ? (row.values[coverPropertyId] as string | undefined)
+            : undefined;
+        // Sanitize cover URL to prevent XSS
+        const coverValue =
+          typeof rawCoverValue === "string" &&
+          (rawCoverValue.startsWith("http://") ||
+            rawCoverValue.startsWith("https://") ||
+            rawCoverValue.startsWith("/"))
+            ? rawCoverValue
             : undefined;
         const hasCover = !!coverValue;
 

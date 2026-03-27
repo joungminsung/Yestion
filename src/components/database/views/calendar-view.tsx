@@ -162,7 +162,7 @@ export function CalendarView({
           return (
             <div
               key={key}
-              className="min-h-[100px] border-b border-r p-1"
+              className="group min-h-[100px] border-b border-r p-1"
               style={{
                 borderColor: "var(--border-default)",
                 backgroundColor: isCurrentMonth

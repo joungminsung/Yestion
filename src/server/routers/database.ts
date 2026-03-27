@@ -213,15 +213,23 @@ export const databaseRouter = router({
     .mutation(async ({ ctx, input }) => {
       if (input.properties.length === 0) return { success: true };
 
-      // Verify access via the first property
-      const first = await ctx.db.property.findUnique({
-        where: { id: input.properties[0]!.id },
-        include: { database: { include: { page: { select: { workspaceId: true } } } } },
+      // Verify ALL properties belong to the same database
+      const allProperties = await ctx.db.property.findMany({
+        where: { id: { in: input.properties.map((p) => p.id) } },
+        select: { id: true, databaseId: true },
       });
-      if (!first) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Property not found" });
+
+      if (allProperties.length !== input.properties.length) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "One or more properties not found" });
       }
-      await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, first.database.page.workspaceId);
+
+      const uniqueDbIds = new Set(allProperties.map((p) => p.databaseId));
+      if (uniqueDbIds.size !== 1) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "All properties must belong to the same database" });
+      }
+
+      const databaseId = Array.from(uniqueDbIds)[0]!;
+      await verifyDatabaseAccess(ctx.db, ctx.session.user.id, databaseId);
 
       await Promise.all(
         input.properties.map((p) =>
@@ -393,9 +401,11 @@ export const databaseRouter = router({
       }
       await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, row.database.page.workspaceId);
 
-      // Delete row first (has FK to page), then the page
-      await ctx.db.row.delete({ where: { id: input.id } });
-      await ctx.db.page.delete({ where: { id: row.pageId } });
+      // Delete row and its page in a transaction
+      await ctx.db.$transaction(async (tx) => {
+        await tx.row.delete({ where: { id: input.id } });
+        await tx.page.delete({ where: { id: row.pageId } });
+      });
 
       return { success: true };
     }),

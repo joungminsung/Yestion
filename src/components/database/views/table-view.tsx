@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useMemo } from "react";
 import { CellRenderer } from "../cell-renderer";
 import { CellEditor } from "../cell-editor";
+import { propertyTypeIcon } from "../property-type-icon";
 import type { DatabaseData, RowData, ViewConfig, PropertyType } from "@/types/database";
 
 type TableViewProps = {
@@ -20,33 +21,6 @@ const DEFAULT_COLUMN_WIDTH = 200;
 const MIN_COLUMN_WIDTH = 100;
 const TITLE_COLUMN_WIDTH = 260;
 const ROW_NUMBER_WIDTH = 32;
-
-/** Map property type to a small icon character */
-function propertyTypeIcon(type: PropertyType): string {
-  switch (type) {
-    case "title": return "Aa";
-    case "text": return "T";
-    case "number": return "#";
-    case "select": return "\u25BC";
-    case "multi_select": return "\u25A4";
-    case "date": return "\uD83D\uDCC5";
-    case "person": return "\uD83D\uDC64";
-    case "file": return "\uD83D\uDCCE";
-    case "checkbox": return "\u2611";
-    case "url": return "\uD83D\uDD17";
-    case "email": return "@";
-    case "phone": return "\uD83D\uDCDE";
-    case "status": return "\u25CF";
-    case "created_time":
-    case "last_edited_time": return "\uD83D\uDD52";
-    case "created_by":
-    case "last_edited_by": return "\uD83D\uDC64";
-    case "formula": return "f";
-    case "relation": return "\u2194";
-    case "rollup": return "\u2211";
-    default: return "?";
-  }
-}
 
 export function TableView({
   properties,

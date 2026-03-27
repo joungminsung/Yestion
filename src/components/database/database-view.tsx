@@ -1,11 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { trpc } from "@/server/trpc/client";
 import { useDatabaseStore } from "@/stores/database";
 import { filterRows } from "@/lib/database/filter-engine";
 import { sortRows } from "@/lib/database/sort-engine";
 import { DatabaseToolbar } from "./database-toolbar";
+import { TableView } from "./views/table-view";
+import { BoardView } from "./views/board-view";
+import { ListView } from "./views/list-view";
+import { GalleryView } from "./views/gallery-view";
+import { CalendarView } from "./views/calendar-view";
+import { TimelineView } from "./views/timeline-view";
 import type { ViewConfig, FilterGroup, SortRule, DatabaseData } from "@/types/database";
 
 type DatabaseViewProps = {
@@ -19,8 +26,19 @@ function asViewConfig(config: unknown): ViewConfig {
 }
 
 export function DatabaseView({ databaseId }: DatabaseViewProps) {
+  const router = useRouter();
+  const utils = trpc.useUtils();
   const { data, isLoading, error } = trpc.database.get.useQuery({ databaseId });
   const updateViewMutation = trpc.database.updateView.useMutation();
+  const addRowMutation = trpc.database.addRow.useMutation({
+    onSuccess: () => utils.database.get.invalidate({ databaseId }),
+  });
+  const updateRowMutation = trpc.database.updateRow.useMutation({
+    onSuccess: () => utils.database.get.invalidate({ databaseId }),
+  });
+  const addPropertyMutation = trpc.database.addProperty.useMutation({
+    onSuccess: () => utils.database.get.invalidate({ databaseId }),
+  });
 
   const {
     activeViewId,
@@ -76,6 +94,43 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
     [activeView, updateViewMutation],
   );
 
+  // ── View callback handlers ──────────────────────────────────
+
+  const handleAddRow = useCallback(
+    (defaultValues?: Record<string, unknown>) => {
+      addRowMutation.mutate({
+        databaseId,
+        values: defaultValues ?? {},
+      });
+    },
+    [addRowMutation, databaseId],
+  );
+
+  const handleUpdateRow = useCallback(
+    (rowId: string, propertyId: string, value: unknown) => {
+      updateRowMutation.mutate({
+        id: rowId,
+        values: { [propertyId]: value },
+      });
+    },
+    [updateRowMutation],
+  );
+
+  const handleRowClick = useCallback(
+    (pageId: string) => {
+      router.push(`/page/${pageId}`);
+    },
+    [router],
+  );
+
+  const handleAddProperty = useCallback(() => {
+    addPropertyMutation.mutate({
+      databaseId,
+      name: "New Property",
+      type: "text",
+    });
+  }, [addPropertyMutation, databaseId]);
+
   // Apply filter + sort
   const processedRows = useMemo(() => {
     if (!data) return [];
@@ -89,6 +144,40 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
     const filtered = filterRows(rows, effectiveFilter);
     return sortRows(filtered, effectiveSorts, propertyTypes);
   }, [data, effectiveFilter, effectiveSorts, propertyTypes]);
+
+  // ── Render the active view component ────────────────────────
+
+  function renderView() {
+    if (!data || !activeViewConfig) return null;
+
+    const viewProps = {
+      databaseId: data.id ?? databaseId,
+      properties: data.properties as DatabaseData["properties"],
+      rows: processedRows,
+      viewConfig: activeViewConfig,
+      onAddRow: handleAddRow,
+      onUpdateRow: handleUpdateRow,
+      onRowClick: handleRowClick,
+      onAddProperty: handleAddProperty,
+    };
+
+    switch (activeView?.type) {
+      case "table":
+        return <TableView {...viewProps} />;
+      case "board":
+        return <BoardView {...viewProps} />;
+      case "list":
+        return <ListView {...viewProps} />;
+      case "gallery":
+        return <GalleryView {...viewProps} />;
+      case "calendar":
+        return <CalendarView {...viewProps} />;
+      case "timeline":
+        return <TimelineView {...viewProps} />;
+      default:
+        return <TableView {...viewProps} />;
+    }
+  }
 
   if (isLoading) {
     return (
@@ -133,21 +222,12 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
         activeViewId={activeView?.id ?? null}
         properties={data.properties as DatabaseData["properties"]}
         onUpdateViewConfig={handleUpdateViewConfig}
+        databaseId={databaseId}
       />
 
-      {/* Active view placeholder */}
-      <div className="min-h-[200px] p-2">
-        <div className="text-sm text-[var(--text-secondary)]">
-          <p className="mb-2 font-medium text-[var(--text-primary)]">
-            {(activeView?.type ?? "table").charAt(0).toUpperCase() +
-              (activeView?.type ?? "table").slice(1)}{" "}
-            view
-          </p>
-          <p>
-            {processedRows.length} row{processedRows.length !== 1 ? "s" : ""} |{" "}
-            {data.properties.length} properties
-          </p>
-        </div>
+      {/* Active view */}
+      <div className="min-h-[200px]">
+        {renderView()}
       </div>
     </div>
   );
