@@ -12,7 +12,7 @@ import { SidebarTrash } from "./sidebar-trash";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/server/trpc/client";
-import { Search, Settings, Plus, FileText, LayoutTemplate, BarChart3 } from "lucide-react";
+import { Search, Settings, Plus, FileText, LayoutTemplate, BarChart3, Zap } from "lucide-react";
 import { useSidebarKeyboardNav } from "./sidebar-keyboard-nav";
 import { PageTemplatePicker } from "@/components/page/page-template-picker";
 import { useTranslations } from "next-intl";
@@ -205,6 +205,16 @@ export function Sidebar() {
           >
             <BarChart3 size={16} />
             <span>Projects</span>
+          </button>
+
+          {/* Automations */}
+          <button
+            onClick={() => router.push(`/${workspaceId}/automations`)}
+            className="flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto"
+            style={{ fontSize: "14px", color: "var(--text-secondary)" }}
+          >
+            <Zap size={16} />
+            <span>Automations</span>
           </button>
 
           {/* Settings */}
