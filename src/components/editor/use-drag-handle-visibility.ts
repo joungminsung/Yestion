@@ -103,14 +103,16 @@ export function useDragHandleVisibility() {
 
   useEffect(() => clearTimer, [clearTimer]);
 
+  // CSS transition handles the smooth animation between 0 and 1.
+  // appearing/disappearing use target opacity; the 150ms CSS transition does the rest.
   const opacity =
     state.phase === "hidden"
       ? 0
       : state.phase === "appearing"
-        ? 0.5
+        ? 1   // target: full opacity (CSS transitions from 0)
         : state.phase === "visible"
           ? 1
-          : 0.5;
+          : 0; // disappearing: target 0 (CSS transitions from 1)
 
   return { state, show, hide, lock, unlock, opacity };
 }

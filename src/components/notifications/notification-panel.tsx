@@ -34,7 +34,7 @@ export function NotificationPanel({ onClose }: { onClose: () => void }) {
   const params = useParams();
   const workspaceId = params.workspaceId as string | undefined;
 
-  const [activeTab, setActiveTab] = useState<"all" | "unread" | "mentions">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "unread" | "mentions" | "comments">("all");
 
   const utils = trpc.useUtils();
   const { data, isLoading } = trpc.notification.list.useQuery(
@@ -65,6 +65,7 @@ export function NotificationPanel({ onClose }: { onClose: () => void }) {
     switch (activeTab) {
       case "unread": return notifications.filter((n) => !n.read);
       case "mentions": return notifications.filter((n) => n.type === "mention");
+      case "comments": return notifications.filter((n) => n.type === "comment" || n.type === "comment_reply");
       default: return notifications;
     }
   }, [notifications, activeTab]);
@@ -175,7 +176,7 @@ export function NotificationPanel({ onClose }: { onClose: () => void }) {
 
         {/* Tabs */}
         <div className="flex gap-1 px-3 py-1 border-b flex-shrink-0" style={{ borderColor: "var(--border-default)" }}>
-          {(["all", "unread", "mentions"] as const).map((tab) => (
+          {(["all", "unread", "mentions", "comments"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -190,7 +191,9 @@ export function NotificationPanel({ onClose }: { onClose: () => void }) {
                 ? "전체"
                 : tab === "unread"
                 ? `안 읽음${unreadCount ? ` (${unreadCount})` : ""}`
-                : "멘션"}
+                : tab === "mentions"
+                ? "멘션"
+                : "댓글"}
             </button>
           ))}
         </div>

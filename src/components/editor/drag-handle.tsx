@@ -16,13 +16,22 @@ import { useDragHandleVisibility } from "./use-drag-handle-visibility";
 type DragHandleProps = { editor: Editor; onMenuOpen: (pos: number) => void };
 
 /**
- * Resolves the nearest top-level block position for a given ProseMirror position.
- * Walks up from the deepest node to find the outermost block ancestor.
+ * Resolves the deepest block-level node position at a given ProseMirror position.
+ * Walks from max depth upward to find the innermost block ancestor,
+ * enabling drag handles on blocks inside toggles, columns, and tables.
  */
 function resolveBlockPos(doc: PmNode, pos: number): number {
   try {
     const $pos = doc.resolve(pos);
-    for (let d = 1; d <= $pos.depth; d++) {
+    // Walk from deepest to shallowest to find the innermost block
+    for (let d = $pos.depth; d >= 1; d--) {
+      const node = $pos.node(d);
+      if (node.isBlock && node.isTextblock === false) {
+        return $pos.before(d);
+      }
+    }
+    // Fallback: find the nearest textblock's parent
+    for (let d = $pos.depth; d >= 1; d--) {
       const node = $pos.node(d);
       if (node.isBlock) {
         return $pos.before(d);
@@ -46,13 +55,14 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
   const computeHandlePosition = useCallback(
     (blockDom: HTMLElement) => {
       const blockRect = blockDom.getBoundingClientRect();
-      const editorRect = editor.view.dom.getBoundingClientRect();
+      const handleWidth = 28;
+      const gap = 8;
       return {
         top: blockRect.top + 2,
-        left: Math.max(editorRect.left - 44, 8),
+        left: Math.max(blockRect.left - handleWidth - gap, 8),
       };
     },
-    [editor]
+    []
   );
 
   const handleMouseMove = useCallback(
