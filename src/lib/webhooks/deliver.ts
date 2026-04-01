@@ -14,6 +14,31 @@ type DeliveryResult = {
   error?: string;
 };
 
+function validateWebhookUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
+    const hostname = parsed.hostname.toLowerCase();
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname === "0.0.0.0" ||
+      hostname.endsWith(".local") ||
+      hostname.endsWith(".internal") ||
+      /^10\./.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+      /^192\.168\./.test(hostname) ||
+      /^169\.254\./.test(hostname)
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Deliver an event payload to a webhook endpoint.
  * Includes HMAC-SHA256 signature and timeout.
@@ -23,8 +48,12 @@ export async function deliverWebhook(
   event: string,
   payload: Record<string, unknown>
 ): Promise<DeliveryResult> {
+  if (!validateWebhookUrl(target.url)) {
+    return { success: false, durationMs: 0, error: "Blocked: URL targets private/internal network" };
+  }
+
   const body = JSON.stringify({
-    id: `evt_${Date.now()}`,
+    id: `evt_${crypto.randomUUID()}`,
     type: event,
     timestamp: new Date().toISOString(),
     data: payload,
@@ -40,10 +69,10 @@ export async function deliverWebhook(
     const response = await fetch(target.url, {
       method: "POST",
       headers: {
+        ...(target.headers ?? {}),  // Custom headers first
         "Content-Type": "application/json",
         "X-Webhook-Signature": `sha256=${signature}`,
         "X-Webhook-Event": event,
-        ...(target.headers ?? {}),
       },
       body,
       signal: controller.signal,

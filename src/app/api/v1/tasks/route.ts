@@ -2,13 +2,8 @@ import { NextRequest } from "next/server";
 import { db } from "@/server/db/client";
 import { authenticateApiKey, unauthorized, badRequest } from "@/lib/api-auth";
 
-function rateLimitHeaders() {
-  return {
-    "X-RateLimit-Limit": "300",
-    "X-RateLimit-Remaining": "299",
-    "X-RateLimit-Reset": String(Math.floor(Date.now() / 1000) + 60),
-  };
-}
+const VALID_STATUSES = ["backlog", "todo", "in_progress", "in_review", "done", "cancelled"];
+const VALID_PRIORITIES = ["urgent", "high", "medium", "low"];
 
 // GET /api/v1/tasks — List tasks for a project
 export async function GET(request: NextRequest) {
@@ -39,7 +34,7 @@ export async function GET(request: NextRequest) {
     orderBy: [{ position: "asc" }],
   });
 
-  return Response.json({ results: tasks }, { headers: rateLimitHeaders() });
+  return Response.json({ results: tasks });
 }
 
 // POST /api/v1/tasks — Create a task
@@ -52,6 +47,13 @@ export async function POST(request: NextRequest) {
     const { projectId, title, status, priority, assigneeId, dueDate, labels } = body;
 
     if (!projectId || !title) return badRequest("projectId and title required");
+
+    if (status && !VALID_STATUSES.includes(status)) {
+      return Response.json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` }, { status: 400 });
+    }
+    if (priority && !VALID_PRIORITIES.includes(priority)) {
+      return Response.json({ error: `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(", ")}` }, { status: 400 });
+    }
 
     // Verify the project belongs to the authenticated workspace
     const project = await db.project.findFirst({
@@ -73,10 +75,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return Response.json(task, {
-      status: 201,
-      headers: rateLimitHeaders(),
-    });
+    return Response.json(task, { status: 201 });
   } catch {
     return badRequest("Invalid request body");
   }

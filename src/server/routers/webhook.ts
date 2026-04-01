@@ -17,15 +17,34 @@ const SUBSCRIBABLE_EVENTS = [
   "member.joined", "member.removed",
 ] as const;
 
+async function verifyWebhookAccess(db: any, webhookId: string, userId: string) {
+  const webhook = await db.webhook.findUnique({ where: { id: webhookId } });
+  if (!webhook) throw new Error("Webhook not found");
+  const member = await db.workspaceMember.findFirst({
+    where: { workspaceId: webhook.workspaceId, userId },
+  });
+  if (!member) throw new Error("Not authorized");
+  return webhook;
+}
+
 export const webhookRouter = router({
   list: protectedProcedure
     .input(z.object({ workspaceId: z.string() }))
     .query(async ({ ctx, input }) => {
-      return ctx.db.webhook.findMany({
+      const member = await ctx.db.workspaceMember.findFirst({
+        where: { workspaceId: input.workspaceId, userId: ctx.session.user.id },
+      });
+      if (!member) throw new Error("Not authorized");
+
+      const webhooks = await ctx.db.webhook.findMany({
         where: { workspaceId: input.workspaceId },
         orderBy: { createdAt: "desc" },
         include: { _count: { select: { deliveries: true } } },
       });
+      return webhooks.map((w: any) => ({
+        ...w,
+        secret: w.secret.slice(0, 8) + "..." + w.secret.slice(-4),
+      }));
     }),
 
   create: protectedProcedure
@@ -39,6 +58,7 @@ export const webhookRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const secret = generateSecret();
+      // Return full secret on create — intentional one-time view for initial setup
       return ctx.db.webhook.create({
         data: {
           ...input,
@@ -58,6 +78,7 @@ export const webhookRouter = router({
       description: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await verifyWebhookAccess(ctx.db, input.id, ctx.session.user.id);
       const { id, ...data } = input;
       return ctx.db.webhook.update({ where: { id }, data });
     }),
@@ -65,12 +86,14 @@ export const webhookRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      await verifyWebhookAccess(ctx.db, input.id, ctx.session.user.id);
       return ctx.db.webhook.delete({ where: { id: input.id } });
     }),
 
   deliveries: protectedProcedure
     .input(z.object({ webhookId: z.string(), limit: z.number().default(20) }))
     .query(async ({ ctx, input }) => {
+      await verifyWebhookAccess(ctx.db, input.webhookId, ctx.session.user.id);
       return ctx.db.webhookDelivery.findMany({
         where: { webhookId: input.webhookId },
         orderBy: { deliveredAt: "desc" },
@@ -87,6 +110,7 @@ export const webhookRouter = router({
   regenerateSecret: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      await verifyWebhookAccess(ctx.db, input.id, ctx.session.user.id);
       const secret = generateSecret();
       return ctx.db.webhook.update({
         where: { id: input.id },

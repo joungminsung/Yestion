@@ -2,14 +2,6 @@ import { NextRequest } from "next/server";
 import { db } from "@/server/db/client";
 import { authenticateApiKey, unauthorized, badRequest } from "@/lib/api-auth";
 
-function rateLimitHeaders() {
-  return {
-    "X-RateLimit-Limit": "300",
-    "X-RateLimit-Remaining": "299",
-    "X-RateLimit-Reset": String(Math.floor(Date.now() / 1000) + 60),
-  };
-}
-
 // GET /api/v1/projects — List projects in a workspace
 export async function GET(request: NextRequest) {
   const auth = await authenticateApiKey(request);
@@ -28,7 +20,7 @@ export async function GET(request: NextRequest) {
     orderBy: { createdAt: "desc" },
   });
 
-  return Response.json({ results: projects }, { headers: rateLimitHeaders() });
+  return Response.json({ results: projects });
 }
 
 // POST /api/v1/projects — Create a project
@@ -55,10 +47,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return Response.json(project, {
-      status: 201,
-      headers: rateLimitHeaders(),
-    });
+    return Response.json(project, { status: 201 });
   } catch {
     return badRequest("Invalid request body");
   }

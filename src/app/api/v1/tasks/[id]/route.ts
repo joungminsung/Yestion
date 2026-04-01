@@ -2,6 +2,9 @@ import { NextRequest } from "next/server";
 import { db } from "@/server/db/client";
 import { authenticateApiKey, unauthorized, notFound } from "@/lib/api-auth";
 
+const VALID_STATUSES = ["backlog", "todo", "in_progress", "in_review", "done", "cancelled"];
+const VALID_PRIORITIES = ["urgent", "high", "medium", "low"];
+
 // GET /api/v1/tasks/[id] — Get a single task with subtasks
 export async function GET(
   request: NextRequest,
@@ -40,6 +43,13 @@ export async function PATCH(
 
   const body = await request.json();
   const { title, status, priority, assigneeId, dueDate, labels } = body;
+
+  if (status && !VALID_STATUSES.includes(status)) {
+    return Response.json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` }, { status: 400 });
+  }
+  if (priority && !VALID_PRIORITIES.includes(priority)) {
+    return Response.json({ error: `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(", ")}` }, { status: 400 });
+  }
 
   const task = await db.task.update({
     where: { id: params.id },
