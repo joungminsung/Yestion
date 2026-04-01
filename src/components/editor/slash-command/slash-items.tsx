@@ -133,7 +133,7 @@ export const SLASH_ITEMS: SlashItem[] = [
         .focus()
         .insertContent({
           type: "callout",
-          attrs: { icon: "💡", color: "default" },
+          attrs: { icon: <Lightbulb size={14} />, color: "default" },
         })
         .run();
     },
@@ -200,7 +200,7 @@ export const SLASH_ITEMS: SlashItem[] = [
       editor
         .chain()
         .focus()
-        .insertContent({ type: "linkToPage", attrs: { pageId: null, pageTitle: "", pageIcon: "📄" } })
+        .insertContent({ type: "linkToPage", attrs: { pageId: null, pageTitle: "", pageIcon: <FileText size={14} /> } })
         .run();
     },
   },
@@ -213,7 +213,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     command: (editor) => {
       editor.chain().focus().insertContent({
         type: "linkToPage",
-        attrs: { pageId: "__new__", pageTitle: "", pageIcon: "📄" },
+        attrs: { pageId: "__new__", pageTitle: "", pageIcon: <FileText size={14} /> },
       }).run();
     },
   },
