@@ -7,6 +7,7 @@ import { trpc } from "@/server/trpc/client";
 import { useToastStore } from "@/stores/toast";
 import { useThemeStore } from "@/stores/theme";
 import { cn } from "@/lib/utils";
+import { NotificationSettings } from "./notification-settings";
 
 export function AccountSettings() {
   const addToast = useToastStore((s) => s.addToast);
@@ -102,6 +103,10 @@ export function AccountSettings() {
             <ResendVerifyButton />
           </div>
         )}
+      </section>
+
+      <section className="mb-8">
+        <NotificationSettings />
       </section>
     </div>
   );
