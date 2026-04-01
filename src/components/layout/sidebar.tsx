@@ -18,6 +18,8 @@ import { PageTemplatePicker } from "@/components/page/page-template-picker";
 import { useTranslations } from "next-intl";
 import { useDevice } from "@/components/providers/responsive-provider";
 
+const MOBILE_SIDEBAR_WIDTH = "min(85vw, 320px)";
+
 export function Sidebar() {
   const t = useTranslations("sidebar");
   const router = useRouter();
@@ -27,12 +29,13 @@ export function Sidebar() {
   const { isOpen, width, isResizing, isHoverExpanded } = useSidebarStore();
   const { isMobile } = useDevice();
 
-  // Auto-close sidebar on navigation (mobile only)
+  // Close sidebar on navigation change or when entering mobile mode.
+  // Intentionally excludes isOpen to avoid re-running on every toggle.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isMobile && isOpen) {
       useSidebarStore.getState().setOpen(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, isMobile]);
   const openPalette = useCommandPaletteStore((s) => s.open);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -167,14 +170,12 @@ export function Sidebar() {
         )}
         style={{
           width: isMobile
-            ? "min(85vw, 320px)"
+            ? MOBILE_SIDEBAR_WIDTH
             : sidebarVisible ? `${width}px` : "0px",
           transform: isMobile
             ? (isOpen ? "translateX(0)" : "translateX(-100%)")
             : undefined,
-          zIndex: isMobile
-            ? 100
-            : isHoverExpanded && !isOpen ? 100 : undefined,
+          zIndex: 100,
           overflow: "hidden",
           boxShadow: (isMobile && isOpen) || (isHoverExpanded && !isOpen)
             ? "var(--shadow-popup)"
@@ -183,7 +184,7 @@ export function Sidebar() {
         onMouseLeave={isMobile ? undefined : handleSidebarMouseLeave}
         onMouseEnter={isMobile ? undefined : handleSidebarMouseEnter}
       >
-        <div className="flex flex-col h-full" style={{ width: isMobile ? "min(85vw, 320px)" : `${width}px` }}>
+        <div className="flex flex-col h-full" style={{ width: isMobile ? MOBILE_SIDEBAR_WIDTH : `${width}px` }}>
           {/* Workspace Switcher */}
           <WorkspaceSwitcher currentWorkspaceId={workspaceId} />
 

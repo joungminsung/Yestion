@@ -531,15 +531,13 @@ export function Topbar() {
             crumbs.length > 0 ? (
               (() => {
                 const lastCrumb = crumbs[crumbs.length - 1]!;
-                const title = lastCrumb.title || "제목 없음";
-                const truncated = title.length > 25 ? title.slice(0, 25) + "…" : title;
                 return (
                   <span
                     className="truncate max-w-[200px]"
                     style={{ color: "var(--text-primary)", fontWeight: 500 }}
                   >
                     {lastCrumb.icon && <span className="mr-1">{lastCrumb.icon}</span>}
-                    {truncated}
+                    {lastCrumb.title || "제목 없음"}
                   </span>
                 );
               })()
