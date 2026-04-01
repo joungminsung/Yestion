@@ -17,7 +17,10 @@ export function CommentPanel({
   const [showResolved, setShowResolved] = useState(false);
 
   const utils = trpc.useUtils();
-  const { data: comments, isLoading } = trpc.comment.list.useQuery({ pageId });
+  const { data: comments, isLoading } = trpc.comment.list.useQuery(
+    { pageId },
+    { refetchInterval: 5000 },
+  );
   const createComment = trpc.comment.create.useMutation({
     onSuccess: () => {
       setNewComment("");

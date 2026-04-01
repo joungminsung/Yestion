@@ -38,7 +38,7 @@ export function ActivityPanel({
 }) {
   const { data: activities, isLoading } = trpc.activity.list.useQuery(
     { pageId, limit: 50 },
-    { refetchInterval: 30000 },
+    { refetchInterval: 10000 },
   );
 
   return (

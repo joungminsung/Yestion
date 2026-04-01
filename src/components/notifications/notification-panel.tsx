@@ -37,8 +37,14 @@ export function NotificationPanel({ onClose }: { onClose: () => void }) {
   const [activeTab, setActiveTab] = useState<"all" | "unread" | "mentions">("all");
 
   const utils = trpc.useUtils();
-  const { data, isLoading } = trpc.notification.list.useQuery({});
-  const { data: countData } = trpc.notification.count.useQuery();
+  const { data, isLoading } = trpc.notification.list.useQuery(
+    {},
+    { refetchInterval: 5000 },
+  );
+  const { data: countData } = trpc.notification.count.useQuery(
+    undefined,
+    { refetchInterval: 5000 },
+  );
   const markRead = trpc.notification.markRead.useMutation({
     onSuccess: () => {
       utils.notification.list.invalidate();

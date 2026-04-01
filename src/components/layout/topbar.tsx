@@ -194,7 +194,7 @@ export function Topbar() {
   }, [navStore, router]);
 
   const { data: user } = trpc.user.me.useQuery();
-  const { data: unreadCount } = trpc.notification.count.useQuery(undefined, { refetchInterval: 30000 });
+  const { data: unreadCount } = trpc.notification.count.useQuery(undefined, { refetchInterval: 5000 });
 
   const { data: ancestors } = trpc.page.getAncestors.useQuery(
     { id: pageId! },

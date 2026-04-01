@@ -29,7 +29,10 @@ function asViewConfig(config: unknown): ViewConfig {
 export function DatabaseView({ databaseId }: DatabaseViewProps) {
   const router = useRouter();
   const utils = trpc.useUtils();
-  const { data, isLoading, error } = trpc.database.get.useQuery({ databaseId });
+  const { data, isLoading, error } = trpc.database.get.useQuery(
+    { databaseId },
+    { refetchInterval: 10000 },
+  );
   const updateViewMutation = trpc.database.updateView.useMutation();
   const addRowMutation = trpc.database.addRow.useMutation({
     onSuccess: () => utils.database.get.invalidate({ databaseId }),

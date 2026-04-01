@@ -73,7 +73,7 @@ export function Sidebar() {
 
   const { data: flatPages } = trpc.page.list.useQuery(
     { workspaceId },
-    { enabled: !!workspaceId }
+    { enabled: !!workspaceId, refetchInterval: 10000 },
   );
 
   // Build tree from flat list

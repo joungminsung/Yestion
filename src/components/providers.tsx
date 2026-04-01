@@ -58,8 +58,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
           },
           queries: {
             retry: 1,
-            staleTime: 60000,
-            refetchOnWindowFocus: false,
+            staleTime: 5000,
+            refetchOnWindowFocus: true,
           },
         },
       })

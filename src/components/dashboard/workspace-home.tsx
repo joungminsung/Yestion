@@ -22,7 +22,7 @@ export function WorkspaceHome() {
 
   const { data: pages, isLoading } = trpc.page.list.useQuery(
     { workspaceId },
-    { enabled: !!workspaceId }
+    { enabled: !!workspaceId, refetchInterval: 10000 },
   );
 
   // page.list already filters isDeleted:false server-side and orders by position
