@@ -3,6 +3,20 @@ import { Plugin, PluginKey, EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, EditorView } from "@tiptap/pm/view";
 import { Node as PmNode, DOMSerializer } from "@tiptap/pm/model";
 
+/**
+ * Pure utility: given a sorted list of block offsets, returns those
+ * falling within [min(fromPos,toPos), max(fromPos,toPos)].
+ */
+export function selectBlockRangePositions(
+  blockOffsets: number[],
+  fromPos: number,
+  toPos: number
+): number[] {
+  const minPos = Math.min(fromPos, toPos);
+  const maxPos = Math.max(fromPos, toPos);
+  return blockOffsets.filter((offset) => offset >= minPos && offset <= maxPos);
+}
+
 export const BLOCK_SELECTION_KEY = new PluginKey("blockSelection");
 
 export type BlockSelectionState = {
@@ -74,45 +88,66 @@ export const BlockSelection = Extension.create({
               return true;
             }
 
-            // Copy selected blocks
+            // Copy selected blocks with full formatting
             if ((event.metaKey || event.ctrlKey) && event.key === "c") {
               event.preventDefault();
               const fragments: string[] = [];
-              const htmlFragments: string[] = [];
+              const serializer = DOMSerializer.fromSchema(view.state.schema);
+              const container = document.createElement("div");
+
               for (const pos of pluginState.selectedBlocks) {
                 const node = view.state.doc.nodeAt(pos);
                 if (node) {
                   fragments.push(node.textContent);
-                  const div = document.createElement("div");
-                  const fragment = DOMSerializer.fromSchema(view.state.schema).serializeFragment(
-                    node.content
-                  );
-                  div.appendChild(fragment);
-                  htmlFragments.push(div.innerHTML);
+                  const domNode = serializer.serializeNode(node);
+                  container.appendChild(domNode);
                 }
               }
+
               const text = fragments.join("\n");
-              const html = htmlFragments.join("");
-              navigator.clipboard.write([
-                new ClipboardItem({
-                  "text/plain": new Blob([text], { type: "text/plain" }),
-                  "text/html": new Blob([html], { type: "text/html" }),
-                }),
-              ]).catch(() => {
-                navigator.clipboard.writeText(text).catch(() => {});
-              });
+              const html = container.innerHTML;
+
+              navigator.clipboard
+                .write([
+                  new ClipboardItem({
+                    "text/plain": new Blob([text], { type: "text/plain" }),
+                    "text/html": new Blob([html], { type: "text/html" }),
+                  }),
+                ])
+                .catch(() => {
+                  navigator.clipboard.writeText(text).catch(() => {});
+                });
+
               return true;
             }
 
-            // Cut selected blocks
+            // Cut selected blocks with full formatting
             if ((event.metaKey || event.ctrlKey) && event.key === "x") {
               event.preventDefault();
               const fragments: string[] = [];
+              const serializer = DOMSerializer.fromSchema(view.state.schema);
+              const container = document.createElement("div");
+
               for (const pos of pluginState.selectedBlocks) {
                 const node = view.state.doc.nodeAt(pos);
-                if (node) fragments.push(node.textContent);
+                if (node) {
+                  fragments.push(node.textContent);
+                  const domNode = serializer.serializeNode(node);
+                  container.appendChild(domNode);
+                }
               }
-              navigator.clipboard.writeText(fragments.join("\n")).catch(() => {});
+
+              navigator.clipboard
+                .write([
+                  new ClipboardItem({
+                    "text/plain": new Blob([fragments.join("\n")], { type: "text/plain" }),
+                    "text/html": new Blob([container.innerHTML], { type: "text/html" }),
+                  }),
+                ])
+                .catch(() => {
+                  navigator.clipboard.writeText(fragments.join("\n")).catch(() => {});
+                });
+
               const sorted = [...pluginState.selectedBlocks].sort((a, b) => b - a);
               let tr = view.state.tr;
               for (const pos of sorted) {
@@ -122,6 +157,24 @@ export const BlockSelection = Extension.create({
               tr = tr.setMeta(BLOCK_SELECTION_KEY, { selectedBlocks: [], anchorBlock: null });
               view.dispatch(tr);
               return true;
+            }
+
+            // Select all blocks (Cmd+A when blocks already selected)
+            if ((event.metaKey || event.ctrlKey) && event.key === "a") {
+              if (pluginState.selectedBlocks.length > 0) {
+                event.preventDefault();
+                const positions: number[] = [];
+                view.state.doc.forEach((_node: PmNode, offset: number) => {
+                  positions.push(offset);
+                });
+                const tr = view.state.tr.setMeta(BLOCK_SELECTION_KEY, {
+                  selectedBlocks: positions,
+                  anchorBlock: positions[0] ?? null,
+                });
+                view.dispatch(tr);
+                return true;
+              }
+              return false;
             }
 
             if (event.key === "Escape") {
@@ -194,7 +247,7 @@ export function toggleBlockInSelection(editor: EditorLike, pos: number) {
   editor.view.dispatch(tr);
 }
 
-/** Select all top-level blocks between fromPos and toPos (inclusive). */
+/** Select all top-level blocks between fromPos and toPos (inclusive, overlap-based). */
 export function selectBlockRange(
   editor: EditorLike,
   fromPos: number,
@@ -204,8 +257,10 @@ export function selectBlockRange(
   const minPos = Math.min(fromPos, toPos);
   const maxPos = Math.max(fromPos, toPos);
 
-  editor.state.doc.forEach((_node: PmNode, offset: number) => {
-    if (offset >= minPos && offset <= maxPos) {
+  editor.state.doc.forEach((node: PmNode, offset: number) => {
+    const blockEnd = offset + node.nodeSize;
+    // Include if block overlaps the range at all
+    if (offset <= maxPos && blockEnd > minPos) {
       positions.push(offset);
     }
   });
