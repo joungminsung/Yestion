@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter, useParams } from "next/navigation";
-import { useRef, useCallback, useState } from "react";
+import { useRouter, useParams, usePathname } from "next/navigation";
+import { useRef, useCallback, useState, useEffect } from "react";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useCommandPaletteStore } from "@/stores/command-palette";
 import { SidebarResizer } from "./sidebar-resizer";
@@ -16,13 +16,24 @@ import { Search, Settings, Plus, FileText, LayoutTemplate } from "lucide-react";
 import { useSidebarKeyboardNav } from "./sidebar-keyboard-nav";
 import { PageTemplatePicker } from "@/components/page/page-template-picker";
 import { useTranslations } from "next-intl";
+import { useDevice } from "@/components/providers/responsive-provider";
 
 export function Sidebar() {
   const t = useTranslations("sidebar");
   const router = useRouter();
   const params = useParams();
+  const pathname = usePathname();
   const workspaceId = params.workspaceId as string;
   const { isOpen, width, isResizing, isHoverExpanded } = useSidebarStore();
+  const { isMobile } = useDevice();
+
+  // Auto-close sidebar on navigation (mobile only)
+  useEffect(() => {
+    if (isMobile && isOpen) {
+      useSidebarStore.getState().setOpen(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, isMobile]);
   const openPalette = useCommandPaletteStore((s) => s.open);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -128,12 +139,21 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Hover zone: invisible strip on the left edge when sidebar is collapsed */}
-      {!isOpen && !isHoverExpanded && (
+      {/* Hover zone: invisible strip on the left edge when sidebar is collapsed (desktop only) */}
+      {!isMobile && !isOpen && !isHoverExpanded && (
         <div
           className="fixed top-0 left-0 bottom-0 w-2 z-[99]"
           onMouseEnter={handleHoverZoneEnter}
           onMouseLeave={handleHoverZoneLeave}
+        />
+      )}
+
+      {/* Mobile backdrop */}
+      {isMobile && isOpen && (
+        <div
+          className="fixed inset-0 z-[99] bg-black/40 transition-opacity duration-300"
+          onClick={() => useSidebarStore.getState().setOpen(false)}
+          aria-hidden="true"
         />
       )}
 
@@ -142,18 +162,28 @@ export function Sidebar() {
         aria-label="페이지 네비게이션"
         className={cn(
           "fixed top-0 left-0 bottom-0 flex flex-col bg-notion-bg-sidebar",
-          !isResizing && "transition-all duration-300 ease-in-out"
+          !isResizing && "transition-all duration-300 ease-in-out",
+          isMobile && "z-[100]"
         )}
         style={{
-          width: sidebarVisible ? `${width}px` : "0px",
-          zIndex: isHoverExpanded && !isOpen ? 100 : "var(--z-sidebar)",
+          width: isMobile
+            ? "min(85vw, 320px)"
+            : sidebarVisible ? `${width}px` : "0px",
+          transform: isMobile
+            ? (isOpen ? "translateX(0)" : "translateX(-100%)")
+            : undefined,
+          zIndex: isMobile
+            ? 100
+            : isHoverExpanded && !isOpen ? 100 : undefined,
           overflow: "hidden",
-          boxShadow: isHoverExpanded && !isOpen ? "var(--shadow-popup)" : undefined,
+          boxShadow: (isMobile && isOpen) || (isHoverExpanded && !isOpen)
+            ? "var(--shadow-popup)"
+            : undefined,
         }}
-        onMouseLeave={handleSidebarMouseLeave}
-        onMouseEnter={handleSidebarMouseEnter}
+        onMouseLeave={isMobile ? undefined : handleSidebarMouseLeave}
+        onMouseEnter={isMobile ? undefined : handleSidebarMouseEnter}
       >
-        <div className="flex flex-col h-full" style={{ width: `${width}px` }}>
+        <div className="flex flex-col h-full" style={{ width: isMobile ? "min(85vw, 320px)" : `${width}px` }}>
           {/* Workspace Switcher */}
           <WorkspaceSwitcher currentWorkspaceId={workspaceId} />
 
@@ -280,14 +310,16 @@ export function Sidebar() {
           )}
         </div>
 
-        <SidebarResizer />
+        {!isMobile && <SidebarResizer />}
       </aside>
 
-      {/* Spacer */}
-      <div
-        className={cn(!isResizing && "transition-all duration-300 ease-in-out")}
-        style={{ width: isOpen ? `${width}px` : "0px", flexShrink: 0 }}
-      />
+      {/* Spacer — zero on mobile (overlay doesn't push content) */}
+      {!isMobile && (
+        <div
+          className={cn(!isResizing && "transition-all duration-300 ease-in-out")}
+          style={{ width: isOpen ? `${width}px` : "0px", flexShrink: 0 }}
+        />
+      )}
     </>
   );
 }

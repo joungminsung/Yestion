@@ -15,6 +15,7 @@ type SidebarStore = {
   setWidth: (width: number) => void;
   setResizing: (resizing: boolean) => void;
   setHoverExpanded: (v: boolean) => void;
+  closeMobile: () => void;
 };
 
 export const useSidebarStore = create<SidebarStore>()(
@@ -30,6 +31,7 @@ export const useSidebarStore = create<SidebarStore>()(
         set({ width: Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, width)) }),
       setResizing: (resizing) => set({ isResizing: resizing }),
       setHoverExpanded: (v) => set({ isHoverExpanded: v }),
+      closeMobile: () => set({ isOpen: false }),
     }),
     {
       name: "notion-sidebar",

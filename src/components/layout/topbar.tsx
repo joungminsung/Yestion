@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter, usePathname } from "next/navigation";
-import { Lock, Unlock, ArrowLeftRight, Star, Copy, Upload, Download, Clock, BarChart3, Bell, Eye, Trash2, FileText } from "lucide-react";
+import { Lock, Unlock, ArrowLeftRight, Star, Copy, Upload, Download, Clock, BarChart3, Bell, Eye, Trash2, FileText, Menu } from "lucide-react";
 import { useSidebarStore } from "@/stores/sidebar";
 import { usePresenceStore, type PresenceUser } from "@/stores/presence";
 import { useNavigationStore } from "@/stores/navigation-history";
@@ -18,6 +18,7 @@ import { markdownToBlocks } from "@/lib/markdown-import";
 import { htmlToBlocks } from "@/lib/html-import";
 import { useToastStore } from "@/stores/toast";
 import { useTranslations } from "next-intl";
+import { useDevice } from "@/components/providers/responsive-provider";
 
 function getInitials(name: string): string {
   return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
@@ -147,6 +148,7 @@ export function Topbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { isOpen, toggle } = useSidebarStore();
+  const { isMobile } = useDevice();
   const presenceUsers = usePresenceStore((s) => s.users);
   const [shareOpen, setShareOpen] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
@@ -462,7 +464,17 @@ export function Topbar() {
       }}
     >
       <div className="flex items-center gap-1 min-w-0">
-        {!isOpen && (
+        {isMobile && (
+          <button
+            onClick={() => useSidebarStore.getState().toggle()}
+            className="flex items-center justify-center w-8 h-8 rounded hover:bg-notion-bg-hover flex-shrink-0"
+            style={{ color: "var(--text-secondary)" }}
+            aria-label="Toggle sidebar"
+          >
+            <Menu size={18} />
+          </button>
+        )}
+        {!isMobile && !isOpen && (
           <button
             onClick={toggle}
             className="p-1 rounded hover:bg-notion-bg-hover flex-shrink-0"
