@@ -39,6 +39,70 @@ const EMOJI_CATEGORIES: { name: string; emoji: string[] }[] = [
 ];
 
 const ALL_EMOJI = EMOJI_CATEGORIES.flatMap((c) => c.emoji);
+
+const EMOJI_KEYWORDS: Record<string, string[]> = {
+  "😀": ["smile", "happy", "grin", "face"],
+  "😃": ["smile", "happy", "grin"],
+  "😄": ["smile", "happy", "grin", "laugh"],
+  "😁": ["grin", "smile", "teeth"],
+  "😆": ["laugh", "happy"],
+  "😅": ["sweat", "smile", "nervous"],
+  "🤣": ["laugh", "rofl", "floor"],
+  "😂": ["laugh", "cry", "tears", "joy"],
+  "🙂": ["smile", "slight"],
+  "😉": ["wink"],
+  "😊": ["blush", "smile", "shy"],
+  "😇": ["angel", "halo", "innocent"],
+  "😍": ["love", "heart", "eyes"],
+  "🤩": ["star", "eyes", "excited"],
+  "😎": ["cool", "sunglasses"],
+  "🤓": ["nerd", "glasses"],
+  "📄": ["page", "document", "file", "paper"],
+  "📝": ["memo", "note", "write", "pencil"],
+  "📚": ["books", "library", "study"],
+  "📖": ["book", "open", "read"],
+  "💡": ["idea", "light", "bulb", "tip"],
+  "🔥": ["fire", "hot", "flame", "trending"],
+  "⭐": ["star", "favorite", "rating"],
+  "🌟": ["star", "glow", "sparkle"],
+  "✨": ["sparkle", "magic", "new"],
+  "⚡": ["lightning", "fast", "electric"],
+  "💎": ["diamond", "gem", "precious"],
+  "🔑": ["key", "password", "access"],
+  "🔒": ["lock", "secure", "private"],
+  "🔓": ["unlock", "open", "public"],
+  "🔔": ["bell", "notification", "alert"],
+  "📌": ["pin", "location", "mark"],
+  "🎯": ["target", "goal", "aim", "bullseye"],
+  "🚀": ["rocket", "launch", "fast", "startup"],
+  "🏆": ["trophy", "winner", "award"],
+  "🎨": ["art", "palette", "design", "color"],
+  "💻": ["computer", "laptop", "code", "dev"],
+  "📱": ["phone", "mobile", "app"],
+  "📅": ["calendar", "date", "schedule"],
+  "📁": ["folder", "directory"],
+  "📂": ["folder", "open"],
+  "📋": ["clipboard", "list", "checklist"],
+  "🗑": ["trash", "delete", "bin"],
+  "👋": ["wave", "hello", "hi", "bye"],
+  "👍": ["thumbs up", "like", "good", "yes"],
+  "👎": ["thumbs down", "dislike", "bad", "no"],
+  "👏": ["clap", "applause", "bravo"],
+  "🤝": ["handshake", "deal", "agreement"],
+  "❤️": ["heart", "love", "red"],
+  "🌈": ["rainbow", "colorful"],
+  "☀️": ["sun", "sunny", "bright"],
+  "🌊": ["wave", "ocean", "water"],
+  "🍎": ["apple", "fruit", "red"],
+  "🎵": ["music", "note", "song"],
+  "🎬": ["movie", "film", "action"],
+  "🚗": ["car", "drive", "vehicle"],
+  "✈️": ["plane", "fly", "travel", "airport"],
+  "🏁": ["flag", "finish", "race"],
+  "🇰🇷": ["korea", "korean", "flag"],
+  "🇺🇸": ["usa", "american", "flag"],
+  "🇯🇵": ["japan", "japanese", "flag"],
+};
 const RECENT_KEY = "notion-recent-icons";
 const MAX_RECENT = 16;
 
@@ -52,10 +116,14 @@ function getRecent(): string[] {
 }
 
 function addRecent(emoji: string) {
-  const recent = getRecent().filter((e) => e !== emoji);
-  recent.unshift(emoji);
-  if (recent.length > MAX_RECENT) recent.length = MAX_RECENT;
-  localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
+  try {
+    const recent = getRecent().filter((e) => e !== emoji);
+    recent.unshift(emoji);
+    if (recent.length > MAX_RECENT) recent.length = MAX_RECENT;
+    localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
+  } catch {
+    // Ignore storage errors (private mode, quota exceeded)
+  }
 }
 
 type PageIconPickerProps = {
@@ -96,7 +164,16 @@ export function PageIconPicker({ currentIcon, onSelect, onClose }: PageIconPicke
   const filteredEmoji = useMemo(() => {
     if (!search.trim()) return null;
     const q = search.toLowerCase();
-    return ALL_EMOJI.filter((emoji) => emoji.includes(q));
+    return ALL_EMOJI.filter((emoji) => {
+      // Check if emoji character contains the query (for pasting emoji)
+      if (emoji.toLowerCase().includes(q)) return true;
+      // Check keywords
+      const keywords = EMOJI_KEYWORDS[emoji];
+      if (keywords) {
+        return keywords.some((kw) => kw.includes(q));
+      }
+      return false;
+    });
   }, [search]);
 
   const handleSelect = useCallback(

@@ -1,8 +1,31 @@
 "use client";
 
 import { memo } from "react";
-import * as LucideIcons from "lucide-react";
 import type { LucideProps } from "lucide-react";
+import {
+  FileText, Star, Lock, Unlock, Trash2, Copy, Upload, Download,
+  Clock, BarChart3, Bell, Eye, ArrowLeftRight, Search, Settings,
+  Plus, ChevronRight, ChevronDown, GripVertical, Palette, Link,
+  MessageSquare, Sparkles, List, ListOrdered, ListChecks, Quote,
+  Code, Type, Heading1, Heading2, Heading3, Lightbulb, Image,
+  Table, Play, Bookmark, Film, Music, Paperclip, Database,
+  X, Check, AlertCircle, Info, HelpCircle, Home, User, Users,
+  Calendar, Folder, FolderOpen, Edit, ExternalLink, MoreHorizontal,
+  Scissors, Clipboard, ClipboardPaste, MoveUp, MoveDown,
+} from "lucide-react";
+import type { ComponentType } from "react";
+
+const ICON_MAP: Record<string, ComponentType<LucideProps>> = {
+  FileText, Star, Lock, Unlock, Trash2, Copy, Upload, Download,
+  Clock, BarChart3, Bell, Eye, ArrowLeftRight, Search, Settings,
+  Plus, ChevronRight, ChevronDown, GripVertical, Palette, Link,
+  MessageSquare, Sparkles, List, ListOrdered, ListChecks, Quote,
+  Code, Type, Heading1, Heading2, Heading3, Lightbulb, Image,
+  Table, Play, Bookmark, Film, Music, Paperclip, Database,
+  X, Check, AlertCircle, Info, HelpCircle, Home, User, Users,
+  Calendar, Folder, FolderOpen, Edit, ExternalLink, MoreHorizontal,
+  Scissors, Clipboard, ClipboardPaste, MoveUp, MoveDown,
+};
 
 const SIZE_MAP = {
   xs: 12,
@@ -62,8 +85,7 @@ export const UnifiedIcon = memo(function UnifiedIcon({
   }
 
   if (icon.type === "lucide") {
-    const iconName = icon.value as keyof typeof LucideIcons;
-    const IconComponent = LucideIcons[iconName] as React.ComponentType<LucideProps> | undefined;
+    const IconComponent = ICON_MAP[icon.value];
     if (!IconComponent) {
       // Fallback to emoji if icon name is invalid
       return (

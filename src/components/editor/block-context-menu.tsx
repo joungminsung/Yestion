@@ -12,8 +12,11 @@ import {
   Link,
   Palette,
   List,
+  ListOrdered,
   ListChecks,
   Quote,
+  Code,
+  Type,
   FileText,
   MessageSquare,
   Sparkles,
@@ -203,7 +206,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     { label: "", icon: "", action: () => {}, divider: true },
     {
       label: "텍스트로 변환",
-      icon: "Aa",
+      icon: <Type size={14} />,
       action: () => {
         editor.chain().focus().setParagraph().run();
         setPosition(null);
@@ -235,7 +238,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     },
     {
       label: "번호 목록",
-      icon: "1.",
+      icon: <ListOrdered size={14} />,
       action: () => {
         editor.chain().focus().toggleOrderedList().run();
         setPosition(null);
@@ -259,7 +262,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     },
     {
       label: "코드로 변환",
-      icon: "<>",
+      icon: <Code size={14} />,
       action: () => {
         editor.chain().focus().toggleCodeBlock().run();
         setPosition(null);
