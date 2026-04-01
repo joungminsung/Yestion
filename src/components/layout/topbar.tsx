@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter, usePathname } from "next/navigation";
+import { Lock, Unlock, ArrowLeftRight, Star, Copy, Upload, Download, Clock, BarChart3, Bell, Eye, Trash2, FileText } from "lucide-react";
 import { useSidebarStore } from "@/stores/sidebar";
 import { usePresenceStore, type PresenceUser } from "@/stores/presence";
 import { useNavigationStore } from "@/stores/navigation-history";
@@ -131,7 +132,7 @@ function ChildDropdown({
             style={{ color: "var(--text-primary)" }}
           >
             <span className="flex-shrink-0">
-              {child.icon || "📄"}
+              {child.icon || <FileText size={14} />}
             </span>
             <span className="truncate">{child.title || "제목 없음"}</span>
           </Link>
@@ -324,40 +325,45 @@ export function Topbar() {
   const isFullWidth = currentPage?.isFullWidth ?? false;
 
   type MenuItem =
-    | { label: string; action: () => void; danger?: boolean; divider?: false }
-    | { divider: true; label?: never; action?: never; danger?: never };
+    | { icon: ReactNode; label: string; action: () => void; danger?: boolean; divider?: false }
+    | { divider: true; icon?: never; label?: never; action?: never; danger?: never };
 
   const moreMenuItems: MenuItem[] = [
     {
-      label: `${isLocked ? "🔓 잠금 해제" : "🔒 잠금"}`,
+      icon: isLocked ? <Unlock size={16} className="shrink-0" /> : <Lock size={16} className="shrink-0" />,
+      label: isLocked ? "잠금 해제" : "잠금",
       action: () => {
         if (pageId) updatePage.mutate({ id: pageId, isLocked: !isLocked });
         setShowMoreMenu(false);
       },
     },
     {
-      label: `${isFullWidth ? "↔ 기본 너비" : "↔ 전체 너비"}`,
+      icon: <ArrowLeftRight size={16} className="shrink-0" />,
+      label: isFullWidth ? "기본 너비" : "전체 너비",
       action: () => {
         if (pageId) updatePage.mutate({ id: pageId, isFullWidth: !isFullWidth });
         setShowMoreMenu(false);
       },
     },
     {
-      label: "⭐ 즐겨찾기 추가",
+      icon: <Star size={16} className="shrink-0" />,
+      label: "즐겨찾기 추가",
       action: () => {
         if (pageId) addFavorite.mutate({ pageId });
         setShowMoreMenu(false);
       },
     },
     {
-      label: "⭐ 즐겨찾기 해제",
+      icon: <Star size={16} className="shrink-0" />,
+      label: "즐겨찾기 해제",
       action: () => {
         if (pageId) removeFavorite.mutate({ pageId });
         setShowMoreMenu(false);
       },
     },
     {
-      label: "📋 복제",
+      icon: <Copy size={16} className="shrink-0" />,
+      label: "복제",
       action: () => {
         if (pageId) duplicatePage.mutate({ id: pageId });
         setShowMoreMenu(false);
@@ -365,42 +371,50 @@ export function Topbar() {
     },
     { divider: true },
     {
-      label: "📤 Markdown 내보내기",
+      icon: <Upload size={16} className="shrink-0" />,
+      label: "Markdown 내보내기",
       action: () => handleExport("md"),
     },
     {
-      label: "📤 HTML 내보내기",
+      icon: <Upload size={16} className="shrink-0" />,
+      label: "HTML 내보내기",
       action: () => handleExport("html"),
     },
     {
-      label: "📤 PDF 내보내기",
+      icon: <Upload size={16} className="shrink-0" />,
+      label: "PDF 내보내기",
       action: () => handleExport("pdf"),
     },
     {
-      label: "📥 Markdown 가져오기",
+      icon: <Download size={16} className="shrink-0" />,
+      label: "Markdown 가져오기",
       action: handleMarkdownImport,
     },
     {
-      label: "📥 HTML 가져오기",
+      icon: <Download size={16} className="shrink-0" />,
+      label: "HTML 가져오기",
       action: handleHtmlImport,
     },
     { divider: true },
     {
-      label: "🕐 히스토리",
+      icon: <Clock size={16} className="shrink-0" />,
+      label: "히스토리",
       action: () => {
         setHistoryOpen(true);
         setShowMoreMenu(false);
       },
     },
     {
-      label: "📊 활동",
+      icon: <BarChart3 size={16} className="shrink-0" />,
+      label: "활동",
       action: () => {
         setActivityOpen(true);
         setShowMoreMenu(false);
       },
     },
     {
-      label: `🔔 알림: ${getNotifLevel() === "all" ? "전체" : getNotifLevel() === "comments" ? "댓글만" : getNotifLevel() === "mentions" ? "멘션만" : "끄기"}`,
+      icon: <Bell size={16} className="shrink-0" />,
+      label: `알림: ${getNotifLevel() === "all" ? "전체" : getNotifLevel() === "comments" ? "댓글만" : getNotifLevel() === "mentions" ? "멘션만" : "끄기"}`,
       action: () => {
         if (!pageId) return;
         const levels = ["all", "comments", "mentions", "off"];
@@ -412,7 +426,8 @@ export function Topbar() {
       },
     },
     {
-      label: `👁 관심 페이지 ${isPageWatched() ? "(해제)" : "(등록)"}`,
+      icon: <Eye size={16} className="shrink-0" />,
+      label: `관심 페이지 ${isPageWatched() ? "(해제)" : "(등록)"}`,
       action: () => {
         if (!pageId) return;
         const watched = isPageWatched();
@@ -424,7 +439,8 @@ export function Topbar() {
     },
     { divider: true },
     {
-      label: "🗑 삭제",
+      icon: <Trash2 size={16} className="shrink-0" />,
+      label: "삭제",
       action: () => {
         if (pageId) moveToTrash.mutate({ id: pageId });
         setShowMoreMenu(false);
@@ -664,6 +680,7 @@ export function Topbar() {
                             : "var(--text-primary)",
                       }}
                     >
+                      {item.icon}
                       {item.label}
                     </button>
                   )
