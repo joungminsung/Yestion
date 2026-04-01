@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { X, Search, LayoutTemplate } from "lucide-react";
 import { trpc } from "@/server/trpc/client";
 
@@ -32,15 +32,16 @@ export function TemplateGallery({ workspaceId, onSelect, onClose }: Props) {
   // Seed system templates on first load if none exist
   const seedMutation = trpc.template.seed.useMutation();
   const utils = trpc.useUtils();
+  const [seeded, setSeeded] = useState(false);
 
-  // Auto-seed on first load
-  useState(() => {
-    if (!templates && !isLoading) {
+  useEffect(() => {
+    if (!seeded && !isLoading && templates && templates.length === 0) {
+      setSeeded(true);
       seedMutation.mutate(undefined, {
         onSuccess: () => utils.template.list.invalidate(),
       });
     }
-  });
+  }, [templates, isLoading, seeded, seedMutation, utils.template.list]);
 
   const filtered = useMemo(() => {
     if (!templates) return [];

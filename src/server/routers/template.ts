@@ -237,7 +237,7 @@ export const templateRouter = router({
       description: z.string().optional(),
       icon: z.string().optional(),
       category: z.string().default("custom"),
-      blocks: z.any().default([]),
+      blocks: z.array(z.record(z.string(), z.unknown())).default([]),
       tags: z.array(z.string()).default([]),
       isPublic: z.boolean().default(false),
     }))
@@ -256,6 +256,9 @@ export const templateRouter = router({
       const template = await ctx.db.template.findUnique({ where: { id: input.id } });
       if (!template || template.isDefault) {
         throw new Error("Cannot delete system template");
+      }
+      if (template.creatorId && template.creatorId !== ctx.session.user.id) {
+        throw new Error("Not authorized to delete this template");
       }
       return ctx.db.template.delete({ where: { id: input.id } });
     }),

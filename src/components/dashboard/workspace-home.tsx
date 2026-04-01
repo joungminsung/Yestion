@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { trpc } from "@/server/trpc/client";
-import { FileText, Plus, Search } from "lucide-react";
+import { FileText, LayoutTemplate, Plus, Search } from "lucide-react";
 import { useCommandPaletteStore } from "@/stores/command-palette";
+import { TemplateGallery } from "@/components/page/template-gallery";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -18,7 +20,7 @@ export function WorkspaceHome() {
   const workspaceId = params.workspaceId as string;
   const openPalette = useCommandPaletteStore((s) => s.open);
 
-  const { data: pages } = trpc.page.list.useQuery(
+  const { data: pages, isLoading } = trpc.page.list.useQuery(
     { workspaceId },
     { enabled: !!workspaceId }
   );
@@ -32,6 +34,25 @@ export function WorkspaceHome() {
       router.push(`/${workspaceId}/${newPage.id}`);
     },
   });
+
+  const [showGallery, setShowGallery] = useState(false);
+
+  if (isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto px-6 py-8">
+        <div className="h-8 w-48 rounded bg-notion-bg-hover animate-pulse mb-8" />
+        <div className="flex gap-3 mb-8">
+          <div className="h-10 w-28 rounded-lg bg-notion-bg-hover animate-pulse" />
+          <div className="h-10 w-28 rounded-lg bg-notion-bg-hover animate-pulse" />
+        </div>
+        <div className="space-y-2">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="h-10 rounded-lg bg-notion-bg-hover animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">
@@ -60,6 +81,14 @@ export function WorkspaceHome() {
         >
           <Search size={16} />
           <span className="text-sm">Search</span>
+        </button>
+        <button
+          onClick={() => setShowGallery(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg border hover:bg-notion-bg-hover transition-colors"
+          style={{ borderColor: "var(--border-default)", color: "var(--text-primary)" }}
+        >
+          <LayoutTemplate size={16} />
+          <span className="text-sm">Templates</span>
         </button>
       </div>
 
@@ -115,6 +144,17 @@ export function WorkspaceHome() {
           </div>
         </div>
       </section>
+
+      {showGallery && (
+        <TemplateGallery
+          workspaceId={workspaceId}
+          onSelect={(tmpl) => {
+            createPage.mutate({ workspaceId, title: tmpl.name });
+            setShowGallery(false);
+          }}
+          onClose={() => setShowGallery(false)}
+        />
+      )}
     </div>
   );
 }
