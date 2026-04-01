@@ -431,3 +431,40 @@ model TaskActivity {
 
   @@index([taskId])
 }
+
+model Automation {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  name          String
+  description   String?
+  isEnabled     Boolean  @default(true)
+  trigger       Json     // { type: string, config: Record<string, unknown> }
+  conditions    Json     @default("[]") // Array of condition objects
+  actions       Json     @default("[]") // Array of action objects
+  createdBy     String
+  lastTriggered DateTime?
+  triggerCount  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  logs          AutomationLog[]
+
+  @@index([workspaceId])
+  @@index([isEnabled])
+}
+
+model AutomationLog {
+  id              String   @id @default(cuid())
+  automationId    String
+  triggeredBy     String
+  triggerData     Json?
+  actionsExecuted Json?
+  status          String   // "success" | "partial" | "failed"
+  error           String?
+  executedAt      DateTime @default(now())
+
+  automation      Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@index([automationId])
+  @@index([executedAt])
+}
