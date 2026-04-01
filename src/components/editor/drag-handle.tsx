@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback, useRef } from "react";
 import type { Editor } from "@tiptap/react";
+import type { Node as PmNode } from "@tiptap/pm/model";
 import { NodeSelection } from "@tiptap/pm/state";
 import { GripVertical, Plus } from "lucide-react";
 import {
@@ -18,8 +19,7 @@ type DragHandleProps = { editor: Editor; onMenuOpen: (pos: number) => void };
  * Resolves the nearest top-level block position for a given ProseMirror position.
  * Walks up from the deepest node to find the outermost block ancestor.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function resolveBlockPos(doc: any, pos: number): number {
+function resolveBlockPos(doc: PmNode, pos: number): number {
   try {
     const $pos = doc.resolve(pos);
     for (let d = 1; d <= $pos.depth; d++) {
@@ -40,6 +40,8 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
   const dropIndicatorElRef = useRef<HTMLDivElement | null>(null);
   const autoScrollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const handleElRef = useRef<HTMLDivElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const lastBlockPosRef = useRef<number | null>(null);
 
   const computeHandlePosition = useCallback(
     (blockDom: HTMLElement) => {
@@ -55,18 +57,26 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
 
   const handleMouseMove = useCallback(
     (event: MouseEvent) => {
-      if (!editor.view) return;
-      const view = editor.view;
-      const posResult = view.posAtCoords({ left: event.clientX, top: event.clientY });
-      if (!posResult) { hide(); return; }
+      if (rafRef.current) return; // already scheduled
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        if (!editor.view) return;
+        const view = editor.view;
+        const posResult = view.posAtCoords({ left: event.clientX, top: event.clientY });
+        if (!posResult) { hide(); lastBlockPosRef.current = null; return; }
 
-      try {
-        const blockPos = resolveBlockPos(view.state.doc, posResult.pos);
-        const blockDom = view.nodeDOM(blockPos);
-        if (!blockDom || !(blockDom instanceof HTMLElement)) { hide(); return; }
-        const handlePosition = computeHandlePosition(blockDom);
-        show(blockPos, handlePosition);
-      } catch { hide(); }
+        try {
+          const blockPos = resolveBlockPos(view.state.doc, posResult.pos);
+          // Skip if same block
+          if (blockPos === lastBlockPosRef.current) return;
+          lastBlockPosRef.current = blockPos;
+
+          const blockDom = view.nodeDOM(blockPos);
+          if (!blockDom || !(blockDom instanceof HTMLElement)) { hide(); return; }
+          const handlePosition = computeHandlePosition(blockDom);
+          show(blockPos, handlePosition);
+        } catch { hide(); }
+      });
     },
     [editor, show, hide, computeHandlePosition]
   );
@@ -81,6 +91,7 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
     return () => {
       dom.removeEventListener("mousemove", handleMouseMove);
       dom.removeEventListener("mouseleave", handleMouseLeave);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [editor, handleMouseMove, handleMouseLeave]);
 
@@ -135,10 +146,13 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
 
   const handleAddBlock = useCallback(() => {
     if (vis.blockPos === null) return;
-    editor.chain().focus().insertContentAt(vis.blockPos, { type: "paragraph" }).run();
-    setTimeout(() => {
-      editor.chain().focus().setTextSelection(vis.blockPos! + 1).insertContent("/").run();
-    }, 50);
+    const pos = vis.blockPos;
+    editor
+      .chain()
+      .focus()
+      .insertContentAt(pos, { type: "paragraph" })
+      .setTextSelection(pos + 1)
+      .run();
   }, [editor, vis.blockPos]);
 
   const handleGripMouseDown = useCallback(

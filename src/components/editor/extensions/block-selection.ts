@@ -24,6 +24,36 @@ export type BlockSelectionState = {
   anchorBlock: number | null;
 };
 
+/** Serialize selected blocks to clipboard as text + HTML. */
+function copyBlocksToClipboard(view: EditorView, positions: number[]) {
+  const fragments: string[] = [];
+  const serializer = DOMSerializer.fromSchema(view.state.schema);
+  const container = document.createElement("div");
+
+  for (const pos of positions) {
+    const node = view.state.doc.nodeAt(pos);
+    if (node) {
+      fragments.push(node.textContent);
+      const domNode = serializer.serializeNode(node);
+      container.appendChild(domNode);
+    }
+  }
+
+  const text = fragments.join("\n");
+  const html = container.innerHTML;
+
+  navigator.clipboard
+    .write([
+      new ClipboardItem({
+        "text/plain": new Blob([text], { type: "text/plain" }),
+        "text/html": new Blob([html], { type: "text/html" }),
+      }),
+    ])
+    .catch(() => {
+      navigator.clipboard.writeText(text).catch(() => {});
+    });
+}
+
 export const BlockSelection = Extension.create({
   name: "blockSelection",
 
@@ -91,63 +121,14 @@ export const BlockSelection = Extension.create({
             // Copy selected blocks with full formatting
             if ((event.metaKey || event.ctrlKey) && event.key === "c") {
               event.preventDefault();
-              const fragments: string[] = [];
-              const serializer = DOMSerializer.fromSchema(view.state.schema);
-              const container = document.createElement("div");
-
-              for (const pos of pluginState.selectedBlocks) {
-                const node = view.state.doc.nodeAt(pos);
-                if (node) {
-                  fragments.push(node.textContent);
-                  const domNode = serializer.serializeNode(node);
-                  container.appendChild(domNode);
-                }
-              }
-
-              const text = fragments.join("\n");
-              const html = container.innerHTML;
-
-              navigator.clipboard
-                .write([
-                  new ClipboardItem({
-                    "text/plain": new Blob([text], { type: "text/plain" }),
-                    "text/html": new Blob([html], { type: "text/html" }),
-                  }),
-                ])
-                .catch(() => {
-                  navigator.clipboard.writeText(text).catch(() => {});
-                });
-
+              copyBlocksToClipboard(view, pluginState.selectedBlocks);
               return true;
             }
 
             // Cut selected blocks with full formatting
             if ((event.metaKey || event.ctrlKey) && event.key === "x") {
               event.preventDefault();
-              const fragments: string[] = [];
-              const serializer = DOMSerializer.fromSchema(view.state.schema);
-              const container = document.createElement("div");
-
-              for (const pos of pluginState.selectedBlocks) {
-                const node = view.state.doc.nodeAt(pos);
-                if (node) {
-                  fragments.push(node.textContent);
-                  const domNode = serializer.serializeNode(node);
-                  container.appendChild(domNode);
-                }
-              }
-
-              navigator.clipboard
-                .write([
-                  new ClipboardItem({
-                    "text/plain": new Blob([fragments.join("\n")], { type: "text/plain" }),
-                    "text/html": new Blob([container.innerHTML], { type: "text/html" }),
-                  }),
-                ])
-                .catch(() => {
-                  navigator.clipboard.writeText(fragments.join("\n")).catch(() => {});
-                });
-
+              copyBlocksToClipboard(view, pluginState.selectedBlocks);
               const sorted = [...pluginState.selectedBlocks].sort((a, b) => b - a);
               let tr = view.state.tr;
               for (const pos of sorted) {

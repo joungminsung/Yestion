@@ -62,6 +62,19 @@ describe("visibilityReducer", () => {
     expect(afterHide.phase).toBe("visible");
   });
 
+  it("UNLOCK after LOCK allows HIDE", () => {
+    const state: VisibilityState = {
+      phase: "visible",
+      blockPos: 0,
+      handlePosition: { top: 100, left: 50 },
+      locked: true,
+    };
+    const unlocked = visibilityReducer(state, { type: "UNLOCK" });
+    expect(unlocked.locked).toBe(false);
+    const afterHide = visibilityReducer(unlocked, { type: "HIDE" });
+    expect(afterHide.phase).toBe("disappearing");
+  });
+
   it("HIDDEN ignores HIDE", () => {
     const state: VisibilityState = { phase: "hidden", blockPos: null, handlePosition: null };
     const result = visibilityReducer(state, { type: "HIDE" });

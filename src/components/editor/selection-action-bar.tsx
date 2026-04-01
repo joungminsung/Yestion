@@ -33,6 +33,21 @@ export function SelectionActionBar({ editor }: Props) {
     return () => { editor.off("transaction", update); };
   }, [editor]);
 
+  useEffect(() => {
+    if (!showTurnInto) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      setShowTurnInto(false);
+    };
+    // Delay to avoid catching the click that opened it
+    const timer = setTimeout(() => {
+      document.addEventListener("mousedown", handleClickOutside);
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showTurnInto]);
+
   if (selectedCount < 2) return null;
 
   const handleDelete = () => {
