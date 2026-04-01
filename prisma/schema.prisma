@@ -333,3 +333,24 @@ model ChatMessage {
   @@index([pageId, createdAt])
   @@index([userId])
 }
+
+model Template {
+  id          String   @id @default(cuid())
+  workspaceId String?
+  creatorId   String?
+  name        String
+  description String?
+  icon        String?
+  category    String   @default("custom")
+  blocks      Json     @default("[]")
+  isPublic    Boolean  @default(false)
+  isDefault   Boolean  @default(false)
+  usageCount  Int      @default(0)
+  tags        String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([category])
+  @@index([isDefault])
+}
