@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/server/trpc/client";
 import { PageCover } from "./page-cover";
 import { PageIconPicker } from "./page-icon-picker";
@@ -19,6 +19,7 @@ type PageHeaderProps = {
 export function PageHeader({ page }: PageHeaderProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [showIconPicker, setShowIconPicker] = useState(false);
+  const [showCoverPicker, setShowCoverPicker] = useState(false);
 
   const utils = trpc.useUtils();
   const updatePage = trpc.page.update.useMutation({
@@ -33,10 +34,12 @@ export function PageHeader({ page }: PageHeaderProps) {
   };
 
   const handleChangeCover = () => {
-    const url = window.prompt("커버 이미지 URL을 입력하세요:", page.cover || "");
-    if (url !== null) {
-      updatePage.mutate({ id: page.id, cover: url || null });
-    }
+    setShowCoverPicker(true);
+  };
+
+  const handleCoverUrlSelect = (url: string) => {
+    updatePage.mutate({ id: page.id, cover: url || null });
+    setShowCoverPicker(false);
   };
 
   const handleRemoveCover = () => {
@@ -52,6 +55,37 @@ export function PageHeader({ page }: PageHeaderProps) {
           onChangeCover={handleChangeCover}
           onRemoveCover={handleRemoveCover}
         />
+      )}
+
+      {/* Cover Picker Modal */}
+      {showCoverPicker && (
+        <>
+          <div
+            className="fixed inset-0"
+            style={{ zIndex: 90 }}
+            onClick={() => setShowCoverPicker(false)}
+          />
+          <div
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+            style={{ zIndex: 91 }}
+          >
+            <div
+              className="rounded-lg overflow-hidden"
+              style={{
+                backgroundColor: "var(--bg-primary)",
+                border: "1px solid var(--border-default)",
+                boxShadow: "var(--shadow-popup)",
+                width: "520px",
+              }}
+            >
+              <CoverPickerTabs
+                currentCover={page.cover}
+                onSelect={handleCoverUrlSelect}
+                onClose={() => setShowCoverPicker(false)}
+              />
+            </div>
+          </div>
+        </>
       )}
 
       {/* Icon + Controls area */}
@@ -131,6 +165,241 @@ export function PageHeader({ page }: PageHeaderProps) {
         <div style={{ marginTop: !page.icon && !isHovered && !page.cover ? "72px" : undefined }}>
           <PageTitle pageId={page.id} initialTitle={page.title || "제목 없음"} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Cover Picker with tabs: URL / Unsplash ── */
+
+function CoverPickerTabs({
+  currentCover,
+  onSelect,
+  onClose,
+}: {
+  currentCover: string | null;
+  onSelect: (url: string) => void;
+  onClose: () => void;
+}) {
+  const [tab, setTab] = useState<"url" | "unsplash">("unsplash");
+  const [urlInput, setUrlInput] = useState(currentCover || "");
+
+  return (
+    <div>
+      {/* Tab bar */}
+      <div
+        className="flex items-center gap-0 px-3 pt-2"
+        style={{ borderBottom: "1px solid var(--border-default)" }}
+      >
+        <button
+          onClick={() => setTab("unsplash")}
+          className="px-3 py-2 text-sm relative"
+          style={{
+            color: tab === "unsplash" ? "var(--text-primary)" : "var(--text-tertiary)",
+            fontWeight: tab === "unsplash" ? 500 : 400,
+          }}
+        >
+          Unsplash
+          {tab === "unsplash" && (
+            <div
+              className="absolute bottom-0 left-0 right-0 h-0.5"
+              style={{ backgroundColor: "var(--text-primary)" }}
+            />
+          )}
+        </button>
+        <button
+          onClick={() => setTab("url")}
+          className="px-3 py-2 text-sm relative"
+          style={{
+            color: tab === "url" ? "var(--text-primary)" : "var(--text-tertiary)",
+            fontWeight: tab === "url" ? 500 : 400,
+          }}
+        >
+          URL
+          {tab === "url" && (
+            <div
+              className="absolute bottom-0 left-0 right-0 h-0.5"
+              style={{ backgroundColor: "var(--text-primary)" }}
+            />
+          )}
+        </button>
+      </div>
+
+      {/* Tab content */}
+      {tab === "unsplash" && (
+        <UnsplashPickerInline onSelect={onSelect} />
+      )}
+
+      {tab === "url" && (
+        <div className="p-4">
+          <div className="flex gap-2">
+            <input
+              type="url"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              placeholder="이미지 URL을 입력하세요"
+              className="flex-1 px-3 py-2 rounded text-sm outline-none"
+              style={{
+                backgroundColor: "var(--bg-secondary)",
+                color: "var(--text-primary)",
+                border: "1px solid var(--border-default)",
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && urlInput.trim()) {
+                  onSelect(urlInput.trim());
+                }
+              }}
+            />
+            <button
+              onClick={() => {
+                if (urlInput.trim()) onSelect(urlInput.trim());
+              }}
+              className="px-4 py-2 rounded text-sm font-medium text-white"
+              style={{ backgroundColor: "#2383e2" }}
+            >
+              적용
+            </button>
+          </div>
+          <div className="flex justify-end mt-3">
+            <button
+              onClick={onClose}
+              className="px-3 py-1.5 rounded text-sm hover:bg-notion-bg-hover"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Inline Unsplash Picker (no outer container) ── */
+
+interface UnsplashPhoto {
+  id: string;
+  urls: { regular: string; small: string };
+  alt_description: string | null;
+  user: { name: string };
+}
+
+const UNSPLASH_API = "https://api.unsplash.com";
+
+function UnsplashPickerInline({ onSelect }: { onSelect: (url: string) => void }) {
+  const accessKey = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
+  const [query, setQuery] = useState("");
+  const [photos, setPhotos] = useState<UnsplashPhoto[]>([]);
+  const [loading, setLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    if (!accessKey) return;
+    setLoading(true);
+    fetch(`${UNSPLASH_API}/photos?per_page=18&order_by=popular`, {
+      headers: { Authorization: `Client-ID ${accessKey}` },
+    })
+      .then((r) => r.json())
+      .then((data) => setPhotos(data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [accessKey]);
+
+  const handleSearch = (value: string) => {
+    setQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!value.trim()) return;
+    debounceRef.current = setTimeout(async () => {
+      if (!accessKey) return;
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `${UNSPLASH_API}/search/photos?query=${encodeURIComponent(value)}&per_page=18&orientation=landscape`,
+          { headers: { Authorization: `Client-ID ${accessKey}` } }
+        );
+        const data = await res.json();
+        setPhotos(data.results || []);
+      } catch {
+        // ignore
+      } finally {
+        setLoading(false);
+      }
+    }, 400);
+  };
+
+  if (!accessKey) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-sm mb-1" style={{ color: "var(--text-secondary)" }}>
+          Unsplash API 키를 설정해주세요
+        </p>
+        <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+          환경 변수 <code className="px-1 py-0.5 rounded" style={{ backgroundColor: "var(--bg-tertiary)" }}>NEXT_PUBLIC_UNSPLASH_ACCESS_KEY</code>
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="p-3" style={{ borderBottom: "1px solid var(--border-default)" }}>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => handleSearch(e.target.value)}
+          placeholder="Unsplash에서 이미지 검색..."
+          autoFocus
+          className="w-full px-3 py-2 rounded text-sm outline-none"
+          style={{
+            backgroundColor: "var(--bg-secondary)",
+            color: "var(--text-primary)",
+            border: "1px solid var(--border-default)",
+          }}
+        />
+      </div>
+      <div className="overflow-y-auto" style={{ maxHeight: "300px" }}>
+        {loading && (
+          <div className="p-4 text-center">
+            <p className="text-sm" style={{ color: "var(--text-tertiary)" }}>검색 중...</p>
+          </div>
+        )}
+        {!loading && photos.length > 0 && (
+          <div className="grid grid-cols-3 gap-1 p-2">
+            {photos.map((photo) => (
+              <button
+                key={photo.id}
+                onClick={() => {
+                  onSelect(photo.urls.regular);
+                  if (accessKey) {
+                    fetch(`${UNSPLASH_API}/photos/${photo.id}/download`, {
+                      headers: { Authorization: `Client-ID ${accessKey}` },
+                    }).catch(() => {});
+                  }
+                }}
+                className="relative group overflow-hidden rounded"
+                style={{ aspectRatio: "3/2" }}
+              >
+                <img
+                  src={photo.urls.small}
+                  alt={photo.alt_description || ""}
+                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                  loading="lazy"
+                />
+                <div
+                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end"
+                  style={{ background: "linear-gradient(transparent 40%, rgba(0,0,0,0.6))" }}
+                >
+                  <span className="text-white text-[10px] px-2 pb-1.5 truncate w-full">
+                    {photo.user.name}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="px-3 py-1.5 text-right" style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+        Photos by Unsplash
       </div>
     </div>
   );

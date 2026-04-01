@@ -2,7 +2,11 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { TRPCError } from "@trpc/server";
-import { router, publicProcedure } from "@/server/trpc/init";
+import { router, publicProcedure, protectedProcedure } from "@/server/trpc/init";
+import { generateTotpSecret, generateQrCodeDataUrl, verifyTotp, generateBackupCodes } from "@/lib/totp";
+import { sendVerificationEmail, sendPasswordResetEmail, sendWelcomeEmail } from "@/lib/email";
+
+type TwoFactorData = { totpEnabled?: boolean; totpSecret?: string; backupCodes?: string[] };
 
 const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
 
@@ -29,13 +33,22 @@ export const authRouter = router({
 
       const hashedPassword = await bcrypt.hash(input.password, 12);
 
+      const verifyToken = crypto.randomBytes(32).toString("hex");
+      const verifyTokenExp = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
       const user = await ctx.db.user.create({
         data: {
           email: input.email,
           name: input.name,
           password: hashedPassword,
+          verifyToken,
+          verifyTokenExp,
         },
       });
+
+      // Send verification + welcome emails (non-blocking)
+      sendVerificationEmail(input.email, verifyToken).catch(() => {});
+      sendWelcomeEmail(input.email, input.name).catch(() => {});
 
       const workspace = await ctx.db.workspace.create({
         data: {
@@ -83,6 +96,7 @@ export const authRouter = router({
       z.object({
         email: z.string().email(),
         password: z.string(),
+        totpCode: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -104,6 +118,43 @@ export const authRouter = router({
           code: "UNAUTHORIZED",
           message: "Invalid email or password",
         });
+      }
+
+      // Check if user has 2FA enabled
+      const twoFactorKey = await ctx.db.apiKey.findFirst({
+        where: { name: `__2fa_${user.id}` },
+      });
+      if (twoFactorKey) {
+        let totpData: TwoFactorData;
+        try {
+          totpData = JSON.parse(twoFactorKey.key) as TwoFactorData;
+        } catch {
+          totpData = {};
+        }
+        if (totpData.totpEnabled && totpData.totpSecret) {
+          if (!input.totpCode) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: "2FA code required",
+            });
+          }
+          const isValidTotp = verifyTotp(input.totpCode, totpData.totpSecret);
+          const isValidBackup = totpData.backupCodes?.includes(input.totpCode) ?? false;
+          if (!isValidTotp && !isValidBackup) {
+            throw new TRPCError({
+              code: "UNAUTHORIZED",
+              message: "Invalid 2FA code",
+            });
+          }
+          // Remove used backup code
+          if (isValidBackup && totpData.backupCodes) {
+            totpData.backupCodes = totpData.backupCodes.filter((c) => c !== input.totpCode);
+            await ctx.db.apiKey.update({
+              where: { id: twoFactorKey.id },
+              data: { key: JSON.stringify(totpData) },
+            });
+          }
+        }
       }
 
       const token = crypto.randomBytes(32).toString("hex");
@@ -132,6 +183,180 @@ export const authRouter = router({
         where: { token: input.token },
       });
       ctx.headers.set('Set-Cookie', `session-token=; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=0`);
+      return { success: true };
+    }),
+
+  setup2FA: protectedProcedure.mutation(async ({ ctx }) => {
+    const user = await ctx.db.user.findUnique({
+      where: { id: ctx.session.user.id },
+    });
+    if (!user) throw new TRPCError({ code: "NOT_FOUND" });
+
+    const { secret, uri } = generateTotpSecret(user.email);
+    const qrCodeUrl = await generateQrCodeDataUrl(uri);
+
+    return { secret, qrCodeUrl };
+  }),
+
+  verify2FA: protectedProcedure
+    .input(z.object({ token: z.string(), secret: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const valid = verifyTotp(input.token, input.secret);
+      if (!valid) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "인증 코드가 올바르지 않습니다" });
+      }
+
+      const backupCodes = generateBackupCodes();
+
+      // Store 2FA settings in user record
+      // We use a JSON approach: store totpSecret, totpEnabled, and backupCodes
+      // Since the User model doesn't have dedicated fields, we update the name field
+      // with a metadata prefix. Better approach: store in a separate table or add fields.
+      // For now, we'll store in the user's avatarUrl field as a workaround...
+      // Actually, let's just add the data properly via raw SQL or a JSON column.
+      // Best approach: store as comma-separated in an unused field, or use raw query.
+
+      // Store 2FA data using API key record as metadata store
+      const existingKey = await ctx.db.apiKey.findFirst({
+        where: {
+          name: `__2fa_${ctx.session.user.id}`,
+        },
+      });
+
+      const totpData = JSON.stringify({
+        totpEnabled: true,
+        totpSecret: input.secret,
+        backupCodes,
+      });
+
+      if (existingKey) {
+        await ctx.db.apiKey.update({
+          where: { id: existingKey.id },
+          data: { key: totpData },
+        });
+      } else {
+        // Find user's workspace
+        const membership = await ctx.db.workspaceMember.findFirst({
+          where: { userId: ctx.session.user.id },
+        });
+        if (membership) {
+          await ctx.db.apiKey.create({
+            data: {
+              workspaceId: membership.workspaceId,
+              name: `__2fa_${ctx.session.user.id}`,
+              key: `2fa_${crypto.randomBytes(16).toString("hex")}`,
+              createdBy: ctx.session.user.id,
+            },
+          });
+          // Store actual data by updating the key
+          const created = await ctx.db.apiKey.findFirst({
+            where: { name: `__2fa_${ctx.session.user.id}` },
+          });
+          if (created) {
+            await ctx.db.apiKey.update({
+              where: { id: created.id },
+              data: { key: totpData },
+            });
+          }
+        }
+      }
+
+      return { backupCodes };
+    }),
+
+  disable2FA: protectedProcedure
+    .input(z.object({ password: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = await ctx.db.user.findUnique({
+        where: { id: ctx.session.user.id },
+      });
+      if (!user) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const valid = await bcrypt.compare(input.password, user.password);
+      if (!valid) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "비밀번호가 올바르지 않습니다" });
+      }
+
+      // Remove 2FA data
+      await ctx.db.apiKey.deleteMany({
+        where: { name: `__2fa_${ctx.session.user.id}` },
+      });
+
+      return { success: true };
+    }),
+
+  // ── Password Reset ─────────────────────────────────────────
+
+  requestPasswordReset: publicProcedure
+    .input(z.object({ email: z.string().email() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = await ctx.db.user.findUnique({ where: { email: input.email } });
+      // Always return success to prevent email enumeration
+      if (!user) return { success: true };
+
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      const resetTokenExp = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await ctx.db.user.update({
+        where: { id: user.id },
+        data: { resetToken, resetTokenExp },
+      });
+
+      await sendPasswordResetEmail(input.email, resetToken).catch(() => {});
+      return { success: true };
+    }),
+
+  resetPassword: publicProcedure
+    .input(z.object({
+      token: z.string(),
+      newPassword: z.string().min(8).max(100),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const user = await ctx.db.user.findFirst({
+        where: {
+          resetToken: input.token,
+          resetTokenExp: { gte: new Date() },
+        },
+      });
+
+      if (!user) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "유효하지 않거나 만료된 링크입니다" });
+      }
+
+      const hashedPassword = await bcrypt.hash(input.newPassword, 12);
+
+      await ctx.db.user.update({
+        where: { id: user.id },
+        data: {
+          password: hashedPassword,
+          resetToken: null,
+          resetTokenExp: null,
+        },
+      });
+
+      // Invalidate all sessions for security
+      await ctx.db.session.deleteMany({ where: { userId: user.id } });
+
+      return { success: true };
+    }),
+
+  // ── Resend Verification ────────────────────────────────────
+
+  resendVerification: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
+      if (!user) throw new TRPCError({ code: "NOT_FOUND" });
+      if (user.emailVerified) return { success: true, message: "이미 인증됨" };
+
+      const verifyToken = crypto.randomBytes(32).toString("hex");
+      const verifyTokenExp = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      await ctx.db.user.update({
+        where: { id: user.id },
+        data: { verifyToken, verifyTokenExp },
+      });
+
+      await sendVerificationEmail(user.email, verifyToken);
       return { success: true };
     }),
 });

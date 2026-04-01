@@ -1,4 +1,6 @@
 import { Node, mergeAttributes } from "@tiptap/core";
+import { ReactNodeViewRenderer } from "@tiptap/react";
+import { TocNodeView } from "../media/toc-node-view";
 
 export const TableOfContents = Node.create({
   name: "tableOfContents",
@@ -26,5 +28,9 @@ export const TableOfContents = Node.create({
       }),
       "목차",
     ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(TocNodeView);
   },
 });

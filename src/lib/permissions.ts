@@ -1,8 +1,9 @@
+import type { PrismaClient } from "@prisma/client";
+
 export type EffectivePermission = "edit" | "comment" | "view" | "none";
 
 export async function getEffectivePermission(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  db: any,
+  db: PrismaClient,
   userId: string,
   pageId: string,
   depth: number = 0
@@ -37,7 +38,7 @@ export async function getEffectivePermission(
 
   // 3. Check parent page permission (inheritance)
   if (page.parentId) {
-    return getEffectivePermission(db, userId, page.parentId);
+    return getEffectivePermission(db, userId, page.parentId, depth + 1);
   }
 
   return "none";

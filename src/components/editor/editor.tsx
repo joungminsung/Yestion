@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
+import { useState, useEffect, useCallback, forwardRef, useImperativeHandle, lazy, Suspense } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -8,7 +8,7 @@ import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
-import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import { CodeBlockEnhanced } from "./extensions/code-block-enhanced";
 import { ImageBlock } from "./extensions/image-block";
 import { EmbedBlock } from "./extensions/embed-block";
 import { BookmarkBlock } from "./extensions/bookmark-block";
@@ -23,6 +23,7 @@ import HorizontalRule from "@tiptap/extension-horizontal-rule";
 import { TextStyle } from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
 import Highlight from "@tiptap/extension-highlight";
+import TextAlign from "@tiptap/extension-text-align";
 import { Table } from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableHeader from "@tiptap/extension-table-header";
@@ -46,18 +47,21 @@ import { MentionNode } from "./extensions/mention-node";
 import { MentionExtension } from "./extensions/mention-ext";
 import { BlockSelection, BLOCK_SELECTION_KEY } from "./extensions/block-selection";
 import { MicroInteractions } from "./extensions/micro-interactions";
+import { LinkPreviewExtension, LinkPreviewPopup, useLinkPreview } from "./link-preview-popup";
 import { MarkdownPaste } from "./extensions/markdown-paste";
 import { ClipboardImage } from "./extensions/clipboard-image";
 import { FileDrop } from "./extensions/file-drop";
-import { SlashCommand } from "./slash-command/slash-command";
-import { MentionList, type MentionItem } from "./mention/mention-list";
-import { FindReplace } from "./find-replace";
-import { InlineToolbar } from "./inline-toolbar";
-import { DragHandle } from "./drag-handle";
-import { BlockMenu } from "./block-menu";
-import { BlockContextMenu } from "./block-context-menu";
-import { AiPrompt } from "./ai/ai-prompt";
 import { useAiStore } from "@/stores/ai";
+import type { MentionItem } from "./mention/mention-list";
+
+const SlashCommand = lazy(() => import("./slash-command/slash-command").then(m => ({ default: m.SlashCommand })));
+const MentionList = lazy(() => import("./mention/mention-list").then(m => ({ default: m.MentionList })));
+const FindReplace = lazy(() => import("./find-replace").then(m => ({ default: m.FindReplace })));
+const InlineToolbar = lazy(() => import("./inline-toolbar").then(m => ({ default: m.InlineToolbar })));
+const DragHandle = lazy(() => import("./drag-handle").then(m => ({ default: m.DragHandle })));
+const BlockMenu = lazy(() => import("./block-menu").then(m => ({ default: m.BlockMenu })));
+const BlockContextMenu = lazy(() => import("./block-context-menu").then(m => ({ default: m.BlockContextMenu })));
+const AiPrompt = lazy(() => import("./ai/ai-prompt").then(m => ({ default: m.AiPrompt })));
 import "./utils/editor-styles.css";
 import "./cursor-styles.css";
 
@@ -77,6 +81,7 @@ type NotionEditorProps = {
   mentionItems?: MentionItem[];
   onTyping?: () => void;
   onAddComment?: (content: string, range: { from: number; to: number }) => void;
+  onTurnIntoPage?: (blockText: string, from: number, to: number) => void;
 };
 
 export type NotionEditorHandle = { commands: { setContent: (content: unknown) => boolean } };
@@ -92,6 +97,7 @@ export const NotionEditor = forwardRef<
   mentionItems = [],
   onTyping,
   onAddComment,
+  onTurnIntoPage,
 }, ref) {
   const [menuState, setMenuState] = useState<{pos: number; coords: {top: number; left: number}} | null>(null);
   const aiStore = useAiStore();
@@ -103,8 +109,6 @@ export const NotionEditor = forwardRef<
         heading: { levels: [1, 2, 3] },
         codeBlock: false,
         horizontalRule: false,
-        // C2: Disable StarterKit history when collaboration is active to avoid
-        // conflicts with Yjs undo manager
         ...(collaboration ? { history: false } : {}),
       }),
       Placeholder.configure({
@@ -126,7 +130,7 @@ export const NotionEditor = forwardRef<
       Link.configure({ openOnClick: false }),
       TaskList,
       TaskItem.configure({ nested: true }),
-      CodeBlockLowlight.configure({ lowlight }),
+      CodeBlockEnhanced.configure({ lowlight }),
       ImageBlock.configure({ allowBase64: true }),
       EmbedBlock,
       BookmarkBlock,
@@ -152,6 +156,7 @@ export const NotionEditor = forwardRef<
       TextStyle,
       Color,
       Highlight.configure({ multicolor: true }),
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
       BlockId,
       BlockSelection,
       MarkdownPaste,
@@ -161,6 +166,7 @@ export const NotionEditor = forwardRef<
       MentionNode,
       MentionExtension,
       MicroInteractions,
+      LinkPreviewExtension,
       ...(collaboration ? [
         Collaboration.configure({ document: collaboration.ydoc }),
         CollaborationCursor.configure({
@@ -182,7 +188,14 @@ export const NotionEditor = forwardRef<
     editorProps: {
       attributes: { class: "notion-editor", role: "textbox", "aria-multiline": "true", "aria-label": "페이지 에디터" },
       handleKeyDown(_view, event) {
-        // Tab: indent (sink list item or insert spaces in code block)
+        // Cmd+Shift+H: toggle highlight
+        if (event.key === "h" && (event.metaKey || event.ctrlKey) && event.shiftKey) {
+          event.preventDefault();
+          editor!.chain().focus().toggleHighlight({ color: "var(--color-yellow-bg)" }).run();
+          return true;
+        }
+
+        // Tab: indent
         if (event.key === "Tab" && !event.shiftKey) {
           if (editor?.isActive("listItem") || editor?.isActive("taskItem")) {
             event.preventDefault();
@@ -201,7 +214,7 @@ export const NotionEditor = forwardRef<
           return true;
         }
 
-        // Shift+Tab: outdent (lift list item)
+        // Shift+Tab: outdent
         if (event.key === "Tab" && event.shiftKey) {
           if (editor?.isActive("listItem") || editor?.isActive("taskItem")) {
             event.preventDefault();
@@ -215,12 +228,8 @@ export const NotionEditor = forwardRef<
           return true;
         }
 
-        // 7.10 ESC hierarchy
+        // ESC hierarchy
         if (event.key === "Escape") {
-          // Level 1: Close any open menu (slash, block menu, context menu, AI)
-          // These components handle their own ESC
-
-          // Level 2: Deselect blocks
           const blockState = BLOCK_SELECTION_KEY.getState(editor!.state);
           if (blockState && blockState.selectedBlocks.length > 0) {
             editor!.view.dispatch(
@@ -231,8 +240,6 @@ export const NotionEditor = forwardRef<
             );
             return true;
           }
-
-          // Level 3: Blur editor
           editor!.commands.blur();
           return true;
         }
@@ -242,14 +249,11 @@ export const NotionEditor = forwardRef<
     },
   });
 
-  // Expose editor commands via ref for C3 block-to-Yjs hydration
   useImperativeHandle(ref, () => {
     if (!editor) return { commands: { setContent: () => false } };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return { commands: { setContent: (content: unknown) => editor.commands.setContent(content as any) } };
+    return { commands: { setContent: (content: unknown) => editor.commands.setContent(content as Parameters<typeof editor.commands.setContent>[0]) } };
   }, [editor]);
 
-  // Listen for AI open events from slash command
   useEffect(() => {
     const handleAiOpen = (e: Event) => {
       const { context, position } = (e as CustomEvent).detail;
@@ -274,42 +278,62 @@ export const NotionEditor = forwardRef<
     }
   }, [editor]);
 
+  const linkPreview = useLinkPreview(editor);
+
   if (!editor) return null;
 
   return (
     <div className="relative">
-      <FindReplace editor={editor} />
+      <Suspense fallback={null}>
+        <FindReplace editor={editor} />
+      </Suspense>
       <EditorContent editor={editor} />
       {editor.view && (
-        <>
+        <Suspense fallback={null}>
           <InlineToolbar editor={editor} onAddComment={onAddComment} />
           <SlashCommand editor={editor} />
           <MentionList editor={editor} items={mentionItems} />
-          <BlockContextMenu editor={editor} />
+          <BlockContextMenu editor={editor} onTurnIntoPage={onTurnIntoPage} onAddComment={onAddComment} />
           <DragHandle editor={editor} onMenuOpen={(pos) => {
             if (!editor.view) return;
             const coords = editor.view.coordsAtPos(pos);
             setMenuState({ pos, coords: { top: coords.top, left: coords.left - 4 } });
           }} />
-        </>
+        </Suspense>
       )}
-      {menuState && <BlockMenu editor={editor} pos={menuState.pos} coords={menuState.coords} onClose={() => setMenuState(null)} />}
+      {menuState && (
+        <Suspense fallback={null}>
+          <BlockMenu editor={editor} pos={menuState.pos} coords={menuState.coords} onClose={() => setMenuState(null)} onTurnIntoPage={onTurnIntoPage} />
+        </Suspense>
+      )}
       {aiStore.isOpen && aiStore.position && (
-        <div
-          className="fixed"
-          style={{
-            top: `${aiStore.position.top}px`,
-            left: `${aiStore.position.left}px`,
-            zIndex: "var(--z-modal)",
-          }}
-        >
-          <AiPrompt
-            context={aiStore.context || undefined}
-            onInsert={handleAiInsert}
-            onReplace={handleAiReplace}
-            onClose={aiStore.close}
-          />
-        </div>
+        <Suspense fallback={null}>
+          <div
+            className="fixed"
+            style={{
+              top: `${aiStore.position.top}px`,
+              left: `${aiStore.position.left}px`,
+              zIndex: "var(--z-modal)",
+            }}
+          >
+            <AiPrompt
+              context={aiStore.context || undefined}
+              onInsert={handleAiInsert}
+              onReplace={handleAiReplace}
+              onClose={aiStore.close}
+            />
+          </div>
+        </Suspense>
+      )}
+      {linkPreview.preview && (
+        <LinkPreviewPopup
+          data={linkPreview.preview.data}
+          coords={linkPreview.preview.coords}
+          onClose={linkPreview.handleClose}
+          onOpen={linkPreview.handleOpen}
+          onCopyLink={linkPreview.handleCopyLink}
+          onRemoveLink={linkPreview.handleRemoveLink}
+        />
       )}
     </div>
   );

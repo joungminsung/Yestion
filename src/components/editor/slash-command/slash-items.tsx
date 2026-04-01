@@ -6,7 +6,7 @@ import {
   Quote, Minus, Code, Sigma, TableOfContents, Columns2,
   ImageIcon, Table, Link as LinkIcon, Play, MapPin,
   Bookmark, Film, Music, Paperclip, Database, BarChart3,
-  RefreshCw, FileText,
+  RefreshCw, FileText, Calendar, Clock,
 } from "lucide-react";
 
 export type SlashItem = {
@@ -205,6 +205,19 @@ export const SLASH_ITEMS: SlashItem[] = [
     },
   },
   {
+    title: "하위 페이지",
+    description: "현재 페이지 아래에 새 페이지를 만듭니다.",
+    icon: <FileText size={18} />,
+    category: "고급 블록",
+    keywords: ["subpage", "page", "하위", "페이지", "새페이지"],
+    command: (editor) => {
+      editor.chain().focus().insertContent({
+        type: "linkToPage",
+        attrs: { pageId: "__new__", pageTitle: "", pageIcon: "📄" },
+      }).run();
+    },
+  },
+  {
     title: "목차",
     description: "페이지의 제목 목록을 표시합니다.",
     icon: <TableOfContents size={18} />,
@@ -240,6 +253,38 @@ export const SLASH_ITEMS: SlashItem[] = [
           ],
         })
         .run();
+    },
+  },
+  {
+    title: "3열",
+    description: "3개의 열 레이아웃을 추가합니다.",
+    icon: <Columns2 size={18} />,
+    category: "고급 블록",
+    keywords: ["column", "3열", "레이아웃", "three"],
+    command: (editor) => {
+      editor.chain().focus().insertContent({
+        type: "columnList",
+        content: [
+          { type: "column", attrs: { width: 0.33 }, content: [{ type: "paragraph" }] },
+          { type: "column", attrs: { width: 0.34 }, content: [{ type: "paragraph" }] },
+          { type: "column", attrs: { width: 0.33 }, content: [{ type: "paragraph" }] },
+        ],
+      }).run();
+    },
+  },
+  {
+    title: "4열",
+    description: "4개의 열 레이아웃을 추가합니다.",
+    icon: <Columns2 size={18} />,
+    category: "고급 블록",
+    keywords: ["column", "4열", "레이아웃", "four"],
+    command: (editor) => {
+      editor.chain().focus().insertContent({
+        type: "columnList",
+        content: Array.from({ length: 4 }, () => ({
+          type: "column", attrs: { width: 0.25 }, content: [{ type: "paragraph" }],
+        })),
+      }).run();
     },
   },
   {
@@ -354,6 +399,46 @@ export const SLASH_ITEMS: SlashItem[] = [
         type: "paragraph",
         content: [{ type: "text", text: "[풀페이지 데이터베이스 — 사이드바에서 생성]" }],
       }).run();
+    },
+  },
+  {
+    title: "오늘 날짜",
+    description: "오늘 날짜를 삽입합니다.",
+    icon: <Calendar size={18} />,
+    category: "인라인",
+    keywords: ["today", "date", "오늘", "날짜"],
+    command: (editor) => {
+      const today = new Date().toLocaleDateString("ko-KR", {
+        year: "numeric", month: "long", day: "numeric", weekday: "short",
+      });
+      editor.chain().focus().insertContent(today).run();
+    },
+  },
+  {
+    title: "내일 날짜",
+    description: "내일 날짜를 삽입합니다.",
+    icon: <Calendar size={18} />,
+    category: "인라인",
+    keywords: ["tomorrow", "내일", "날짜"],
+    command: (editor) => {
+      const tomorrow = new Date(Date.now() + 86400000).toLocaleDateString("ko-KR", {
+        year: "numeric", month: "long", day: "numeric", weekday: "short",
+      });
+      editor.chain().focus().insertContent(tomorrow).run();
+    },
+  },
+  {
+    title: "현재 시간",
+    description: "현재 날짜와 시간을 삽입합니다.",
+    icon: <Clock size={18} />,
+    category: "인라인",
+    keywords: ["now", "time", "현재", "시간"],
+    command: (editor) => {
+      const now = new Date().toLocaleString("ko-KR", {
+        year: "numeric", month: "long", day: "numeric", weekday: "short",
+        hour: "2-digit", minute: "2-digit",
+      });
+      editor.chain().focus().insertContent(now).run();
     },
   },
 ];

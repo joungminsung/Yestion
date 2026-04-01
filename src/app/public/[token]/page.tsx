@@ -82,19 +82,33 @@ export default async function PublicPage({ params }: { params: { token: string }
   );
 }
 
+type RichTextItem = { text?: string; content?: string };
 type BlockData = {
   id: string;
   type: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  content: any;
+  content: unknown;
   children?: BlockData[];
 };
 
+type BlockContent = {
+  text?: string;
+  richText?: RichTextItem[];
+  checked?: boolean;
+  url?: string;
+  caption?: string;
+  name?: string;
+  icon?: string;
+  expression?: string;
+  title?: string;
+  description?: string;
+  embedUrl?: string;
+  number?: string;
+  height?: number;
+};
+
 function PublicBlock({ block }: { block: BlockData }) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const content = (block.content || {}) as Record<string, any>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const text = content?.richText?.map((rt: any) => rt.text || rt.content || "").join("") || content?.text || "";
+  const content = (block.content || {}) as BlockContent;
+  const text = content.richText?.map((rt) => rt.text || rt.content || "").join("") || content.text || "";
 
   const renderText = () => {
     switch (block.type) {

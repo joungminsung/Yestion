@@ -7,10 +7,25 @@ export const userRouter = router({
   me: protectedProcedure.query(async ({ ctx }) => {
     const user = await ctx.db.user.findUnique({
       where: { id: ctx.session.user.id },
-      select: { id: true, email: true, name: true, avatarUrl: true, locale: true, theme: true },
+      select: { id: true, email: true, name: true, avatarUrl: true, locale: true, theme: true, emailVerified: true, emailNotify: true },
     });
     if (!user) throw new TRPCError({ code: "NOT_FOUND" });
-    return user;
+
+    // Check if 2FA is enabled
+    const twoFactorKey = await ctx.db.apiKey.findFirst({
+      where: { name: `__2fa_${ctx.session.user.id}` },
+    });
+    let totpEnabled = false;
+    if (twoFactorKey) {
+      try {
+        const data = JSON.parse(twoFactorKey.key);
+        totpEnabled = data.totpEnabled === true;
+      } catch {
+        // ignore
+      }
+    }
+
+    return { ...user, totpEnabled };
   }),
 
   updateProfile: protectedProcedure
@@ -19,12 +34,13 @@ export const userRouter = router({
       avatarUrl: z.string().url().nullable().optional(),
       locale: z.enum(["ko", "en"]).optional(),
       theme: z.enum(["light", "dark", "system"]).optional(),
+      emailNotify: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       return ctx.db.user.update({
         where: { id: ctx.session.user.id },
         data: input,
-        select: { id: true, email: true, name: true, avatarUrl: true, locale: true, theme: true },
+        select: { id: true, email: true, name: true, avatarUrl: true, locale: true, theme: true, emailVerified: true, emailNotify: true },
       });
     }),
 

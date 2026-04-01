@@ -14,8 +14,7 @@ interface CommentData {
   content: string;
   authorId: string;
   resolved: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  reactions?: any;
+  reactions?: Record<string, string[]> | unknown;
   createdAt: Date;
   author: CommentAuthor;
   replies?: CommentData[];

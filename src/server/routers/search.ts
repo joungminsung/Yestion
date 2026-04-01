@@ -50,7 +50,7 @@ export const searchRouter = router({
         JOIN "Page" p ON p."id" = b."pageId"
         WHERE p."workspaceId" = ${input.workspaceId}
           AND p."isDeleted" = false
-          AND b."content"::text ILIKE ${'%' + input.query + '%'}
+          AND b."content"::text ILIKE ${`%${input.query}%`}
         LIMIT 20
       `;
 

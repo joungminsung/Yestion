@@ -2,6 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { Editor } from "@tiptap/react";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
+
+const findPluginKey = new PluginKey("findHighlight");
 
 type Props = { editor: Editor };
 
@@ -14,6 +18,53 @@ export function FindReplace({ editor }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const findPluginRef = useRef<Plugin | null>(null);
+
+  // Register the find highlight plugin
+  useEffect(() => {
+    if (!editor) return;
+
+    const plugin = new Plugin({
+      key: findPluginKey,
+      state: {
+        init() {
+          return { matches: [] as { from: number; to: number }[], currentIndex: -1 };
+        },
+        apply(tr, prev) {
+          const meta = tr.getMeta(findPluginKey);
+          if (meta) return meta;
+          if (tr.docChanged) return { matches: [], currentIndex: -1 };
+          return prev;
+        },
+      },
+      props: {
+        decorations(state) {
+          const pluginState = findPluginKey.getState(state);
+          if (!pluginState || pluginState.matches.length === 0) return DecorationSet.empty;
+          const decos = pluginState.matches.map((m: { from: number; to: number }, i: number) =>
+            Decoration.inline(m.from, m.to, {
+              class: i === pluginState.currentIndex ? "notion-find-current" : "notion-find-match",
+            })
+          );
+          return DecorationSet.create(state.doc, decos);
+        },
+      },
+    });
+
+    findPluginRef.current = plugin;
+    editor.registerPlugin(plugin);
+    return () => {
+      editor.unregisterPlugin(findPluginKey);
+      findPluginRef.current = null;
+    };
+  }, [editor]);
+
+  // Update decorations when matches or currentIndex change
+  useEffect(() => {
+    if (!editor || !findPluginRef.current) return;
+    const tr = editor.state.tr.setMeta(findPluginKey, { matches, currentIndex });
+    editor.view.dispatch(tr);
+  }, [matches, currentIndex, editor]);
 
   // Cmd+F to open, Cmd+H to open with replace
   useEffect(() => {
@@ -64,6 +115,10 @@ export function FindReplace({ editor }: Props) {
     if (matches[index]) {
       editor.chain().focus().setTextSelection(matches[index]).run();
       setCurrentIndex(index);
+      // Scroll into view
+      const coords = editor.view.coordsAtPos(matches[index].from);
+      const el = document.elementFromPoint(coords.left, coords.top);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
 
@@ -88,7 +143,13 @@ export function FindReplace({ editor }: Props) {
     findMatches();
   };
 
-  const clearHighlights = () => { setMatches([]); };
+  const clearHighlights = () => {
+    setMatches([]);
+    if (editor && findPluginRef.current) {
+      const tr = editor.state.tr.setMeta(findPluginKey, { matches: [], currentIndex: -1 });
+      editor.view.dispatch(tr);
+    }
+  };
 
   if (!isOpen) return null;
 

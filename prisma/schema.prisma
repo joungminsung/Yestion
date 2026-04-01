@@ -8,15 +8,21 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  email       String   @unique
-  name        String
-  password    String
-  avatarUrl   String?
-  locale      String   @default("ko")
-  theme       String   @default("system")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String
+  password        String
+  avatarUrl       String?
+  locale          String    @default("ko")
+  theme           String    @default("system")
+  emailVerified   Boolean   @default(false)
+  verifyToken     String?
+  verifyTokenExp  DateTime?
+  resetToken      String?
+  resetTokenExp   DateTime?
+  emailNotify     Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   memberships      WorkspaceMember[]
   sessions         Session[]
@@ -25,6 +31,7 @@ model User {
   comments         Comment[]
   notifications    Notification[]
   activityLogs     ActivityLog[]
+  chatMessages     ChatMessage[]
 }
 
 model Workspace {
@@ -95,6 +102,7 @@ model Page {
   permissions       PagePermission[]
   comments          Comment[]
   activityLogs      ActivityLog[]
+  chatMessages      ChatMessage[]
   publicAccessToken String?  @unique
   publicAccessLevel String?
   snapshots         PageSnapshot[]
@@ -308,4 +316,20 @@ model SyncedBlock {
 
   @@index([sourceBlockId])
   @@index([sourcePageId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  pageId    String
+  userId    String
+  content   String
+  type      String   @default("text")  // "text" | "block_ref" | "system" | "poll" | "task"
+  metadata  Json     @default("{}")     // blockId, blockType, blockPreview, pollOptions, taskDone, mentions, pinnedAt
+  createdAt DateTime @default(now())
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([pageId, createdAt])
+  @@index([userId])
 }

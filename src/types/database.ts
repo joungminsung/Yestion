@@ -89,6 +89,7 @@ export type FilterOperator =
   | "on_or_after";
 
 export type FilterCondition = {
+  id?: string;
   propertyId: string;
   operator: FilterOperator;
   value?: string | number | boolean | string[];
@@ -116,6 +117,12 @@ export type GroupRule = {
 
 // ── View Config ────────────────────────────────────────────
 
+export type RowHeight = "short" | "medium" | "tall" | "auto";
+
+export type AggregationFunction = "none" | "count" | "sum" | "average" | "min" | "max";
+
+export type DatabaseLockLevel = "none" | "structure" | "full";
+
 export type ViewConfig = {
   filter?: FilterGroup;
   sorts?: SortRule[];
@@ -134,6 +141,12 @@ export type ViewConfig = {
   timelineEndProperty?: string;
   // wrap cells
   wrapCells?: boolean;
+  // row height
+  rowHeight?: RowHeight;
+  // per-column summary aggregation
+  columnAggregations?: Record<string, AggregationFunction>;
+  // database lock
+  lockLevel?: DatabaseLockLevel;
 };
 
 // ── Row Data ───────────────────────────────────────────────

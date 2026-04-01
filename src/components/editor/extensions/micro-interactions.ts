@@ -98,6 +98,19 @@ export const MicroInteractions = Extension.create({
           return false;
         }
       },
+
+      // Cmd+D: duplicate block
+      "Mod-d": () => {
+        const { $from } = this.editor.state.selection;
+        const blockStart = $from.before(1);
+        const node = this.editor.state.doc.nodeAt(blockStart);
+        if (!node) return false;
+        this.editor.chain()
+          .focus()
+          .insertContentAt(blockStart + node.nodeSize, node.toJSON())
+          .run();
+        return true;
+      },
     };
   },
 });

@@ -8,7 +8,7 @@ import { DatabaseFilter } from "./database-filter";
 import { DatabaseSort } from "./database-sort";
 import { propertyTypeIcon } from "./property-type-icon";
 import { parseCSV, detectPropertyType } from "@/lib/csv-import";
-import type { ViewConfig, ViewType, FilterGroup, SortRule, GroupRule, DatabaseData } from "@/types/database";
+import type { ViewConfig, ViewType, FilterGroup, SortRule, GroupRule, DatabaseData, RowHeight, DatabaseLockLevel, AggregationFunction } from "@/types/database";
 import { Table, Kanban, List, LayoutGrid, Calendar, ArrowRight } from "lucide-react";
 
 const GROUPABLE_TYPES = new Set(["select", "multi_select", "status", "person"]);
@@ -20,6 +20,19 @@ const VIEW_TYPE_OPTIONS: { type: ViewType; label: string; icon: ReactNode }[] = 
   { type: "gallery", label: "Gallery", icon: <LayoutGrid size={14} /> },
   { type: "calendar", label: "Calendar", icon: <Calendar size={14} /> },
   { type: "timeline", label: "Timeline", icon: <ArrowRight size={14} /> },
+];
+
+const ROW_HEIGHT_OPTIONS: { value: RowHeight; label: string; height: string }[] = [
+  { value: "short", label: "Short", height: "33px" },
+  { value: "medium", label: "Medium", height: "56px" },
+  { value: "tall", label: "Tall", height: "76px" },
+  { value: "auto", label: "Auto", height: "Auto" },
+];
+
+const LOCK_OPTIONS: { value: DatabaseLockLevel; label: string; description: string }[] = [
+  { value: "none", label: "Unlocked", description: "Anyone can edit" },
+  { value: "structure", label: "Structure lock", description: "Can edit data, not properties or views" },
+  { value: "full", label: "Full lock", description: "No changes allowed" },
 ];
 
 type DatabaseToolbarProps = {
@@ -61,6 +74,8 @@ export function DatabaseToolbar({
   const [showGroup, setShowGroup] = useState(false);
   const [showProperties, setShowProperties] = useState(false);
   const [showNewView, setShowNewView] = useState(false);
+  const [showRowHeight, setShowRowHeight] = useState(false);
+  const [showLock, setShowLock] = useState(false);
   const [csvPreview, setCsvPreview] = useState<{ headers: string[]; rows: string[][]; propertyTypes: Record<string, string> } | null>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
@@ -69,9 +84,14 @@ export function DatabaseToolbar({
   const groupRef = useRef<HTMLDivElement>(null);
   const propertiesRef = useRef<HTMLDivElement>(null);
   const newViewRef = useRef<HTMLDivElement>(null);
+  const rowHeightRef = useRef<HTMLDivElement>(null);
+  const lockRef = useRef<HTMLDivElement>(null);
 
   const effectiveFilter = localFilters ?? activeViewConfig?.filter ?? null;
   const effectiveSorts = localSorts ?? activeViewConfig?.sorts ?? null;
+  const currentRowHeight = activeViewConfig?.rowHeight ?? "short";
+  const currentLockLevel = activeViewConfig?.lockLevel ?? "none";
+  const isLocked = currentLockLevel !== "none";
 
   const filterCount = useMemo(() => {
     if (!effectiveFilter) return 0;
@@ -88,6 +108,23 @@ export function DatabaseToolbar({
     () => properties.filter((p) => GROUPABLE_TYPES.has(p.type)),
     [properties],
   );
+
+  // Listen for aggregation update events from table-view
+  useEffect(() => {
+    function handleAggregationUpdate(e: Event) {
+      const detail = (e as CustomEvent).detail as { propertyId: string; aggregation: AggregationFunction };
+      if (!onUpdateViewConfig) return;
+      const current = activeViewConfig?.columnAggregations ?? {};
+      onUpdateViewConfig({
+        columnAggregations: {
+          ...current,
+          [detail.propertyId]: detail.aggregation,
+        },
+      });
+    }
+    document.addEventListener("database:updateAggregation", handleAggregationUpdate);
+    return () => document.removeEventListener("database:updateAggregation", handleAggregationUpdate);
+  }, [onUpdateViewConfig, activeViewConfig?.columnAggregations]);
 
   // Close panels on outside click
   useEffect(() => {
@@ -107,10 +144,16 @@ export function DatabaseToolbar({
       if (showNewView && newViewRef.current && !newViewRef.current.contains(e.target as Node)) {
         setShowNewView(false);
       }
+      if (showRowHeight && rowHeightRef.current && !rowHeightRef.current.contains(e.target as Node)) {
+        setShowRowHeight(false);
+      }
+      if (showLock && lockRef.current && !lockRef.current.contains(e.target as Node)) {
+        setShowLock(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showFilter, showSort, showGroup, showProperties, showNewView]);
+  }, [showFilter, showSort, showGroup, showProperties, showNewView, showRowHeight, showLock]);
 
   const handleFilterChange = (filter: FilterGroup | null) => {
     setLocalFilters(filter);
@@ -169,6 +212,26 @@ export function DatabaseToolbar({
     [databaseId, addViewMutation],
   );
 
+  const handleRowHeightChange = useCallback(
+    (height: RowHeight) => {
+      if (onUpdateViewConfig) {
+        onUpdateViewConfig({ rowHeight: height });
+      }
+      setShowRowHeight(false);
+    },
+    [onUpdateViewConfig],
+  );
+
+  const handleLockChange = useCallback(
+    (level: DatabaseLockLevel) => {
+      if (onUpdateViewConfig) {
+        onUpdateViewConfig({ lockLevel: level });
+      }
+      setShowLock(false);
+    },
+    [onUpdateViewConfig],
+  );
+
   const handleCSVFile = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -211,6 +274,8 @@ export function DatabaseToolbar({
     if (panel !== "group") setShowGroup(false);
     if (panel !== "properties") setShowProperties(false);
     if (panel !== "newView") setShowNewView(false);
+    if (panel !== "rowHeight") setShowRowHeight(false);
+    if (panel !== "lock") setShowLock(false);
   };
 
   return (
@@ -218,6 +283,20 @@ export function DatabaseToolbar({
       className="relative flex items-center gap-1 border-b px-2 py-1"
       style={{ borderColor: "var(--border-default)" }}
     >
+      {/* Lock indicator */}
+      {isLocked && (
+        <span
+          className="mr-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium"
+          style={{
+            backgroundColor: currentLockLevel === "full" ? "#ffe2dd" : "#fdecc8",
+            color: currentLockLevel === "full" ? "#e03e3e" : "#a17e2b",
+          }}
+        >
+          <LockIcon />
+          {currentLockLevel === "full" ? "Locked" : "Structure locked"}
+        </span>
+      )}
+
       {/* Filter button */}
       <div className="relative" ref={filterRef}>
         <Button
@@ -331,6 +410,42 @@ export function DatabaseToolbar({
         )}
       </div>
 
+      {/* Row Height button */}
+      <div className="relative" ref={rowHeightRef}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1"
+          onClick={() => { closeAllExcept("rowHeight"); setShowRowHeight(!showRowHeight); }}
+        >
+          <RowHeightIcon />
+          Height
+        </Button>
+        {showRowHeight && (
+          <div
+            className="absolute left-0 top-full z-50 mt-1 min-w-[160px] rounded-md border bg-[var(--bg-primary)] p-1 shadow-lg"
+            style={{ borderColor: "var(--border-default)" }}
+          >
+            {ROW_HEIGHT_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => handleRowHeightChange(opt.value)}
+                className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors hover:bg-[var(--bg-hover)]"
+                style={{
+                  color: currentRowHeight === opt.value ? "#2383e2" : "var(--text-primary)",
+                }}
+              >
+                <span>{opt.label}</span>
+                <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>{opt.height}</span>
+                {currentRowHeight === opt.value && (
+                  <span className="text-xs">&#10003;</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* CSV Import */}
       <div className="relative">
         <input
@@ -345,7 +460,7 @@ export function DatabaseToolbar({
           size="sm"
           onClick={() => csvInputRef.current?.click()}
         >
-          CSV 가져오기
+          CSV
         </Button>
         {csvPreview && (
           <div
@@ -359,7 +474,7 @@ export function DatabaseToolbar({
               onClick={(e) => e.stopPropagation()}
             >
               <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
-                CSV 가져오기 미리보기
+                CSV Import Preview
               </h3>
               <div className="overflow-x-auto mb-3">
                 <table className="w-full text-xs border-collapse">
@@ -397,13 +512,13 @@ export function DatabaseToolbar({
                 </table>
                 {csvPreview.rows.length > 5 && (
                   <p className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
-                    ... 외 {csvPreview.rows.length - 5}개 행
+                    ... and {csvPreview.rows.length - 5} more rows
                   </p>
                 )}
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setCsvPreview(null)}>
-                  취소
+                  Cancel
                 </Button>
                 <Button
                   size="sm"
@@ -411,7 +526,7 @@ export function DatabaseToolbar({
                   disabled={importCSVMutation.isPending}
                   className="bg-[#2383e2] text-white hover:bg-[#0b6ec5]"
                 >
-                  {importCSVMutation.isPending ? "가져오는 중..." : `가져오기 (${csvPreview.rows.length}행)`}
+                  {importCSVMutation.isPending ? "Importing..." : `Import (${csvPreview.rows.length} rows)`}
                 </Button>
               </div>
             </div>
@@ -421,6 +536,46 @@ export function DatabaseToolbar({
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Lock button */}
+      <div className="relative" ref={lockRef}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1"
+          onClick={() => { closeAllExcept("lock"); setShowLock(!showLock); }}
+        >
+          {isLocked ? <LockIcon /> : <UnlockIcon />}
+          {isLocked ? "Locked" : "Lock"}
+        </Button>
+        {showLock && (
+          <div
+            className="absolute right-0 top-full z-50 mt-1 min-w-[240px] rounded-md border bg-[var(--bg-primary)] p-1 shadow-lg"
+            style={{ borderColor: "var(--border-default)" }}
+          >
+            {LOCK_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => handleLockChange(opt.value)}
+                className="flex w-full flex-col items-start gap-0.5 rounded px-2 py-1.5 text-left transition-colors hover:bg-[var(--bg-hover)]"
+                style={{
+                  color: currentLockLevel === opt.value ? "#2383e2" : "var(--text-primary)",
+                }}
+              >
+                <div className="flex w-full items-center justify-between">
+                  <span className="text-sm font-medium">{opt.label}</span>
+                  {currentLockLevel === opt.value && (
+                    <span className="text-xs">&#10003;</span>
+                  )}
+                </div>
+                <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+                  {opt.description}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Properties toggle */}
       <div className="relative" ref={propertiesRef}>
@@ -525,6 +680,36 @@ function GroupIcon() {
       <rect x="14" y="3" width="7" height="7" />
       <rect x="3" y="14" width="7" height="7" />
       <rect x="14" y="14" width="7" height="7" />
+    </svg>
+  );
+}
+
+function RowHeightIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <line x1="4" y1="18" x2="20" y2="18" />
+      <polyline points="12 2 12 6" />
+      <polyline points="12 18 12 22" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
+function UnlockIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 9.9-1" />
     </svg>
   );
 }

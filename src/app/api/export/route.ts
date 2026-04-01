@@ -40,13 +40,14 @@ export async function GET(req: NextRequest) {
     orderBy: { position: "asc" },
   });
 
-  const blockData: BlockData[] = blocks.map((b) => ({
+  type PrismaBlock = { type: string; content: unknown; children?: PrismaBlock[] };
+  const blockData: BlockData[] = blocks.map((b: PrismaBlock) => ({
     type: b.type,
     content: (b.content as Record<string, unknown>) ?? {},
-    children: (b.children ?? []).map((c) => ({
+    children: (b.children ?? []).map((c: PrismaBlock) => ({
       type: c.type,
       content: (c.content as Record<string, unknown>) ?? {},
-      children: ((c as unknown as { children?: BlockData[] }).children ?? []).map((gc) => ({
+      children: ((c as unknown as { children?: BlockData[] }).children ?? []).map((gc: BlockData) => ({
         type: gc.type,
         content: gc.content ?? {},
         children: [],

@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { PropertyType, PropertyConfig, SelectOption } from "@/types/database";
+import { FormulaEditor } from "./formula-editor";
+import type { PropertyType, PropertyConfig, SelectOption, DatabaseData } from "@/types/database";
 
 type PropertyEditorProps = {
   property: {
@@ -21,6 +22,8 @@ type PropertyEditorProps = {
   }) => void;
   onDelete: () => void;
   onClose: () => void;
+  /** All database properties, needed for formula editor autocomplete */
+  allProperties?: DatabaseData["properties"];
 };
 
 const PROPERTY_TYPES: { value: PropertyType; label: string }[] = [
@@ -54,6 +57,7 @@ export function PropertyEditor({
   onUpdate,
   onDelete,
   onClose,
+  allProperties,
 }: PropertyEditorProps) {
   const [name, setName] = useState(property.name);
   const [type, setType] = useState<PropertyType>(property.type);
@@ -74,12 +78,15 @@ export function PropertyEditor({
 
   const handleTypeChange = (newType: PropertyType) => {
     setType(newType);
-    // Reset config when type changes to select-like types
-    if (
-      (newType === "select" || newType === "multi_select" || newType === "status") &&
-      !config.options
-    ) {
-      setConfig({ ...config, options: [] });
+    // Reset config when type changes — clear irrelevant config from previous type
+    if (newType === "select" || newType === "multi_select" || newType === "status") {
+      setConfig({ options: config.options ?? [] });
+    } else if (newType === "formula") {
+      setConfig({ formula: config.formula ?? "" });
+    } else if (newType === "relation") {
+      setConfig({ relationDbId: config.relationDbId });
+    } else {
+      setConfig({});
     }
   };
 
@@ -143,6 +150,18 @@ export function PropertyEditor({
           <OptionsList
             options={config.options ?? []}
             onChange={(options) => setConfig({ ...config, options })}
+          />
+        </div>
+      )}
+
+      {/* Formula config */}
+      {type === "formula" && (
+        <div className="border-b p-2" style={{ borderColor: "var(--border-default)" }}>
+          <FormulaEditor
+            formula={config.formula ?? ""}
+            properties={allProperties ?? []}
+            config={config}
+            onChange={(formula) => setConfig({ ...config, formula })}
           />
         </div>
       )}

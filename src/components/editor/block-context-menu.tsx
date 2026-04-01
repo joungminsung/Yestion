@@ -2,8 +2,39 @@
 
 import { useEffect, useState, useCallback } from "react";
 import type { Editor } from "@tiptap/react";
+import { useAiStore } from "@/stores/ai";
 
-type ContextMenuProps = { editor: Editor };
+const TEXT_COLORS = [
+  { name: "기본", value: "default", css: "var(--text-primary)" },
+  { name: "회색", value: "gray", css: "var(--color-gray)" },
+  { name: "갈색", value: "brown", css: "var(--color-brown)" },
+  { name: "주황", value: "orange", css: "var(--color-orange)" },
+  { name: "노랑", value: "yellow", css: "var(--color-yellow)" },
+  { name: "초록", value: "green", css: "var(--color-green)" },
+  { name: "파랑", value: "blue", css: "var(--color-blue)" },
+  { name: "보라", value: "purple", css: "var(--color-purple)" },
+  { name: "분홍", value: "pink", css: "var(--color-pink)" },
+  { name: "빨강", value: "red", css: "var(--color-red)" },
+];
+
+const BG_COLORS = [
+  { name: "기본", value: "default", css: "transparent" },
+  { name: "회색", value: "gray", css: "var(--color-gray-bg)" },
+  { name: "갈색", value: "brown", css: "var(--color-brown-bg)" },
+  { name: "주황", value: "orange", css: "var(--color-orange-bg)" },
+  { name: "노랑", value: "yellow", css: "var(--color-yellow-bg)" },
+  { name: "초록", value: "green", css: "var(--color-green-bg)" },
+  { name: "파랑", value: "blue", css: "var(--color-blue-bg)" },
+  { name: "보라", value: "purple", css: "var(--color-purple-bg)" },
+  { name: "분홍", value: "pink", css: "var(--color-pink-bg)" },
+  { name: "빨강", value: "red", css: "var(--color-red-bg)" },
+];
+
+type ContextMenuProps = {
+  editor: Editor;
+  onTurnIntoPage?: (blockText: string, from: number, to: number) => void;
+  onAddComment?: (content: string, range: { from: number; to: number }) => void;
+};
 
 type MenuItem = {
   label: string;
@@ -11,18 +42,22 @@ type MenuItem = {
   shortcut?: string;
   action: () => void;
   divider?: boolean;
+  submenu?: boolean;
 };
 
-export function BlockContextMenu({ editor }: ContextMenuProps) {
+export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: ContextMenuProps) {
   const [position, setPosition] = useState<{
     top: number;
     left: number;
   } | null>(null);
+  const [showColorSubmenu, setShowColorSubmenu] = useState(false);
+  const aiStore = useAiStore();
 
   const handleContextMenu = useCallback(
     (event: MouseEvent) => {
       event.preventDefault();
       setPosition({ top: event.clientY, left: event.clientX });
+      setShowColorSubmenu(false);
 
       // Resolve the block at mouse position and select it if no existing selection
       try {
@@ -98,7 +133,10 @@ export function BlockContextMenu({ editor }: ContextMenuProps) {
       icon: "\u2702\uFE0F",
       shortcut: "\u2318X",
       action: () => {
-        document.execCommand("cut");
+        const { from, to } = editor.state.selection;
+        const text = editor.state.doc.textBetween(from, to);
+        navigator.clipboard.writeText(text).catch(() => {});
+        editor.chain().focus().deleteSelection().run();
         setPosition(null);
       },
     },
@@ -107,7 +145,9 @@ export function BlockContextMenu({ editor }: ContextMenuProps) {
       icon: "\u{1F4C4}",
       shortcut: "\u2318C",
       action: () => {
-        document.execCommand("copy");
+        const { from, to } = editor.state.selection;
+        const text = editor.state.doc.textBetween(from, to);
+        navigator.clipboard.writeText(text).catch(() => {});
         setPosition(null);
       },
     },
@@ -116,9 +156,29 @@ export function BlockContextMenu({ editor }: ContextMenuProps) {
       icon: "\u{1F4CB}",
       shortcut: "\u2318V",
       action: () => {
-        document.execCommand("paste");
+        navigator.clipboard.readText().then((text) => {
+          if (text) editor.chain().focus().insertContent(text).run();
+        }).catch(() => {});
         setPosition(null);
       },
+    },
+    {
+      label: "링크 복사",
+      icon: "\u{1F517}",
+      action: () => {
+        const url = window.location.href;
+        navigator.clipboard.writeText(url).catch(() => {});
+        setPosition(null);
+      },
+    },
+    { label: "", icon: "", action: () => {}, divider: true },
+    {
+      label: "색상",
+      icon: "\u{1F3A8}",
+      action: () => {
+        setShowColorSubmenu((prev) => !prev);
+      },
+      submenu: true,
     },
     { label: "", icon: "", action: () => {}, divider: true },
     {
@@ -166,6 +226,66 @@ export function BlockContextMenu({ editor }: ContextMenuProps) {
       icon: "\u2611",
       action: () => {
         editor.chain().focus().toggleTaskList().run();
+        setPosition(null);
+      },
+    },
+    {
+      label: "인용으로 변환",
+      icon: "\u275D",
+      action: () => {
+        editor.chain().focus().toggleBlockquote().run();
+        setPosition(null);
+      },
+    },
+    {
+      label: "코드로 변환",
+      icon: "<>",
+      action: () => {
+        editor.chain().focus().toggleCodeBlock().run();
+        setPosition(null);
+      },
+    },
+    { label: "", icon: "", action: () => {}, divider: true },
+    {
+      label: "페이지로 변환",
+      icon: "\u{1F4C4}",
+      action: () => {
+        if (!onTurnIntoPage) { setPosition(null); return; }
+        const { from } = editor.state.selection;
+        const $from = editor.state.doc.resolve(from);
+        const blockStart = $from.before(1);
+        const node = editor.state.doc.nodeAt(blockStart);
+        if (node) {
+          onTurnIntoPage(node.textContent, blockStart, blockStart + node.nodeSize);
+        }
+        setPosition(null);
+      },
+    },
+    {
+      label: "댓글 추가",
+      icon: "\u{1F4AC}",
+      action: () => {
+        const { from, to } = editor.state.selection;
+        if (onAddComment && from !== to) {
+          editor.state.doc.textBetween(from, to); // get selected text for context
+          const comment = window.prompt("댓글 작성:");
+          if (comment) {
+            onAddComment(comment, { from, to });
+          }
+        }
+        setPosition(null);
+      },
+    },
+    {
+      label: "AI에게 요청",
+      icon: "\u2728",
+      action: () => {
+        const { from } = editor.state.selection;
+        const $from = editor.state.doc.resolve(from);
+        const blockStart = $from.before(1);
+        const node = editor.state.doc.nodeAt(blockStart);
+        const blockText = node ? node.textContent : "";
+        aiStore.open(blockText, { top: position.top, left: position.left + 220 });
         setPosition(null);
       },
     },
@@ -241,7 +361,7 @@ export function BlockContextMenu({ editor }: ContextMenuProps) {
 
   return (
     <div
-      className="fixed rounded-lg overflow-hidden py-1 dropdown-enter"
+      className="fixed rounded-lg overflow-visible py-1 dropdown-enter"
       style={{
         top: menuTop,
         left: menuLeft,
@@ -249,6 +369,8 @@ export function BlockContextMenu({ editor }: ContextMenuProps) {
         backgroundColor: "var(--bg-primary)",
         boxShadow: "var(--shadow-popup)",
         width: "220px",
+        maxHeight: "80vh",
+        overflowY: "auto",
       }}
     >
       {items.map((item, i) =>
@@ -263,7 +385,7 @@ export function BlockContextMenu({ editor }: ContextMenuProps) {
           />
         ) : (
           <button
-            key={item.label}
+            key={`${item.label}-${i}`}
             className="w-full flex items-center justify-between px-3 py-1.5 text-sm hover:bg-notion-bg-hover text-left"
             style={{ color: "var(--text-primary)" }}
             onMouseDown={(e) => e.stopPropagation()}
@@ -283,8 +405,90 @@ export function BlockContextMenu({ editor }: ContextMenuProps) {
                 {item.shortcut}
               </span>
             )}
+            {item.submenu && (
+              <span
+                className="text-xs"
+                style={{ color: "var(--text-tertiary)" }}
+              >
+                {"\u25B6"}
+              </span>
+            )}
           </button>
         )
+      )}
+      {showColorSubmenu && (
+        <div
+          className="absolute rounded-lg py-2 px-2"
+          style={{
+            top: 0,
+            left: "100%",
+            marginLeft: 4,
+            backgroundColor: "var(--bg-primary)",
+            boxShadow: "var(--shadow-popup)",
+            width: "220px",
+            zIndex: 1,
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div
+            className="mb-2"
+            style={{
+              fontSize: "11px",
+              color: "var(--text-tertiary)",
+              fontWeight: 500,
+            }}
+          >
+            텍스트 색상
+          </div>
+          <div className="flex flex-wrap gap-1 mb-3">
+            {TEXT_COLORS.map((c) => (
+              <button
+                key={c.value}
+                className="w-6 h-6 rounded flex items-center justify-center text-sm hover:ring-2 ring-[#2383e2]"
+                style={{ color: c.css }}
+                title={c.name}
+                onClick={() => {
+                  if (c.value === "default")
+                    editor.chain().focus().unsetColor().run();
+                  else editor.chain().focus().setColor(c.css).run();
+                  setPosition(null);
+                }}
+              >
+                A
+              </button>
+            ))}
+          </div>
+          <div
+            className="mb-2"
+            style={{
+              fontSize: "11px",
+              color: "var(--text-tertiary)",
+              fontWeight: 500,
+            }}
+          >
+            배경 색상
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {BG_COLORS.map((c) => (
+              <button
+                key={c.value}
+                className="w-6 h-6 rounded border hover:ring-2 ring-[#2383e2]"
+                style={{
+                  backgroundColor: c.css,
+                  borderColor: "var(--border-default)",
+                }}
+                title={c.name}
+                onClick={() => {
+                  if (c.value === "default")
+                    editor.chain().focus().unsetHighlight().run();
+                  else
+                    editor.chain().focus().setHighlight({ color: c.css }).run();
+                  setPosition(null);
+                }}
+              />
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

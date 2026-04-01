@@ -79,6 +79,49 @@ export function AccountSettings() {
           ))}
         </div>
       </section>
+
+      <section className="mb-8">
+        <h3 className="text-sm font-medium mb-3" style={{ color: "var(--text-primary)" }}>이메일 알림</h3>
+        <div className="flex items-center gap-3">
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={user.emailNotify !== false}
+              onChange={(e) => updateProfile.mutate({ emailNotify: e.target.checked })}
+              className="sr-only peer"
+            />
+            <div className="w-9 h-5 bg-gray-300 peer-checked:bg-[#2383e2] rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4" />
+          </label>
+          <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            페이지 공유, 댓글 등의 알림을 이메일로 받기
+          </span>
+        </div>
+        {!user.emailVerified && (
+          <div className="mt-3 p-3 rounded text-sm flex items-center justify-between" style={{ backgroundColor: "var(--color-yellow-bg)", color: "var(--color-orange)" }}>
+            <span>이메일이 아직 인증되지 않았습니다.</span>
+            <ResendVerifyButton />
+          </div>
+        )}
+      </section>
     </div>
+  );
+}
+
+function ResendVerifyButton() {
+  const addToast = useToastStore((s) => s.addToast);
+  const resend = trpc.auth.resendVerification.useMutation({
+    onSuccess: () => addToast({ message: "인증 메일이 발송되었습니다", type: "success" }),
+    onError: (err) => addToast({ message: err.message, type: "error" }),
+  });
+
+  return (
+    <button
+      onClick={() => resend.mutate()}
+      disabled={resend.isPending}
+      className="px-3 py-1 rounded text-xs font-medium hover:opacity-80"
+      style={{ backgroundColor: "var(--color-orange)", color: "#fff" }}
+    >
+      {resend.isPending ? "발송 중..." : "인증 메일 재발송"}
+    </button>
   );
 }

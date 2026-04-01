@@ -120,6 +120,25 @@ export function EmbedNodeView({ node, updateAttributes, selected, editor }: Node
             </button>
           </div>
         )}
+        {embedUrl && (
+          <div className="flex items-center gap-2 mt-1" contentEditable={false}>
+            <select
+              value={String(node.attrs.height || 400)}
+              onChange={(e) => updateAttributes({ height: parseInt(e.target.value) })}
+              className="text-xs border rounded px-1 py-0.5"
+              style={{
+                borderColor: "var(--border-default)",
+                backgroundColor: "var(--bg-primary)",
+                color: "var(--text-secondary)",
+              }}
+            >
+              <option value="200">작게 (200px)</option>
+              <option value="400">보통 (400px)</option>
+              <option value="600">크게 (600px)</option>
+              <option value="800">최대 (800px)</option>
+            </select>
+          </div>
+        )}
       </div>
     </NodeViewWrapper>
   );

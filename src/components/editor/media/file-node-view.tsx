@@ -3,7 +3,17 @@
 import { useState, useCallback, useEffect } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { FileUpload } from "./file-upload";
-import { Paperclip, FileText } from "lucide-react";
+import { FileText, FileSpreadsheet, FileImage, FileVideo, FileAudio, File as FileIcon, Paperclip, Download } from "lucide-react";
+
+function getFileIcon(name: string) {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  if (["pdf", "doc", "docx", "txt", "md"].includes(ext)) return <FileText size={18} />;
+  if (["xls", "xlsx", "csv"].includes(ext)) return <FileSpreadsheet size={18} />;
+  if (["png", "jpg", "jpeg", "gif", "svg", "webp"].includes(ext)) return <FileImage size={18} />;
+  if (["mp4", "webm", "mov", "avi"].includes(ext)) return <FileVideo size={18} />;
+  if (["mp3", "wav", "ogg", "flac"].includes(ext)) return <FileAudio size={18} />;
+  return <FileIcon size={18} />;
+}
 
 function formatFileSize(bytes: number): string {
   if (!bytes || bytes === 0) return "";
@@ -66,7 +76,7 @@ export function FileNodeView({ node, updateAttributes }: NodeViewProps) {
   return (
     <NodeViewWrapper>
       <div className="notion-file-block">
-        <div className="notion-file-icon"><FileText size={20} /></div>
+        <div className="notion-file-icon">{getFileIcon(name)}</div>
         <div className="notion-file-info">
           <span className="notion-file-name">{name}</span>
           {(sizeLabel || type) && (

@@ -104,13 +104,37 @@ function tiptapTypeToBlockType(node: TiptapNode): BlockType {
       return "image";
     case "table":
       return "table";
+    case "videoBlock":
+      return "video";
+    case "audioBlock":
+      return "audio";
+    case "fileBlock":
+      return "file";
+    case "embed":
+      return "embed";
+    case "bookmark":
+      return "bookmark";
+    case "equation":
+      return "equation";
+    case "linkToPage":
+      return "link_to_page";
+    case "syncedBlock":
+      return "synced_block";
+    case "tableOfContents":
+      return "table_of_contents";
+    case "callout":
+      return "callout";
+    case "details":
+      return "toggle";
+    case "columnList":
+      return "column_list";
     default:
       return node.type as BlockType;
   }
 }
 
 // Block types that use the tiptapNode fallback (complex nested structures)
-const FALLBACK_TYPES = new Set(["bulletList", "orderedList", "table", "taskList"]);
+const FALLBACK_TYPES = new Set(["bulletList", "orderedList", "table", "taskList", "details", "columnList"]);
 
 function extractContent(node: TiptapNode): Record<string, unknown> {
   // Complex / nested types -> fallback
@@ -155,6 +179,73 @@ function extractContent(node: TiptapNode): Record<string, unknown> {
         url: (node.attrs?.src as string) ?? "",
         ...(node.attrs?.alt ? { caption: node.attrs.alt as string } : {}),
         ...(node.attrs?.width ? { width: node.attrs.width as number } : {}),
+      };
+
+    case "videoBlock":
+      return {
+        url: (node.attrs?.src as string) ?? "",
+        title: (node.attrs?.title as string) ?? "",
+      };
+
+    case "audioBlock":
+      return {
+        url: (node.attrs?.src as string) ?? "",
+        title: (node.attrs?.title as string) ?? "",
+      };
+
+    case "fileBlock":
+      return {
+        url: (node.attrs?.src as string) ?? "",
+        name: (node.attrs?.name as string) ?? "",
+        size: (node.attrs?.size as number) ?? 0,
+        fileType: (node.attrs?.type as string) ?? "",
+      };
+
+    case "embed":
+      return {
+        url: (node.attrs?.url as string) ?? "",
+        embedUrl: (node.attrs?.embedUrl as string) ?? "",
+        provider: (node.attrs?.provider as string) ?? "",
+        width: (node.attrs?.width as number) ?? 0,
+        height: (node.attrs?.height as number) ?? 0,
+      };
+
+    case "bookmark":
+      return {
+        url: (node.attrs?.url as string) ?? "",
+        title: (node.attrs?.title as string) ?? "",
+        description: (node.attrs?.description as string) ?? "",
+        image: (node.attrs?.image as string) ?? "",
+        favicon: (node.attrs?.favicon as string) ?? "",
+        siteName: (node.attrs?.siteName as string) ?? "",
+      };
+
+    case "equation":
+      return {
+        expression: (node.attrs?.expression as string) ?? "",
+      };
+
+    case "linkToPage":
+      return {
+        pageId: (node.attrs?.pageId as string) ?? "",
+        pageTitle: (node.attrs?.pageTitle as string) ?? "",
+        pageIcon: (node.attrs?.pageIcon as string) ?? "",
+      };
+
+    case "tableOfContents":
+      return {};
+
+    case "syncedBlock":
+      return {
+        sourceBlockId: (node.attrs?.sourceBlockId as string) ?? "",
+        sourcePageId: (node.attrs?.sourcePageId as string) ?? "",
+      };
+
+    case "callout":
+      return {
+        icon: (node.attrs?.icon as string) ?? "",
+        color: (node.attrs?.color as string) ?? "",
+        richText: tiptapContentToRichText(node.content),
       };
 
     default:
@@ -241,12 +332,110 @@ function blockContentToTiptapNode(block: BlockData): TiptapNode {
         },
       };
 
+    case "video":
+      return {
+        type: "videoBlock",
+        attrs: {
+          src: (content.url as string) ?? "",
+          title: (content.title as string) ?? "",
+        },
+      };
+
+    case "audio":
+      return {
+        type: "audioBlock",
+        attrs: {
+          src: (content.url as string) ?? "",
+          title: (content.title as string) ?? "",
+        },
+      };
+
+    case "file":
+      return {
+        type: "fileBlock",
+        attrs: {
+          src: (content.url as string) ?? "",
+          name: (content.name as string) ?? "",
+          size: (content.size as number) ?? 0,
+          type: (content.fileType as string) ?? "",
+        },
+      };
+
+    case "embed":
+      return {
+        type: "embed",
+        attrs: {
+          url: (content.url as string) ?? "",
+          embedUrl: (content.embedUrl as string) ?? "",
+          provider: (content.provider as string) ?? "",
+          width: (content.width as number) ?? 0,
+          height: (content.height as number) ?? 0,
+        },
+      };
+
+    case "bookmark":
+      return {
+        type: "bookmark",
+        attrs: {
+          url: (content.url as string) ?? "",
+          title: (content.title as string) ?? "",
+          description: (content.description as string) ?? "",
+          image: (content.image as string) ?? "",
+          favicon: (content.favicon as string) ?? "",
+          siteName: (content.siteName as string) ?? "",
+        },
+      };
+
+    case "equation":
+      return {
+        type: "equation",
+        attrs: {
+          expression: (content.expression as string) ?? "",
+        },
+      };
+
+    case "link_to_page":
+      return {
+        type: "linkToPage",
+        attrs: {
+          pageId: (content.pageId as string) ?? "",
+          pageTitle: (content.pageTitle as string) ?? "",
+          pageIcon: (content.pageIcon as string) ?? "",
+        },
+      };
+
+    case "table_of_contents":
+      return {
+        type: "tableOfContents",
+      };
+
+    case "synced_block":
+      return {
+        type: "syncedBlock",
+        attrs: {
+          sourceBlockId: (content.sourceBlockId as string) ?? "",
+          sourcePageId: (content.sourcePageId as string) ?? "",
+        },
+      };
+
+    case "callout":
+      return {
+        type: "callout",
+        attrs: {
+          icon: (content.icon as string) ?? "",
+          color: (content.color as string) ?? "",
+        },
+        content: richTextToTiptapContent(richText ?? []),
+      };
+
     default:
       {
         // Best-effort generic reconstruction
         const tiptapType = block.type === "bulleted_list" ? "bulletList"
           : block.type === "numbered_list" ? "orderedList"
           : block.type === "to_do" ? "taskList"
+          : block.type === "toggle" ? "details"
+          : block.type === "column_list" ? "columnList"
           : block.type;
         return { type: tiptapType };
       }

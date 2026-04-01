@@ -6,6 +6,7 @@ import { NodeSelection } from "@tiptap/pm/state";
 import {
   selectBlock,
   selectBlockRange,
+  toggleBlockInSelection,
   BLOCK_SELECTION_KEY,
 } from "./extensions/block-selection";
 
@@ -129,12 +130,27 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
       <div className="fixed flex items-center gap-0.5 opacity-0 hover:opacity-100 transition-opacity" style={{ top: `${position.top}px`, left: `${position.left}px` }}>
         <button className="w-6 h-6 flex items-center justify-center rounded hover:bg-notion-bg-hover"
           style={{ color: "var(--text-tertiary)", fontSize: "18px" }}
-          onClick={() => { if (hoveredPos !== null) editor.chain().focus().insertContentAt(hoveredPos, { type: "paragraph" }).run(); }}
+          onClick={() => {
+            if (hoveredPos === null) return;
+            editor.chain().focus().insertContentAt(hoveredPos, { type: "paragraph" }).run();
+            setTimeout(() => {
+              editor.chain().focus().setTextSelection(hoveredPos + 1).insertContent("/").run();
+            }, 50);
+          }}
           title="블록 추가">+</button>
         <button
           className="w-6 h-6 flex items-center justify-center rounded hover:bg-notion-bg-hover cursor-grab active:cursor-grabbing"
           style={{ color: "var(--text-tertiary)", fontSize: "12px" }}
           draggable
+          onDragStart={(e) => {
+            if (hoveredPos === null) return;
+            const node = editor.state.doc.nodeAt(hoveredPos);
+            const blockId = node?.attrs?.blockId as string | undefined;
+            if (blockId) {
+              e.dataTransfer.setData("text/block-id", blockId);
+              e.dataTransfer.setData("text/plain", node?.textContent ?? "");
+            }
+          }}
           onMouseDown={(e) => {
             if (hoveredPos === null || !editor.view) return;
             e.preventDefault();
@@ -149,6 +165,12 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
               } else {
                 selectBlock(editor, startPos);
               }
+              return;
+            }
+
+            // Handle ctrl/cmd+click for toggle selection
+            if (e.metaKey || e.ctrlKey) {
+              toggleBlockInSelection(editor, startPos);
               return;
             }
 
@@ -225,20 +247,51 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
               }
 
               // Perform the actual block move if we were dragging
-              if (isDragging && dropTargetPos !== null && dropTargetPos !== startPos) {
+              if (isDragging && dropTargetPos !== null) {
+                const targetPos = dropTargetPos;
                 try {
-                  const node = editor.state.doc.nodeAt(startPos);
-                  if (node) {
-                    const tr = editor.state.tr;
-                    // Adjust target position if it's after the source
-                    let insertAt = dropTargetPos;
-                    if (insertAt > startPos) {
-                      insertAt = insertAt - node.nodeSize;
+                  const blockState = BLOCK_SELECTION_KEY.getState(editor.state);
+                  const selectedPositions = blockState && blockState.selectedBlocks.length > 1
+                    ? [...blockState.selectedBlocks].sort((a: number, b: number) => a - b)
+                    : [startPos];
+
+                  // Check if we're actually moving (not dropping in same place)
+                  const isMoving = !selectedPositions.includes(targetPos) &&
+                    !selectedPositions.some((p: number) => {
+                      const n = editor.state.doc.nodeAt(p);
+                      return n && targetPos > p && targetPos <= p + n.nodeSize;
+                    });
+
+                  if (isMoving) {
+                    let tr = editor.state.tr;
+                    // Collect nodes to move (in reverse order for safe deletion)
+                    const nodes = selectedPositions.map((p: number) => ({
+                      pos: p,
+                      node: editor.state.doc.nodeAt(p),
+                    })).filter((n: { pos: number; node: ReturnType<typeof editor.state.doc.nodeAt> }) => n.node !== null);
+
+                    // Calculate total size of selected blocks before drop position
+                    let sizeBeforeDrop = 0;
+                    for (const { pos, node } of nodes) {
+                      if (pos < targetPos) sizeBeforeDrop += node!.nodeSize;
                     }
-                    tr.delete(startPos, startPos + node.nodeSize);
-                    insertAt = Math.min(insertAt, tr.doc.content.size);
-                    insertAt = Math.max(0, insertAt);
-                    tr.insert(insertAt, node);
+
+                    // Delete from end to start
+                    for (const { pos, node } of [...nodes].reverse()) {
+                      tr = tr.delete(pos, pos + node!.nodeSize);
+                    }
+
+                    // Adjust drop position
+                    let insertAt = targetPos - sizeBeforeDrop;
+                    insertAt = Math.max(0, Math.min(insertAt, tr.doc.content.size));
+
+                    // Insert all nodes at drop position
+                    for (const { node } of nodes) {
+                      tr = tr.insert(insertAt, node!);
+                      insertAt += node!.nodeSize;
+                    }
+
+                    tr = tr.setMeta(BLOCK_SELECTION_KEY, { selectedBlocks: [], anchorBlock: null });
                     editor.view.dispatch(tr);
                   }
                 } catch {

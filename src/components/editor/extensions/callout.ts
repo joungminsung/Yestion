@@ -1,4 +1,6 @@
 import { Node, mergeAttributes } from "@tiptap/core";
+import { ReactNodeViewRenderer } from "@tiptap/react";
+import { CalloutNodeView } from "../callout-node-view";
 
 export const Callout = Node.create({
   name: "callout",
@@ -36,5 +38,9 @@ export const Callout = Node.create({
       ["span", { class: "notion-callout-icon", contenteditable: "false" }, HTMLAttributes["data-icon"] || "💡"],
       ["div", { class: "notion-callout-content" }, 0],
     ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(CalloutNodeView);
   },
 });

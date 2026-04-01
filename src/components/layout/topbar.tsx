@@ -12,7 +12,9 @@ import { CommentPanel } from "@/components/comments/comment-panel";
 import { NotificationPanel } from "@/components/notifications/notification-panel";
 import { ActivityPanel } from "@/components/activity/activity-panel";
 import { HistoryPanel } from "@/components/page/history-panel";
+import { ChatPanel } from "@/components/chat/chat-panel";
 import { markdownToBlocks } from "@/lib/markdown-import";
+import { htmlToBlocks } from "@/lib/html-import";
 import { useToastStore } from "@/stores/toast";
 import { useTranslations } from "next-intl";
 
@@ -23,26 +25,36 @@ function getInitials(name: string): string {
 const MAX_VISIBLE_AVATARS = 5;
 
 function PresenceAvatars({ users }: { users: PresenceUser[] }) {
+  const followingUserId = usePresenceStore((s) => s.followingUserId);
+  const setFollowing = usePresenceStore((s) => s.setFollowing);
+
   if (users.length === 0) return null;
   const visible = users.slice(0, MAX_VISIBLE_AVATARS);
   const overflow = users.length - MAX_VISIBLE_AVATARS;
 
+  const handleAvatarClick = (userId: string) => {
+    setFollowing(followingUserId === userId ? null : userId);
+  };
+
   return (
     <div className="flex items-center -space-x-1.5 mr-2">
       {visible.map((u) => (
-        <div
+        <button
           key={u.id}
-          title={u.name}
-          className="flex items-center justify-center rounded-full text-white text-[10px] font-semibold"
+          title={followingUserId === u.id ? `${u.name} 팔로우 중 (클릭하여 해제)` : `${u.name} 팔로우`}
+          onClick={() => handleAvatarClick(u.id)}
+          className="flex items-center justify-center rounded-full text-white text-[10px] font-semibold cursor-pointer transition-all duration-150"
           style={{
             width: 24,
             height: 24,
             backgroundColor: u.color,
-            boxShadow: "0 0 0 2px var(--bg-primary)",
+            boxShadow: followingUserId === u.id ? "0 0 0 2px #2383e2" : "0 0 0 2px var(--bg-primary)",
+            outline: followingUserId === u.id ? "2px solid #2383e2" : "none",
+            outlineOffset: "1px",
           }}
         >
           {getInitials(u.name)}
-        </div>
+        </button>
       ))}
       {overflow > 0 && (
         <div
@@ -141,6 +153,7 @@ export function Topbar() {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const addToast = useToastStore((s) => s.addToast);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
@@ -215,10 +228,13 @@ export function Topbar() {
     },
   });
 
-  const handleExport = (format: "md" | "html") => {
+  const handleExport = (format: "md" | "html" | "pdf") => {
     if (!pageId) return;
-    const url = `/api/export?pageId=${pageId}&format=${format}`;
-    window.open(url, "_blank");
+    if (format === "pdf") {
+      window.open(`/api/export/pdf?pageId=${pageId}`, "_blank");
+    } else {
+      window.open(`/api/export?pageId=${pageId}&format=${format}`, "_blank");
+    }
     setShowMoreMenu(false);
   };
 
@@ -257,6 +273,39 @@ export function Topbar() {
     };
     input.click();
     setShowMoreMenu(false);
+  };
+
+  const handleHtmlImport = () => {
+    if (!pageId) return;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".html,.htm";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      const blocks = htmlToBlocks(text);
+      const blockData = blocks.map((block, idx) => ({
+        id: `import-${Date.now()}-${idx}`,
+        type: block.type,
+        content: { ...block },
+        position: idx,
+        parentId: null,
+      }));
+      importBlocks.mutate({ pageId, blocks: blockData });
+    };
+    input.click();
+    setShowMoreMenu(false);
+  };
+
+  // Page notification level
+  const getNotifLevel = () => {
+    if (!pageId || typeof window === "undefined") return "all";
+    return localStorage.getItem(`notif-level:${pageId}`) || "all";
+  };
+  const isPageWatched = () => {
+    if (!pageId || typeof window === "undefined") return false;
+    return localStorage.getItem(`page-watch:${pageId}`) === "true";
   };
 
   // Click outside to close more menu
@@ -324,8 +373,16 @@ export function Topbar() {
       action: () => handleExport("html"),
     },
     {
+      label: "📤 PDF 내보내기",
+      action: () => handleExport("pdf"),
+    },
+    {
       label: "📥 Markdown 가져오기",
       action: handleMarkdownImport,
+    },
+    {
+      label: "📥 HTML 가져오기",
+      action: handleHtmlImport,
     },
     { divider: true },
     {
@@ -339,6 +396,29 @@ export function Topbar() {
       label: "📊 활동",
       action: () => {
         setActivityOpen(true);
+        setShowMoreMenu(false);
+      },
+    },
+    {
+      label: `🔔 알림: ${getNotifLevel() === "all" ? "전체" : getNotifLevel() === "comments" ? "댓글만" : getNotifLevel() === "mentions" ? "멘션만" : "끄기"}`,
+      action: () => {
+        if (!pageId) return;
+        const levels = ["all", "comments", "mentions", "off"];
+        const current = getNotifLevel();
+        const next = levels[(levels.indexOf(current) + 1) % levels.length]!;
+        localStorage.setItem(`notif-level:${pageId}`, next);
+        addToast({ message: `알림: ${next === "all" ? "전체" : next === "comments" ? "댓글만" : next === "mentions" ? "멘션만" : "끄기"}`, type: "info" });
+        setShowMoreMenu(false);
+      },
+    },
+    {
+      label: `👁 관심 페이지 ${isPageWatched() ? "(해제)" : "(등록)"}`,
+      action: () => {
+        if (!pageId) return;
+        const watched = isPageWatched();
+        if (watched) localStorage.removeItem(`page-watch:${pageId}`);
+        else localStorage.setItem(`page-watch:${pageId}`, "true");
+        addToast({ message: watched ? "관심 페이지 해제됨" : "관심 페이지 등록됨", type: "success" });
         setShowMoreMenu(false);
       },
     },
@@ -511,6 +591,21 @@ export function Topbar() {
           <ShareDialog pageId={pageId} onClose={() => setShareOpen(false)} />
         )}
 
+        {/* Chat button */}
+        <button
+          onClick={() => pageId && setChatOpen(!chatOpen)}
+          className="p-1.5 rounded hover:bg-notion-bg-hover"
+          style={{ color: chatOpen ? "#2383e2" : "var(--text-secondary)" }}
+          disabled={!pageId}
+          title="채팅"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 10a1.5 1.5 0 01-1.5 1.5H5L2 14V3.5A1.5 1.5 0 013.5 2h9A1.5 1.5 0 0114 3.5z" />
+            <line x1="5" y1="6" x2="11" y2="6" />
+            <line x1="5" y1="8.5" x2="9" y2="8.5" />
+          </svg>
+        </button>
+
         {/* Comment button */}
         <button
           onClick={() => pageId && setCommentOpen(!commentOpen)}
@@ -596,6 +691,20 @@ export function Topbar() {
       {/* History panel */}
       {historyOpen && pageId && (
         <HistoryPanel pageId={pageId} onClose={() => setHistoryOpen(false)} />
+      )}
+
+      {/* Chat panel */}
+      {chatOpen && pageId && user && (
+        <div
+          className="fixed right-0 top-0 bottom-0 w-[360px] z-50 shadow-lg"
+          style={{ backgroundColor: "var(--bg-primary)" }}
+        >
+          <ChatPanel
+            pageId={pageId}
+            currentUserId={user.id}
+            onClose={() => setChatOpen(false)}
+          />
+        </div>
       )}
     </header>
   );

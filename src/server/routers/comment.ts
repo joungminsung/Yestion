@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "@/server/trpc/init";
 import type { Context } from "@/server/trpc/init";
+import { sendCommentNotificationEmail } from "@/lib/email";
 
 async function verifyPageAccess(
   db: Context["db"],
@@ -71,8 +72,11 @@ export const commentRouter = router({
         },
       });
 
-      // Create notification for the page owner
-      const page = await ctx.db.page.findUnique({ where: { id: input.pageId }, select: { createdBy: true } });
+      // Create notification + email for the page owner
+      const page = await ctx.db.page.findUnique({
+        where: { id: input.pageId },
+        select: { createdBy: true, title: true, workspaceId: true },
+      });
       if (page && page.createdBy !== ctx.session.user.id) {
         await ctx.db.notification.create({
           data: {
@@ -82,6 +86,22 @@ export const commentRouter = router({
             pageId: input.pageId,
           },
         });
+        // Send email notification (non-blocking)
+        const owner = await ctx.db.user.findUnique({
+          where: { id: page.createdBy },
+          select: { email: true, emailNotify: true },
+        });
+        if (owner?.emailNotify !== false) {
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+          const pageUrl = `${appUrl}/${page.workspaceId}/${input.pageId}`;
+          sendCommentNotificationEmail(
+            owner!.email,
+            ctx.session.user.name,
+            page.title || "제목 없음",
+            input.content,
+            pageUrl,
+          ).catch(() => {});
+        }
       }
 
       // Log activity

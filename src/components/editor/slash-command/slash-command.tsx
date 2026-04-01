@@ -8,6 +8,16 @@ import {
 } from "../extensions/slash-command-ext";
 import { SLASH_ITEMS, type SlashItem } from "./slash-items";
 
+function fuzzyMatch(text: string, query: string): boolean {
+  const lowerText = text.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  let qi = 0;
+  for (let ti = 0; ti < lowerText.length && qi < lowerQuery.length; ti++) {
+    if (lowerText[ti] === lowerQuery[qi]) qi++;
+  }
+  return qi === lowerQuery.length;
+}
+
 export function SlashCommand({ editor }: { editor: Editor }) {
   const [state, setState] = useState<SlashCommandState>({
     active: false,
@@ -37,8 +47,8 @@ export function SlashCommand({ editor }: { editor: Editor }) {
     if (!state.query) return true;
     const q = state.query.toLowerCase();
     return (
-      item.title.toLowerCase().includes(q) ||
-      item.keywords.some((k) => k.toLowerCase().includes(q))
+      fuzzyMatch(item.title, q) ||
+      item.keywords.some((k) => fuzzyMatch(k, q))
     );
   });
 

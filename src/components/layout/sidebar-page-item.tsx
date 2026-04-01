@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { usePageTreeStore } from "@/stores/page-tree";
 import { trpc } from "@/server/trpc/client";
 import { useToastStore } from "@/stores/toast";
 import { FileText, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
+import { PagePeekPreview } from "./page-peek-preview";
+import { PageIconPicker } from "@/components/page/page-icon-picker";
 
 type Page = { id: string; title: string; icon: string | null; parentId?: string | null; children?: Page[] };
 
@@ -28,6 +30,18 @@ export function SidebarPageItem({
   const [dropPosition, setDropPosition] = useState<"before" | "after" | "inside" | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const hoverExpandTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const itemRef = useRef<HTMLDivElement>(null);
+
+  // Hover preview state
+  const [showPeek, setShowPeek] = useState(false);
+  const [peekRect, setPeekRect] = useState<DOMRect | null>(null);
+  const peekEnterTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const peekLeaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMouseInPeek = useRef(false);
+
+  // Inline icon picker state
+  const [showIconPicker, setShowIconPicker] = useState(false);
+  const iconPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -101,10 +115,77 @@ export function SidebarPageItem({
   const movePage = trpc.page.move.useMutation({
     onSuccess: () => utils.page.list.invalidate(),
   });
+  const updatePage = trpc.page.update.useMutation({
+    onSuccess: () => {
+      utils.page.get.invalidate({ id: page.id });
+      utils.page.list.invalidate();
+    },
+  });
+
+  // Hover preview handlers
+  const handleItemMouseEnter = useCallback(() => {
+    if (peekLeaveTimeout.current) {
+      clearTimeout(peekLeaveTimeout.current);
+      peekLeaveTimeout.current = null;
+    }
+    peekEnterTimeout.current = setTimeout(() => {
+      if (itemRef.current) {
+        setPeekRect(itemRef.current.getBoundingClientRect());
+        setShowPeek(true);
+      }
+    }, 500);
+  }, []);
+
+  const handleItemMouseLeave = useCallback(() => {
+    if (peekEnterTimeout.current) {
+      clearTimeout(peekEnterTimeout.current);
+      peekEnterTimeout.current = null;
+    }
+    peekLeaveTimeout.current = setTimeout(() => {
+      if (!isMouseInPeek.current) {
+        setShowPeek(false);
+      }
+    }, 300);
+  }, []);
+
+  const handlePeekMouseEnter = useCallback(() => {
+    isMouseInPeek.current = true;
+    if (peekLeaveTimeout.current) {
+      clearTimeout(peekLeaveTimeout.current);
+      peekLeaveTimeout.current = null;
+    }
+  }, []);
+
+  const handlePeekMouseLeave = useCallback(() => {
+    isMouseInPeek.current = false;
+    peekLeaveTimeout.current = setTimeout(() => {
+      setShowPeek(false);
+    }, 300);
+  }, []);
+
+  // Clean up timeouts
+  useEffect(() => {
+    return () => {
+      if (peekEnterTimeout.current) clearTimeout(peekEnterTimeout.current);
+      if (peekLeaveTimeout.current) clearTimeout(peekLeaveTimeout.current);
+    };
+  }, []);
+
+  // Icon picker handler
+  const handleIconClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowIconPicker(!showIconPicker);
+  };
+
+  const handleIconSelect = (icon: string | null) => {
+    updatePage.mutate({ id: page.id, icon });
+    setShowIconPicker(false);
+  };
 
   return (
     <div>
       <div
+        ref={itemRef}
         className={cn(
           "group relative flex items-center gap-1 py-[2px] pr-2 rounded-sm cursor-pointer hover:bg-notion-bg-hover",
           isActive && "bg-notion-bg-active",
@@ -185,6 +266,8 @@ export function SidebarPageItem({
           setActivePage(page.id);
           router.push(`/${workspaceId}/${page.id}`);
         }}
+        onMouseEnter={handleItemMouseEnter}
+        onMouseLeave={handleItemMouseLeave}
       >
         {/* Drop indicators */}
         {dropPosition === "before" && (
@@ -209,7 +292,12 @@ export function SidebarPageItem({
             }}
           />
         </button>
-        <span className="flex-shrink-0 text-sm flex items-center justify-center" style={{ width: "20px" }}>
+        {/* Clickable icon for inline icon change */}
+        <span
+          className="flex-shrink-0 text-sm flex items-center justify-center cursor-pointer hover:opacity-70 relative"
+          style={{ width: "20px" }}
+          onClick={handleIconClick}
+        >
           {page.icon || <FileText size={16} />}
         </span>
         <span
@@ -241,6 +329,17 @@ export function SidebarPageItem({
           </button>
         </div>
       </div>
+
+      {/* Inline icon picker popup */}
+      {showIconPicker && (
+        <div ref={iconPickerRef} className="relative" style={{ marginLeft: `${12 + depth * 16 + 20}px` }}>
+          <PageIconPicker
+            currentIcon={page.icon}
+            onSelect={handleIconSelect}
+            onClose={() => setShowIconPicker(false)}
+          />
+        </div>
+      )}
 
       {showMenu && (
         <div
@@ -297,6 +396,16 @@ export function SidebarPageItem({
             depth={depth + 1}
           />
         ))}
+
+      {/* Hover peek preview */}
+      {showPeek && peekRect && (
+        <PagePeekPreview
+          pageId={page.id}
+          anchorRect={peekRect}
+          onMouseEnter={handlePeekMouseEnter}
+          onMouseLeave={handlePeekMouseLeave}
+        />
+      )}
     </div>
   );
 }

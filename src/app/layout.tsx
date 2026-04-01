@@ -7,6 +7,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Notion",
   description: "Team workspace",
+  manifest: "/manifest.json",
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 export default async function RootLayout({
@@ -20,9 +24,7 @@ export default async function RootLayout({
   return (
     <html lang={locale} suppressHydrationWarning>
       <head>
-        <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#ffffff" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
       <body>
         <a

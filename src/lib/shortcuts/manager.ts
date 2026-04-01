@@ -46,6 +46,7 @@ export class ShortcutManager {
   }
 
   private matchesEvent(shortcut: Shortcut, event: KeyboardEvent): boolean {
+    if (!shortcut.key || !event.key) return false;
     if (shortcut.key.toLowerCase() !== event.key.toLowerCase()) return false;
     if (!!shortcut.meta !== event.metaKey) return false;
     if (!!shortcut.ctrl !== event.ctrlKey) return false;

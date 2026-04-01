@@ -88,8 +88,7 @@ export const blockRouter = router({
       await verifyPageAccess(ctx.db, ctx.session.user.id, input.pageId);
       await verifyEditPermission(ctx.db, ctx.session.user.id, input.pageId);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await ctx.db.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
+      await ctx.db.$transaction(async (tx) => {
         const existingIds = (await tx.block.findMany({
           where: { pageId: input.pageId },
           select: { id: true },
@@ -102,12 +101,35 @@ export const blockRouter = router({
           await tx.block.deleteMany({ where: { id: { in: toDelete } } });
         }
 
-        for (const b of input.blocks) {
-          await tx.block.upsert({
-            where: { id: b.id },
-            create: { id: b.id, pageId: input.pageId, type: b.type, content: b.content, position: b.position, parentId: b.parentId ?? null },
-            update: { type: b.type, content: b.content, position: b.position, parentId: b.parentId ?? null },
+        // Batch upsert: separate new blocks (create) from existing (update)
+        const existingIdSet = new Set(existingIds);
+        const toCreate = input.blocks.filter((b) => !existingIdSet.has(b.id));
+        const toUpdate = input.blocks.filter((b) => existingIdSet.has(b.id) && !toDelete.includes(b.id));
+
+        if (toCreate.length > 0) {
+          await tx.block.createMany({
+            data: toCreate.map((b) => ({
+              id: b.id,
+              pageId: input.pageId,
+              type: b.type,
+              content: b.content,
+              position: b.position,
+              parentId: b.parentId ?? null,
+            })),
+            skipDuplicates: true,
           });
+        }
+
+        // Updates still need individual queries but run in parallel
+        if (toUpdate.length > 0) {
+          await Promise.all(
+            toUpdate.map((b) =>
+              tx.block.update({
+                where: { id: b.id },
+                data: { type: b.type, content: b.content, position: b.position, parentId: b.parentId ?? null },
+              })
+            )
+          );
         }
       });
 

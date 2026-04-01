@@ -45,11 +45,10 @@ export const SlashCommandExtension = Extension.create({
           handleKeyDown(view, event) {
             if (event.key === "/") {
               const { $from } = view.state.selection;
-              const textBefore = $from.parent.textContent.slice(
-                0,
-                $from.parentOffset,
-              );
-              if (textBefore === "" || textBefore.endsWith(" ")) {
+              const blockText = $from.parent.textContent;
+              const textBefore = blockText.slice(0, $from.parentOffset);
+              // Only trigger slash menu if the current block is empty
+              if (textBefore.trim().length === 0 && blockText.trim().length === 0) {
                 setTimeout(() => {
                   const { from } = view.state.selection;
                   view.dispatch(

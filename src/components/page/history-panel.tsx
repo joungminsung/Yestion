@@ -1,9 +1,16 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
 import { trpc } from "@/server/trpc/client";
 import { useToastStore } from "@/stores/toast";
+
+type SnapshotBlock = {
+  id: string;
+  type: string;
+  content: Record<string, unknown> & { text?: string };
+  parentId: string | null;
+  position: number;
+};
 
 function formatTime(date: Date): string {
   const d = new Date(date);
@@ -193,10 +200,10 @@ export function HistoryPanel({
             className="text-xs font-medium mb-2"
             style={{ color: "var(--text-tertiary)" }}
           >
-            미리보기 (블록 {(selectedSnapshot.blocks as any[]).length}개)
+            미리보기 (블록 {(selectedSnapshot.blocks as SnapshotBlock[]).length}개)
           </p>
           <div className="space-y-1">
-            {(selectedSnapshot.blocks as any[]).slice(0, 10).map((block: any, idx: number) => (
+            {(selectedSnapshot.blocks as SnapshotBlock[]).slice(0, 10).map((block: SnapshotBlock, idx: number) => (
               <div
                 key={block.id || idx}
                 className="text-xs px-2 py-1 rounded"
@@ -217,12 +224,12 @@ export function HistoryPanel({
                     : "")}
               </div>
             ))}
-            {(selectedSnapshot.blocks as any[]).length > 10 && (
+            {(selectedSnapshot.blocks as SnapshotBlock[]).length > 10 && (
               <p
                 className="text-xs text-center"
                 style={{ color: "var(--text-tertiary)" }}
               >
-                ... 외 {(selectedSnapshot.blocks as any[]).length - 10}개
+                ... 외 {(selectedSnapshot.blocks as SnapshotBlock[]).length - 10}개
               </p>
             )}
           </div>

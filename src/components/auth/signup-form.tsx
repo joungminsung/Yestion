@@ -19,7 +19,8 @@ export function SignupForm() {
   const [isLoading, setIsLoading] = useState(false);
 
   const signup = trpc.auth.signup.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
+      document.cookie = `session-token=${data.token}; path=/; max-age=${30 * 24 * 60 * 60}; samesite=lax`;
       router.push("/");
       router.refresh();
     },

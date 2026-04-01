@@ -1,4 +1,6 @@
 import { Node, mergeAttributes } from "@tiptap/core";
+import { ReactNodeViewRenderer } from "@tiptap/react";
+import { ColumnListView } from "../media/column-list-view";
 
 export const ColumnList = Node.create({
   name: "columnList",
@@ -26,6 +28,10 @@ export const ColumnList = Node.create({
       }),
       0,
     ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(ColumnListView);
   },
 });
 

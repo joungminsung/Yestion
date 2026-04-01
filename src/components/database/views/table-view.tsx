@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { CellRenderer } from "../cell-renderer";
 import { CellEditor } from "../cell-editor";
 import { propertyTypeIcon } from "../property-type-icon";
-import type { DatabaseData, RowData, ViewConfig, PropertyType, SortRule } from "@/types/database";
+import type { DatabaseData, RowData, ViewConfig, PropertyType, SortRule, RowHeight, AggregationFunction } from "@/types/database";
 
 type TableViewProps = {
   databaseId: string;
@@ -25,6 +26,12 @@ const MIN_COLUMN_WIDTH = 100;
 const TITLE_COLUMN_WIDTH = 260;
 const ROW_NUMBER_WIDTH = 32;
 
+const ROW_HEIGHT_MAP: Record<Exclude<RowHeight, "auto">, number> = {
+  short: 33,
+  medium: 56,
+  tall: 76,
+};
+
 const READ_ONLY_TYPES: PropertyType[] = [
   "created_time",
   "created_by",
@@ -32,6 +39,15 @@ const READ_ONLY_TYPES: PropertyType[] = [
   "last_edited_by",
   "formula",
   "rollup",
+];
+
+const AGGREGATION_OPTIONS: { value: AggregationFunction; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "count", label: "Count" },
+  { value: "sum", label: "Sum" },
+  { value: "average", label: "Average" },
+  { value: "min", label: "Min" },
+  { value: "max", label: "Max" },
 ];
 
 export function TableView({
@@ -66,7 +82,14 @@ export function TableView({
   const [draggingRowId, setDraggingRowId] = useState<string | null>(null);
   const [dropTargetRowId, setDropTargetRowId] = useState<string | null>(null);
 
-  const tableRef = useRef<HTMLDivElement>(null);
+  // Summary aggregation dropdown
+  const [aggregationDropdown, setAggregationDropdown] = useState<string | null>(null);
+  const aggDropdownRef = useRef<HTMLDivElement>(null);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const rowHeight = viewConfig.rowHeight ?? "short";
+  const effectiveRowHeight = rowHeight === "auto" ? 33 : ROW_HEIGHT_MAP[rowHeight];
 
   // Sort properties: title first, then by position; filter hidden
   const visibleProperties = useMemo(() => {
@@ -280,8 +303,47 @@ export function TableView({
     [onReorderRow],
   );
 
+  // Close aggregation dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (aggregationDropdown && aggDropdownRef.current && !aggDropdownRef.current.contains(e.target as Node)) {
+        setAggregationDropdown(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [aggregationDropdown]);
+
+  // Virtual scrolling setup
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => effectiveRowHeight,
+    overscan: 10,
+  });
+
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalVirtualHeight = rowVirtualizer.getTotalSize();
+
+  // Column aggregation helpers
+  const columnAggregations = useMemo(
+    () => viewConfig.columnAggregations ?? {},
+    [viewConfig.columnAggregations],
+  );
+
+  const getAggregation = useCallback(
+    (propId: string): AggregationFunction => {
+      return columnAggregations[propId] ?? "none";
+    },
+    [columnAggregations],
+  );
+
   return (
-    <div className="overflow-x-auto" ref={tableRef}>
+    <div
+      ref={scrollContainerRef}
+      className="overflow-auto"
+      style={{ maxHeight: "calc(100vh - 200px)" }}
+    >
       <div
         className="inline-grid min-w-full"
         style={{ gridTemplateColumns }}
@@ -339,137 +401,175 @@ export function TableView({
           </button>
         </div>
 
-        {/* ── Data Rows ─────────────────────────────── */}
-        {rows.map((row, rowIndex) => (
+        {/* ── Virtual Data Rows ─────────────────────── */}
+        {/* Spacer before virtual rows */}
+        {virtualRows.length > 0 && virtualRows[0]!.start > 0 && (
           <div
-            key={row.id}
-            className="group"
             style={{
-              display: "contents",
-              opacity: draggingRowId === row.id ? 0.4 : 1,
+              gridColumn: "1 / -1",
+              height: virtualRows[0]!.start,
             }}
-            onMouseEnter={() => setHoveredRowId(row.id)}
-            onMouseLeave={() => setHoveredRowId(null)}
-          >
-            {/* Drop indicator above this row */}
-            {dropTargetRowId === row.id && draggingRowId !== row.id && (
-              <div
-                style={{
-                  gridColumn: `1 / -1`,
-                  height: 2,
-                  backgroundColor: "#2383e2",
-                }}
-              />
-            )}
+          />
+        )}
 
-            {/* Row number / drag handle */}
+        {virtualRows.map((virtualRow) => {
+          const rowIndex = virtualRow.index;
+          const row = rows[rowIndex]!;
+
+          return (
             <div
-              draggable
-              onDragStart={(e) => handleDragStart(e, row.id)}
-              onDragEnd={handleDragEnd}
-              onDragOver={(e) => handleDragOver(e, row.id)}
-              onDrop={(e) => handleDrop(e, row.id)}
-              className="flex items-center justify-center border-b border-r text-[10px] transition-colors"
+              key={row.id}
+              className="group"
               style={{
-                borderColor: "var(--border-default)",
-                backgroundColor:
-                  hoveredRowId === row.id
-                    ? "var(--bg-hover)"
-                    : "var(--bg-primary)",
-                color: "var(--text-tertiary)",
-                height: 33,
-                cursor: "grab",
+                display: "contents",
+                opacity: draggingRowId === row.id ? 0.4 : 1,
               }}
+              onMouseEnter={() => setHoveredRowId(row.id)}
+              onMouseLeave={() => setHoveredRowId(null)}
             >
-              {hoveredRowId === row.id ? (
-                <span style={{ fontSize: "10px", letterSpacing: "2px", lineHeight: 1 }}>&#x2807;</span>
-              ) : (
-                ""
-              )}
-            </div>
-
-            {visibleProperties.map((property, colIndex) => {
-              const isEditing =
-                editingCell?.rowId === row.id &&
-                editingCell?.propertyId === property.id;
-              const isFocused =
-                focusedCell?.rowIndex === rowIndex &&
-                focusedCell?.colIndex === colIndex &&
-                !isEditing;
-              const value = property.type === "title"
-                ? (row.page?.title ?? row.values[property.id])
-                : row.values[property.id];
-
-              return (
+              {/* Drop indicator above this row */}
+              {dropTargetRowId === row.id && draggingRowId !== row.id && (
                 <div
-                  key={property.id}
-                  onDragOver={(e) => handleDragOver(e, row.id)}
-                  onDrop={(e) => handleDrop(e, row.id)}
-                  className="flex items-center border-b border-r px-2 text-sm transition-colors"
                   style={{
-                    borderColor: "var(--border-default)",
-                    backgroundColor:
-                      hoveredRowId === row.id
-                        ? "var(--bg-hover)"
-                        : "var(--bg-primary)",
-                    color: "var(--text-primary)",
-                    height: 33,
-                    overflow: "hidden",
-                    cursor:
-                      property.type === "title" ? "pointer" : "default",
-                    outline: isFocused ? "2px solid #2383e2" : "none",
-                    outlineOffset: -2,
+                    gridColumn: `1 / -1`,
+                    height: 2,
+                    backgroundColor: "#2383e2",
                   }}
-                  onClick={() => {
-                    if (property.type === "title") {
-                      onRowClick(row.pageId);
-                    } else {
-                      handleCellClick(row.id, property.id, property.type, rowIndex, colIndex);
-                    }
-                  }}
-                >
-                  {isEditing ? (
-                    <CellEditor
-                      value={value}
-                      type={property.type}
-                      config={property.config}
-                      onChange={(v) =>
-                        handleCellChange(row.id, property.id, v)
+                />
+              )}
+
+              {/* Row number / drag handle */}
+              <div
+                draggable
+                onDragStart={(e) => handleDragStart(e, row.id)}
+                onDragEnd={handleDragEnd}
+                onDragOver={(e) => handleDragOver(e, row.id)}
+                onDrop={(e) => handleDrop(e, row.id)}
+                className="flex items-center justify-center border-b border-r text-[10px] transition-colors"
+                style={{
+                  borderColor: "var(--border-default)",
+                  backgroundColor:
+                    hoveredRowId === row.id
+                      ? "var(--bg-hover)"
+                      : "var(--bg-primary)",
+                  color: "var(--text-tertiary)",
+                  height: effectiveRowHeight,
+                  cursor: "grab",
+                }}
+              >
+                {hoveredRowId === row.id ? (
+                  <span style={{ fontSize: "10px", letterSpacing: "2px", lineHeight: 1 }}>&#x2807;</span>
+                ) : (
+                  ""
+                )}
+              </div>
+
+              {visibleProperties.map((property, colIndex) => {
+                const isEditing =
+                  editingCell?.rowId === row.id &&
+                  editingCell?.propertyId === property.id;
+                const isFocused =
+                  focusedCell?.rowIndex === rowIndex &&
+                  focusedCell?.colIndex === colIndex &&
+                  !isEditing;
+                const value = property.type === "title"
+                  ? (row.page?.title ?? row.values[property.id])
+                  : row.values[property.id];
+
+                return (
+                  <div
+                    key={property.id}
+                    onDragOver={(e) => handleDragOver(e, row.id)}
+                    onDrop={(e) => handleDrop(e, row.id)}
+                    className="flex items-center border-b border-r px-2 text-sm transition-colors"
+                    style={{
+                      borderColor: "var(--border-default)",
+                      backgroundColor:
+                        hoveredRowId === row.id
+                          ? "var(--bg-hover)"
+                          : "var(--bg-primary)",
+                      color: "var(--text-primary)",
+                      height: effectiveRowHeight,
+                      overflow: "hidden",
+                      cursor:
+                        property.type === "title" ? "pointer" : "default",
+                      outline: isFocused ? "2px solid #2383e2" : "none",
+                      outlineOffset: -2,
+                    }}
+                    onClick={() => {
+                      if (property.type === "title") {
+                        onRowClick(row.pageId);
+                      } else {
+                        handleCellClick(row.id, property.id, property.type, rowIndex, colIndex);
                       }
-                      onClose={handleCellClose}
-                      onNavigate={(e) =>
-                        handleCellNavigate(row.id, property.id, e)
-                      }
-                    />
-                  ) : (
-                    <div className="w-full truncate">
-                      <CellRenderer
+                    }}
+                  >
+                    {isEditing ? (
+                      <CellEditor
                         value={value}
                         type={property.type}
                         config={property.config}
+                        onChange={(v) =>
+                          handleCellChange(row.id, property.id, v)
+                        }
+                        onClose={handleCellClose}
+                        onNavigate={(e) =>
+                          handleCellNavigate(row.id, property.id, e)
+                        }
                       />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                    ) : (
+                      <div
+                        className="w-full"
+                        style={{
+                          overflow: rowHeight === "auto" ? "visible" : "hidden",
+                          textOverflow: rowHeight === "auto" ? "unset" : "ellipsis",
+                          whiteSpace: rowHeight === "auto" ? "normal" : "nowrap",
+                        }}
+                      >
+                        <CellRenderer
+                          value={value}
+                          type={property.type}
+                          config={property.config}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
 
-            {/* Empty cell under the "+" column */}
-            <div
-              onDragOver={(e) => handleDragOver(e, row.id)}
-              onDrop={(e) => handleDrop(e, row.id)}
-              className="border-b transition-colors"
-              style={{
-                borderColor: "var(--border-default)",
-                backgroundColor:
-                  hoveredRowId === row.id
-                    ? "var(--bg-hover)"
-                    : "var(--bg-primary)",
-                height: 33,
-              }}
-            />
-          </div>
-        ))}
+              {/* Empty cell under the "+" column */}
+              <div
+                onDragOver={(e) => handleDragOver(e, row.id)}
+                onDrop={(e) => handleDrop(e, row.id)}
+                className="border-b transition-colors"
+                style={{
+                  borderColor: "var(--border-default)",
+                  backgroundColor:
+                    hoveredRowId === row.id
+                      ? "var(--bg-hover)"
+                      : "var(--bg-primary)",
+                  height: effectiveRowHeight,
+                }}
+              />
+            </div>
+          );
+        })}
+
+        {/* Spacer after virtual rows */}
+        {virtualRows.length > 0 && (
+          (() => {
+            const lastItem = virtualRows[virtualRows.length - 1]!;
+            const remaining = totalVirtualHeight - lastItem.end;
+            return remaining > 0 ? (
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  height: remaining,
+                }}
+              />
+            ) : null;
+          })()
+        )}
 
         {/* ── Summary Row ──────────────────────────── */}
         <div style={{ display: "contents" }}>
@@ -482,11 +582,14 @@ export function TableView({
             }}
           />
           {visibleProperties.map((prop) => {
-            const aggregate = calculateAggregate(rows, prop);
+            const aggFn = getAggregation(prop.id);
+            const aggregate = calculateAggregate(rows, prop, aggFn);
+            const isOpen = aggregationDropdown === prop.id;
+
             return (
               <div
                 key={prop.id}
-                className="flex items-center border-t px-3 text-right"
+                className="relative flex items-center border-t px-3"
                 style={{
                   borderColor: "var(--border-divider)",
                   fontSize: "12px",
@@ -495,7 +598,64 @@ export function TableView({
                   justifyContent: prop.type === "title" ? "flex-start" : "flex-end",
                 }}
               >
-                {prop.type === "title" ? "합계" : aggregate}
+                {prop.type === "title" ? (
+                  <span>Count: {rows.length}</span>
+                ) : (
+                  <button
+                    onClick={() => setAggregationDropdown(isOpen ? null : prop.id)}
+                    className="rounded px-1 py-0.5 text-xs transition-colors hover:bg-[var(--bg-hover)]"
+                    style={{ color: "var(--text-tertiary)" }}
+                  >
+                    {aggregate || (aggFn === "none" ? "Calculate" : aggFn)}
+                  </button>
+                )}
+
+                {/* Aggregation dropdown */}
+                {isOpen && prop.type !== "title" && (
+                  <div
+                    ref={aggDropdownRef}
+                    className="absolute bottom-full right-0 z-50 mb-1 min-w-[140px] rounded-md border shadow-lg"
+                    style={{
+                      backgroundColor: "var(--bg-primary)",
+                      borderColor: "var(--border-default)",
+                    }}
+                  >
+                    {AGGREGATION_OPTIONS.map((opt) => {
+                      // Only show sum/average/min/max for number type
+                      if (
+                        ["sum", "average", "min", "max"].includes(opt.value) &&
+                        prop.type !== "number"
+                      ) {
+                        return null;
+                      }
+                      return (
+                        <button
+                          key={opt.value}
+                          onClick={() => {
+                            // We store the aggregation preference - caller persists via viewConfig
+                            // For now, update local state; the toolbar onUpdateViewConfig would persist it
+                            setAggregationDropdown(null);
+                            // Dispatch a custom event that the parent can listen to
+                            const event = new CustomEvent("database:updateAggregation", {
+                              detail: { propertyId: prop.id, aggregation: opt.value },
+                              bubbles: true,
+                            });
+                            document.dispatchEvent(event);
+                          }}
+                          className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors hover:bg-[var(--bg-hover)]"
+                          style={{
+                            color: aggFn === opt.value ? "#2383e2" : "var(--text-primary)",
+                          }}
+                        >
+                          <span>{opt.label}</span>
+                          {aggFn === opt.value && (
+                            <span className="text-xs">&#10003;</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -535,28 +695,67 @@ export function TableView({
 function calculateAggregate(
   rows: RowData[],
   prop: DatabaseData["properties"][number],
+  aggFn: AggregationFunction,
 ): string {
   if (prop.type === "title") return "";
+  if (aggFn === "none") {
+    // Legacy fallback behavior
+    if (prop.type === "number") {
+      const values = rows
+        .map((r) => Number(r.values[prop.id]))
+        .filter((v) => !isNaN(v));
+      if (values.length === 0) return "";
+      const sum = values.reduce((a, b) => a + b, 0);
+      return `Sum: ${sum.toLocaleString()}`;
+    }
+    if (prop.type === "checkbox") {
+      const checked = rows.filter((r) => r.values[prop.id] === true).length;
+      return `${checked}/${rows.length}`;
+    }
+    return "";
+  }
 
-  if (prop.type === "number") {
+  if (aggFn === "count") {
+    const nonEmpty = rows.filter(
+      (r) => r.values[prop.id] != null && r.values[prop.id] !== "",
+    ).length;
+    return `Count: ${nonEmpty}`;
+  }
+
+  if (aggFn === "sum" && prop.type === "number") {
     const values = rows
       .map((r) => Number(r.values[prop.id]))
       .filter((v) => !isNaN(v));
-    if (values.length === 0) return "";
-    const sum = values.reduce((a, b) => a + b, 0);
-    return `합계: ${sum.toLocaleString()}`;
+    if (values.length === 0) return "Sum: 0";
+    return `Sum: ${values.reduce((a, b) => a + b, 0).toLocaleString()}`;
   }
 
-  if (prop.type === "checkbox") {
-    const checked = rows.filter((r) => r.values[prop.id] === true).length;
-    return `${checked}/${rows.length}`;
+  if (aggFn === "average" && prop.type === "number") {
+    const values = rows
+      .map((r) => Number(r.values[prop.id]))
+      .filter((v) => !isNaN(v));
+    if (values.length === 0) return "Avg: 0";
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    return `Avg: ${avg.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
   }
 
-  // For others: count non-empty values
-  const nonEmpty = rows.filter(
-    (r) => r.values[prop.id] != null && r.values[prop.id] !== "",
-  ).length;
-  return nonEmpty > 0 ? `${nonEmpty}개` : "";
+  if (aggFn === "min" && prop.type === "number") {
+    const values = rows
+      .map((r) => Number(r.values[prop.id]))
+      .filter((v) => !isNaN(v));
+    if (values.length === 0) return "Min: -";
+    return `Min: ${Math.min(...values).toLocaleString()}`;
+  }
+
+  if (aggFn === "max" && prop.type === "number") {
+    const values = rows
+      .map((r) => Number(r.values[prop.id]))
+      .filter((v) => !isNaN(v));
+    if (values.length === 0) return "Max: -";
+    return `Max: ${Math.max(...values).toLocaleString()}`;
+  }
+
+  return "";
 }
 
 // ── Column Header with Resize + Sort ───────────────────────

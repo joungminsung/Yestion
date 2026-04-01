@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { Editor } from "@tiptap/react";
 import { cn } from "@/lib/utils";
 import { AiMenu } from "./ai/ai-menu";
-import { Link as LinkIcon, Sparkles } from "lucide-react";
+import { Link as LinkIcon, Sparkles, AlignLeft, AlignCenter, AlignRight, Highlighter } from "lucide-react";
 
 const TEXT_COLORS = [
   { name: "기본", value: "default", css: "var(--text-primary)" },
@@ -36,7 +36,10 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [showColors, setShowColors] = useState(false);
+  const [showAlign, setShowAlign] = useState(false);
   const [showAiMenu, setShowAiMenu] = useState(false);
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [commentRange, setCommentRange] = useState<{ from: number; to: number } | null>(null);
   const [commentText, setCommentText] = useState("");
@@ -47,7 +50,9 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
     if (from === to) {
       setIsVisible(false);
       setShowColors(false);
+      setShowAlign(false);
       setShowAiMenu(false);
+      setShowLinkInput(false);
       setShowCommentInput(false);
       return;
     }
@@ -66,6 +71,16 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
       editor.off("selectionUpdate", updatePosition);
     };
   }, [editor, updatePosition]);
+
+  const SHORTCUT_HINTS: Record<string, string> = {
+    Bold: "\u2318B",
+    Italic: "\u2318I",
+    Underline: "\u2318U",
+    Strikethrough: "\u2318\u21E7S",
+    Code: "\u2318E",
+    Link: "\u2318K",
+    Highlight: "\u2318\u21E7H",
+  };
 
   const buttons: { label: string; icon: ReactNode; action: () => void; isActive: () => boolean }[] = [
     {
@@ -93,6 +108,12 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
       isActive: () => editor.isActive("strike"),
     },
     {
+      label: "Highlight",
+      icon: <Highlighter size={14} />,
+      action: () => editor.chain().focus().toggleHighlight({ color: "var(--color-yellow-bg)" }).run(),
+      isActive: () => editor.isActive("highlight"),
+    },
+    {
       label: "Code",
       icon: "<>",
       action: () => editor.chain().focus().toggleCode().run(),
@@ -102,17 +123,31 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
       label: "Link",
       icon: <LinkIcon size={14} />,
       action: () => {
-        const url = window.prompt("URL:");
-        if (url) editor.chain().focus().setLink({ href: url }).run();
-        else editor.chain().focus().unsetLink().run();
+        if (editor.isActive("link")) {
+          editor.chain().focus().unsetLink().run();
+        } else {
+          setShowLinkInput(true);
+          setShowColors(false);
+          setShowAlign(false);
+          setShowAiMenu(false);
+          // Pre-fill with existing link if any
+          const attrs = editor.getAttributes("link");
+          setLinkUrl(attrs.href || "");
+        }
       },
-      isActive: () => editor.isActive("link"),
+      isActive: () => editor.isActive("link") || showLinkInput,
     },
     {
       label: "Color",
       icon: "A",
-      action: () => { setShowColors((prev) => !prev); setShowAiMenu(false); },
+      action: () => { setShowColors((prev) => !prev); setShowAlign(false); setShowAiMenu(false); },
       isActive: () => showColors,
+    },
+    {
+      label: "Align",
+      icon: <AlignLeft size={14} />,
+      action: () => { setShowAlign((prev) => !prev); setShowColors(false); setShowAiMenu(false); },
+      isActive: () => showAlign,
     },
     {
       label: "Comment",
@@ -177,7 +212,7 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
                   }
                 : {}),
             }}
-            title={btn.label}
+            title={`${btn.label}${SHORTCUT_HINTS[btn.label] ? ` (${SHORTCUT_HINTS[btn.label]})` : ""}`}
           >
             {btn.icon}
           </button>
@@ -258,6 +293,110 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
               />
             ))}
           </div>
+        </div>
+      )}
+      {showAlign && (
+        <div
+          className="absolute top-full left-0 mt-1 p-2 rounded-lg"
+          style={{
+            backgroundColor: "var(--bg-primary)",
+            boxShadow: "var(--shadow-popup)",
+            width: "160px",
+            zIndex: 1,
+          }}
+        >
+          <div
+            className="mb-2"
+            style={{
+              fontSize: "11px",
+              color: "var(--text-tertiary)",
+              fontWeight: 500,
+            }}
+          >
+            텍스트 정렬
+          </div>
+          {([
+            { label: "왼쪽", value: "left", icon: <AlignLeft size={14} /> },
+            { label: "가운데", value: "center", icon: <AlignCenter size={14} /> },
+            { label: "오른쪽", value: "right", icon: <AlignRight size={14} /> },
+          ] as const).map((align) => (
+            <button
+              key={align.value}
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-notion-bg-hover"
+              style={{
+                color: editor.isActive({ textAlign: align.value }) ? "#2383e2" : "var(--text-primary)",
+              }}
+              onClick={() => {
+                editor.chain().focus().setTextAlign(align.value).run();
+                setShowAlign(false);
+              }}
+            >
+              {align.icon}
+              {align.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {showLinkInput && (
+        <div
+          className="absolute top-full left-0 mt-1 p-2 rounded-lg flex items-center gap-2"
+          style={{
+            backgroundColor: "var(--bg-primary)",
+            boxShadow: "var(--shadow-popup)",
+            width: "320px",
+            zIndex: 1,
+          }}
+        >
+          <input
+            type="url"
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+            placeholder="URL을 입력하세요"
+            className="flex-1 px-2 py-1.5 text-sm border rounded outline-none"
+            style={{
+              borderColor: "var(--border-default)",
+              backgroundColor: "var(--bg-primary)",
+              color: "var(--text-primary)",
+            }}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && linkUrl.trim()) {
+                editor.chain().focus().setLink({ href: linkUrl.trim() }).run();
+                setShowLinkInput(false);
+                setLinkUrl("");
+              }
+              if (e.key === "Escape") {
+                setShowLinkInput(false);
+                setLinkUrl("");
+              }
+            }}
+          />
+          <button
+            onClick={() => {
+              if (linkUrl.trim()) {
+                editor.chain().focus().setLink({ href: linkUrl.trim() }).run();
+              }
+              setShowLinkInput(false);
+              setLinkUrl("");
+            }}
+            className="px-3 py-1.5 text-sm rounded text-white"
+            style={{ backgroundColor: "#2383e2" }}
+          >
+            확인
+          </button>
+          {editor.isActive("link") && (
+            <button
+              onClick={() => {
+                editor.chain().focus().unsetLink().run();
+                setShowLinkInput(false);
+                setLinkUrl("");
+              }}
+              className="px-2 py-1.5 text-sm rounded hover:bg-notion-bg-hover"
+              style={{ color: "var(--color-red)" }}
+            >
+              제거
+            </button>
+          )}
         </div>
       )}
       {showCommentInput && commentRange && (

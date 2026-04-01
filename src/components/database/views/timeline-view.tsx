@@ -33,6 +33,7 @@ export function TimelineView({
   rows,
   viewConfig,
   onAddRow,
+  onUpdateRow,
   onRowClick,
 }: TimelineViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -273,6 +274,9 @@ export function TimelineView({
                 rangeStart={rangeStart}
                 timelineDays={timelineDays}
                 onRowClick={onRowClick}
+                onUpdateRow={onUpdateRow}
+                startPropertyId={startProperty.id}
+                endPropertyId={endProperty?.id ?? null}
               />
             ))}
           </div>
@@ -291,6 +295,9 @@ function TimelineRow({
   rangeStart,
   timelineDays,
   onRowClick,
+  onUpdateRow,
+  startPropertyId,
+  endPropertyId,
 }: {
   row: RowData;
   startDate: Date | null;
@@ -298,23 +305,161 @@ function TimelineRow({
   rangeStart: Date;
   timelineDays: Date[];
   onRowClick: (pageId: string) => void;
+  onUpdateRow: (rowId: string, propertyId: string, value: unknown) => void;
+  startPropertyId: string;
+  endPropertyId: string | null;
 }) {
+  const [dragTooltip, setDragTooltip] = useState<string | null>(null);
+  const [tooltipX, setTooltipX] = useState(0);
+  const dragStateRef = useRef<{
+    type: "start" | "end" | "move";
+    initialMouseX: number;
+    initialStartDate: Date;
+    initialEndDate: Date | null;
+    initialBarLeft: number;
+    initialBarWidth: number;
+  } | null>(null);
+
+  // Local override during drag
+  const [dragOffset, setDragOffset] = useState<{
+    startDays: number;
+    endDays: number;
+  } | null>(null);
+
   // Calculate bar position
   const barStyle = useMemo(() => {
     if (!startDate) return null;
 
-    const offsetDays = differenceInDays(startDate, rangeStart);
+    let effectiveStart = startDate;
+    let effectiveEnd = endDate;
+
+    if (dragOffset) {
+      effectiveStart = addDays(startDate, dragOffset.startDays);
+      if (endDate) {
+        effectiveEnd = addDays(endDate, dragOffset.endDays);
+      }
+    }
+
+    const offsetDays = differenceInDays(effectiveStart, rangeStart);
     const left = offsetDays * DAY_WIDTH;
 
-    if (endDate && !isSameDay(startDate, endDate)) {
-      const duration = differenceInDays(endDate, startDate) + 1;
-      const width = duration * DAY_WIDTH;
+    if (effectiveEnd && !isSameDay(effectiveStart, effectiveEnd)) {
+      const duration = differenceInDays(effectiveEnd, effectiveStart) + 1;
+      const width = Math.max(duration * DAY_WIDTH, DAY_WIDTH);
       return { left, width, isDot: false };
     }
 
     // Single-day dot
     return { left: left + DAY_WIDTH / 2 - 6, width: 12, isDot: true };
-  }, [startDate, endDate, rangeStart]);
+  }, [startDate, endDate, rangeStart, dragOffset]);
+
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent, type: "start" | "end" | "move") => {
+      if (!startDate) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const offsetDays = differenceInDays(startDate, rangeStart);
+      const barLeft = offsetDays * DAY_WIDTH;
+      let barWidth = DAY_WIDTH;
+      if (endDate && !isSameDay(startDate, endDate)) {
+        barWidth = (differenceInDays(endDate, startDate) + 1) * DAY_WIDTH;
+      }
+
+      dragStateRef.current = {
+        type,
+        initialMouseX: e.clientX,
+        initialStartDate: startDate,
+        initialEndDate: endDate,
+        initialBarLeft: barLeft,
+        initialBarWidth: barWidth,
+      };
+
+      const handleMouseMove = (ev: MouseEvent) => {
+        if (!dragStateRef.current) return;
+        const state = dragStateRef.current;
+        const deltaX = ev.clientX - state.initialMouseX;
+        const deltaDays = Math.round(deltaX / DAY_WIDTH);
+
+        let startDays = 0;
+        let endDays = 0;
+
+        if (state.type === "start") {
+          startDays = deltaDays;
+          // Prevent start going past end
+          if (state.initialEndDate) {
+            const maxStartDays = differenceInDays(state.initialEndDate, state.initialStartDate);
+            if (startDays > maxStartDays) startDays = maxStartDays;
+          }
+          const newStart = addDays(state.initialStartDate, startDays);
+          setDragTooltip(format(newStart, "MMM d, yyyy"));
+        } else if (state.type === "end") {
+          endDays = deltaDays;
+          // Prevent end going before start
+          if (state.initialEndDate) {
+            const minEndDays = -differenceInDays(state.initialEndDate, state.initialStartDate);
+            if (endDays < minEndDays) endDays = minEndDays;
+          }
+          const newEnd = addDays(state.initialEndDate ?? state.initialStartDate, endDays);
+          setDragTooltip(format(newEnd, "MMM d, yyyy"));
+        } else {
+          // move - shift both
+          startDays = deltaDays;
+          endDays = deltaDays;
+          const newStart = addDays(state.initialStartDate, startDays);
+          const newEnd = state.initialEndDate ? addDays(state.initialEndDate, endDays) : null;
+          setDragTooltip(
+            newEnd
+              ? `${format(newStart, "MMM d")} - ${format(newEnd, "MMM d")}`
+              : format(newStart, "MMM d, yyyy"),
+          );
+        }
+
+        setTooltipX(ev.clientX);
+        setDragOffset({ startDays, endDays });
+      };
+
+      const handleMouseUp = () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+
+        if (!dragStateRef.current) return;
+        const state = dragStateRef.current;
+
+        // Read final offset from the ref-based calculation
+        const finalOffset = { startDays: 0, endDays: 0 };
+        // We need to get the current dragOffset - use the last set value
+        // The cleanest way is to compute from the final mouse position
+        setDragOffset((current) => {
+          if (current) {
+            finalOffset.startDays = current.startDays;
+            finalOffset.endDays = current.endDays;
+          }
+          return null;
+        });
+
+        // Use setTimeout to ensure we read the final offset
+        setTimeout(() => {
+          if (finalOffset.startDays !== 0) {
+            const newStart = addDays(state.initialStartDate, finalOffset.startDays);
+            onUpdateRow(row.id, startPropertyId, format(newStart, "yyyy-MM-dd"));
+          }
+          if (finalOffset.endDays !== 0 && endPropertyId) {
+            const baseEnd = state.initialEndDate ?? state.initialStartDate;
+            const newEnd = addDays(baseEnd, finalOffset.endDays);
+            onUpdateRow(row.id, endPropertyId, format(newEnd, "yyyy-MM-dd"));
+          }
+        }, 0);
+
+        dragStateRef.current = null;
+        setDragTooltip(null);
+      };
+
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [startDate, endDate, rangeStart, row.id, onUpdateRow, startPropertyId, endPropertyId],
+  );
 
   const today = startOfDay(new Date());
 
@@ -368,6 +513,55 @@ function TimelineRow({
               {row.page?.title ?? "Untitled"}
             </span>
           )}
+
+          {/* Resize handles - only for non-dot bars */}
+          {!barStyle.isDot && (
+            <>
+              {/* Left resize handle */}
+              <div
+                className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize rounded-l opacity-0 transition-opacity hover:opacity-100"
+                style={{ backgroundColor: "rgba(255,255,255,0.3)" }}
+                onMouseDown={(e) => handleResizeStart(e, "start")}
+                onClick={(e) => e.stopPropagation()}
+              />
+              {/* Right resize handle */}
+              <div
+                className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize rounded-r opacity-0 transition-opacity hover:opacity-100"
+                style={{ backgroundColor: "rgba(255,255,255,0.3)" }}
+                onMouseDown={(e) => handleResizeStart(e, "end")}
+                onClick={(e) => e.stopPropagation()}
+              />
+              {/* Middle drag area */}
+              <div
+                className="absolute left-2 right-2 top-0 bottom-0 cursor-grab"
+                onMouseDown={(e) => handleResizeStart(e, "move")}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </>
+          )}
+
+          {/* Single-day dot drag */}
+          {barStyle.isDot && (
+            <div
+              className="absolute inset-0 cursor-grab"
+              onMouseDown={(e) => handleResizeStart(e, "move")}
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Drag tooltip */}
+      {dragTooltip && (
+        <div
+          className="pointer-events-none fixed z-50 rounded bg-gray-900 px-2 py-1 text-xs text-white shadow-lg"
+          style={{
+            left: tooltipX,
+            top: -30,
+            transform: "translateX(-50%)",
+          }}
+        >
+          {dragTooltip}
         </div>
       )}
     </div>

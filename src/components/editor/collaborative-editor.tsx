@@ -11,16 +11,9 @@ import type { BlockType, BlockContent } from "@/types/editor";
 
 type Props = {
   pageId: string;
-  /**
-   * I4: Session token passed from server component. Ideally this should be
-   * replaced with a short-lived, scoped collaboration token to reduce exposure.
-   * The session cookie is httpOnly so this server-to-client prop pass is the
-   * current mechanism — acceptable for an internal team tool.
-   */
   sessionToken: string;
   user: { id: string; name: string };
   isLocked?: boolean;
-  // C3: Initial blocks for hydrating an empty Yjs doc
   initialBlocks?: { id: string; type: string; content: unknown; position: number; parentId: string | null }[];
 };
 
@@ -28,14 +21,89 @@ export function CollaborativeEditor({ pageId, sessionToken, user, isLocked, init
   const [provider, setProvider] = useState<HocuspocusProvider | null>(null);
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  // C3: Flag to hydrate Yjs doc from blocks when doc is empty
   const [needsHydration, setNeedsHydration] = useState(false);
   const editorRef = useRef<NotionEditorHandle | null>(null);
   const [typingUsers, setTypingUsers] = useState<{ id: string; name: string; color: string }[]>([]);
   const typingTimeout = useRef<NodeJS.Timeout | null>(null);
+  const presenceUsers = usePresenceStore((s) => s.users);
+
+  // Follow mode: track scroll position via awareness
+  const followingUserId = usePresenceStore((s) => s.followingUserId);
+  const setFollowing = usePresenceStore((s) => s.setFollowing);
+
+  // Broadcast local scroll position and cursor block via awareness
+  useEffect(() => {
+    if (!provider?.awareness) return;
+
+    const handleScroll = () => {
+      provider.awareness?.setLocalStateField("scrollY", window.scrollY);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [provider]);
+
+  // Exit follow mode on manual scroll
+  useEffect(() => {
+    if (!followingUserId) return;
+
+    let lastFollowScroll = 0;
+    const THRESHOLD = 5;
+
+    const handleManualScroll = () => {
+      // If this scroll event was triggered by follow-mode scrollTo, ignore it
+      if (Math.abs(window.scrollY - lastFollowScroll) < THRESHOLD) return;
+      setFollowing(null);
+    };
+
+    // Store a reference so the follow scroll listener can update lastFollowScroll
+    const onFollowScroll = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.scrollY !== undefined) {
+        lastFollowScroll = detail.scrollY;
+      }
+    };
+
+    window.addEventListener("scroll", handleManualScroll, { passive: true });
+    window.addEventListener("__follow_scroll", onFollowScroll);
+
+    return () => {
+      window.removeEventListener("scroll", handleManualScroll);
+      window.removeEventListener("__follow_scroll", onFollowScroll);
+    };
+  }, [followingUserId, setFollowing]);
+
+  // Follow mode: listen to awareness changes and scroll to followed user's position
+  useEffect(() => {
+    if (!provider?.awareness || !followingUserId) return;
+
+    const handleAwarenessChange = () => {
+      if (!provider.awareness) return;
+      const states = provider.awareness.getStates();
+
+      // Find the client ID for the followed user
+      let followedScrollY: number | null = null;
+      states.forEach((state: Record<string, unknown>) => {
+        const stateUser = state.user as { id: string } | undefined;
+        if (stateUser?.id === followingUserId && typeof state.scrollY === "number") {
+          followedScrollY = state.scrollY as number;
+        }
+      });
+
+      if (followedScrollY !== null) {
+        // Dispatch event so the manual scroll handler can distinguish
+        window.dispatchEvent(new CustomEvent("__follow_scroll", { detail: { scrollY: followedScrollY } }));
+        window.scrollTo({ top: followedScrollY, behavior: "smooth" });
+      }
+    };
+
+    provider.awareness.on("change", handleAwarenessChange);
+    return () => {
+      provider.awareness?.off("change", handleAwarenessChange);
+    };
+  }, [provider, followingUserId]);
 
   useEffect(() => {
-    // I7: Cancellation guard to prevent stale state updates
     let cancelled = false;
 
     const { ydoc: doc, provider: prov } = createCollaborationProvider({ pageId, token: sessionToken });
@@ -44,7 +112,6 @@ export function CollaborativeEditor({ pageId, sessionToken, user, isLocked, init
       if (cancelled) return;
       setIsConnected(true);
 
-      // C3: If Yjs doc is empty but we have initial blocks, flag for hydration
       const fragment = doc.getXmlFragment("default");
       if (fragment.length === 0 && initialBlocks && initialBlocks.length > 0) {
         setNeedsHydration(true);
@@ -91,7 +158,7 @@ export function CollaborativeEditor({ pageId, sessionToken, user, isLocked, init
     };
   }, [pageId, sessionToken, user.id, user.name, initialBlocks]);
 
-  // C3: Hydrate Yjs doc from initial blocks once editor is mounted and doc is synced
+  // Hydrate Yjs doc from initial blocks once editor is mounted and doc is synced
   useEffect(() => {
     if (!needsHydration || !initialBlocks || initialBlocks.length === 0) return;
     if (!editorRef.current) return;
@@ -135,6 +202,25 @@ export function CollaborativeEditor({ pageId, sessionToken, user, isLocked, init
           오프라인 — 변경 사항이 로컬에 저장됩니다
         </div>
       )}
+
+      {followingUserId && (
+        <div
+          className="mb-2 px-3 py-1.5 rounded text-xs flex items-center justify-between"
+          style={{ backgroundColor: "rgba(35, 131, 226, 0.08)", color: "#2383e2" }}
+        >
+          <span>
+            {presenceUsers.find((u) => u.id === followingUserId)?.name ?? "사용자"}님을 팔로우 중
+          </span>
+          <button
+            onClick={() => setFollowing(null)}
+            className="px-2 py-0.5 rounded text-xs hover:bg-notion-bg-hover"
+            style={{ color: "#2383e2" }}
+          >
+            해제
+          </button>
+        </div>
+      )}
+
       <NotionEditor
         ref={editorRef}
         collaboration={{ ydoc, provider, user: { id: user.id, name: user.name, color: getColorForUser(user.id) } }}

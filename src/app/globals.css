@@ -124,7 +124,70 @@ html {
   outline: none;
 }
 
-/* 5.14 Dark mode transition */
+/* 5.14 Focus mode */
+.focus-mode .ProseMirror > *:not(.is-focused) {
+  opacity: 0.15;
+  transition: opacity 200ms ease;
+}
+.focus-mode .ProseMirror > *.is-focused {
+  opacity: 1;
+}
+.focus-mode [role="navigation"],
+.focus-mode [role="banner"] {
+  opacity: 0.3;
+  transition: opacity 200ms ease;
+}
+.focus-mode [role="navigation"]:hover,
+.focus-mode [role="banner"]:hover {
+  opacity: 1;
+}
+
+/* Dark mode transition */
 html[data-transitioning] * {
   transition: background-color 300ms ease, color 300ms ease, border-color 300ms ease !important;
+}
+
+/* Block insert/delete animations (FLIP-style) */
+.ProseMirror > * {
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+}
+
+@keyframes blockInsert {
+  from { opacity: 0; max-height: 0; transform: translateY(-8px); }
+  to { opacity: 1; max-height: 500px; transform: translateY(0); }
+}
+
+@keyframes blockDelete {
+  from { opacity: 1; max-height: 500px; }
+  to { opacity: 0; max-height: 0; }
+}
+
+.block-inserting {
+  animation: blockInsert 200ms ease-out;
+}
+
+.block-deleting {
+  animation: blockDelete 200ms ease-out;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Link preview popup animation */
+@keyframes linkPreviewIn {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.link-preview-enter {
+  animation: linkPreviewIn 150ms ease-out;
+}
+
+/* Follow mode indicator pulse */
+@keyframes followPulse {
+  0%, 100% { box-shadow: 0 0 0 2px #2383e2; }
+  50% { box-shadow: 0 0 0 3px #2383e2, 0 0 8px rgba(35, 131, 226, 0.3); }
+}
+
+.follow-mode-avatar {
+  animation: followPulse 2s ease-in-out infinite;
 }

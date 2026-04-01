@@ -10,6 +10,10 @@ export const ToggleBlock = Node.create({
   addAttributes() {
     return {
       blockId: { default: null },
+      open: {
+        default: true,
+        parseHTML: (el) => el.hasAttribute("open"),
+      },
     };
   },
 
@@ -18,9 +22,11 @@ export const ToggleBlock = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
+    const attrs: Record<string, unknown> = { class: "notion-toggle" };
+    if (HTMLAttributes.open) attrs.open = true;
     return [
       "details",
-      mergeAttributes(HTMLAttributes, { class: "notion-toggle", open: true }),
+      mergeAttributes(HTMLAttributes, attrs),
       0,
     ];
   },

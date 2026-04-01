@@ -7,6 +7,7 @@ import { useCommandPaletteStore } from "@/stores/command-palette";
 import { SidebarResizer } from "./sidebar-resizer";
 import { SidebarPageItem } from "./sidebar-page-item";
 import { SidebarFavorites } from "./sidebar-favorites";
+import { SidebarRecent } from "./sidebar-recent";
 import { SidebarTrash } from "./sidebar-trash";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 import { cn } from "@/lib/utils";
@@ -101,8 +102,10 @@ export function Sidebar() {
           position: (old?.length ?? 0),
           createdAt: new Date(),
           updatedAt: new Date(),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
+          cover: null,
+          isLocked: false,
+          isFullWidth: false,
+        } as NonNullable<typeof old>[number],
       ]);
       return { prev };
     },
@@ -183,6 +186,7 @@ export function Sidebar() {
 
           {/* Page Tree */}
           <div className="flex-1 overflow-y-auto px-1">
+            {workspaceId && <SidebarRecent workspaceId={workspaceId} />}
             {workspaceId && <SidebarFavorites workspaceId={workspaceId} />}
 
             <div

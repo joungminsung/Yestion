@@ -2,15 +2,16 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import { router, protectedProcedure } from "@/server/trpc/init";
+import type { PrismaClient } from "@prisma/client";
+import { sendShareNotificationEmail } from "@/lib/email";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function verifyPageOwnership(db: any, userId: string, pageId: string) {
+async function verifyPageOwnership(db: PrismaClient, userId: string, pageId: string) {
   const page = await db.page.findUnique({ where: { id: pageId }, select: { workspaceId: true } });
   if (!page) throw new TRPCError({ code: "NOT_FOUND" });
   const membership = await db.workspaceMember.findUnique({
     where: { userId_workspaceId: { userId, workspaceId: page.workspaceId } },
   });
-  if (!membership || !["OWNER", "ADMIN", "MEMBER"].includes(membership.role)) {
+  if (!membership || !["OWNER", "ADMIN"].includes(membership.role)) {
     throw new TRPCError({ code: "FORBIDDEN" });
   }
 }
@@ -31,7 +32,7 @@ export const shareRouter = router({
     .input(z.object({ pageId: z.string(), email: z.string().email(), level: z.enum(["edit", "comment", "view"]) }))
     .mutation(async ({ ctx, input }) => {
       await verifyPageOwnership(ctx.db, ctx.session.user.id, input.pageId);
-      const targetUser = await ctx.db.user.findUnique({ where: { email: input.email } });
+      const targetUser = await ctx.db.user.findUnique({ where: { email: input.email }, select: { id: true, email: true, name: true, avatarUrl: true, emailNotify: true } });
       if (!targetUser) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
       const permission = await ctx.db.pagePermission.upsert({
         where: { pageId_userId: { pageId: input.pageId, userId: targetUser.id } },
@@ -40,8 +41,9 @@ export const shareRouter = router({
         include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
       });
 
-      // Create notification for the invited user
+      // Create notification + send email for the invited user
       if (targetUser.id !== ctx.session.user.id) {
+        const page = await ctx.db.page.findUnique({ where: { id: input.pageId }, select: { title: true, workspaceId: true } });
         await ctx.db.notification.create({
           data: {
             userId: targetUser.id,
@@ -50,6 +52,18 @@ export const shareRouter = router({
             pageId: input.pageId,
           },
         });
+        // Send email notification (non-blocking)
+        if (targetUser.emailNotify !== false) {
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+          const pageUrl = `${appUrl}/${page?.workspaceId}/${input.pageId}`;
+          sendShareNotificationEmail(
+            targetUser.email,
+            ctx.session.user.name,
+            page?.title || "제목 없음",
+            pageUrl,
+            input.level,
+          ).catch(() => {});
+        }
       }
 
       await ctx.db.activityLog.create({

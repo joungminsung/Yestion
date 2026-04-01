@@ -439,7 +439,8 @@ function CheckboxCellEditor({
   useEffect(() => {
     onChange(!value);
     onClose();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentional: toggle once on mount then close
+  }, []);
 
   return null;
 }

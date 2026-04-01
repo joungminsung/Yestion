@@ -15,6 +15,8 @@ import { apiKeyRouter } from "@/server/routers/apikey";
 import { activityRouter } from "@/server/routers/activity";
 import { historyRouter } from "@/server/routers/history";
 import { syncedBlockRouter } from "@/server/routers/synced-block";
+import { sessionRouter } from "@/server/routers/session";
+import { chatRouter } from "@/server/routers/chat";
 
 export const appRouter = router({
   auth: authRouter,
@@ -33,6 +35,8 @@ export const appRouter = router({
   activity: activityRouter,
   history: historyRouter,
   syncedBlock: syncedBlockRouter,
+  session: sessionRouter,
+  chat: chatRouter,
 });
 
 export type AppRouter = typeof appRouter;

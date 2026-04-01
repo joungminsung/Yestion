@@ -91,6 +91,7 @@ function flatConditions(filter: FilterGroup | null): FilterCondition[] {
 function makeEmptyCondition(propertyId: string, type: PropertyType): FilterCondition {
   const ops = getOperatorsForType(type);
   return {
+    id: crypto.randomUUID(),
     propertyId,
     operator: ops[0]?.value ?? "contains",
     value: type === "checkbox" ? true : "",
@@ -205,7 +206,7 @@ export function DatabaseFilter({
           const needsValue = !noValueOps.includes(cond.operator);
 
           return (
-            <div key={idx} className="flex items-center gap-1.5">
+            <div key={cond.id || `filter-${idx}`} className="flex items-center gap-1.5">
               {/* Property dropdown */}
               <select
                 value={cond.propertyId}

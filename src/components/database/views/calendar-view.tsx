@@ -32,9 +32,11 @@ export function CalendarView({
   rows,
   viewConfig,
   onAddRow,
+  onUpdateRow,
   onRowClick,
 }: CalendarViewProps) {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
 
   // Find the date property
   const dateProperty = useMemo(() => {
@@ -85,6 +87,42 @@ export function CalendarView({
       onAddRow({ [dateProperty.id]: format(day, "yyyy-MM-dd") });
     },
     [dateProperty, onAddRow],
+  );
+
+  // Drag and drop handlers
+  const handleDragStart = useCallback(
+    (e: React.DragEvent, rowId: string) => {
+      e.dataTransfer.setData("text/plain", rowId);
+      e.dataTransfer.effectAllowed = "move";
+    },
+    [],
+  );
+
+  const handleDragOver = useCallback(
+    (e: React.DragEvent, dateKey: string) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      setDragOverDate(dateKey);
+    },
+    [],
+  );
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverDate(null);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent, dateKey: string) => {
+      e.preventDefault();
+      setDragOverDate(null);
+      if (!dateProperty) return;
+
+      const rowId = e.dataTransfer.getData("text/plain");
+      if (!rowId) return;
+
+      onUpdateRow(rowId, dateProperty.id, dateKey);
+    },
+    [dateProperty, onUpdateRow],
   );
 
   if (!dateProperty) {
@@ -158,17 +196,24 @@ export function CalendarView({
           const dayRows = rowsByDate.get(key) ?? [];
           const isCurrentMonth = isSameMonth(day, currentMonth);
           const isToday = isSameDay(day, today);
+          const isDragOver = dragOverDate === key;
 
           return (
             <div
               key={key}
-              className="group min-h-[100px] border-b border-r p-1"
+              className="group min-h-[100px] border-b border-r p-1 transition-colors"
               style={{
                 borderColor: "var(--border-default)",
-                backgroundColor: isCurrentMonth
-                  ? "var(--bg-primary)"
-                  : "var(--bg-secondary, #f7f6f3)",
+                backgroundColor: isDragOver
+                  ? "rgba(35, 131, 226, 0.1)"
+                  : isCurrentMonth
+                    ? "var(--bg-primary)"
+                    : "var(--bg-secondary, #f7f6f3)",
+                ...(isDragOver ? { outline: "2px solid #2383e2", outlineOffset: -2 } : {}),
               }}
+              onDragOver={(e) => handleDragOver(e, key)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, key)}
             >
               {/* Day number */}
               <div className="mb-0.5 flex items-center justify-between">
@@ -206,12 +251,14 @@ export function CalendarView({
                   return (
                     <button
                       key={row.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, row.id)}
                       onClick={(e) => {
                         e.stopPropagation();
                         onRowClick(row.pageId);
                       }}
                       className="flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-xs transition-colors hover:bg-[var(--bg-hover)]"
-                      style={{ color: "var(--text-primary)" }}
+                      style={{ color: "var(--text-primary)", cursor: "grab" }}
                     >
                       {icon && (
                         <span className="shrink-0 text-[10px]">{icon}</span>

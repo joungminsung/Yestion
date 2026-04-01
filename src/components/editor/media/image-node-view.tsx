@@ -19,8 +19,9 @@ export function ImageNodeView({ node, updateAttributes, selected, editor }: Node
 
   const [showUpload, setShowUpload] = useState(!src);
   const [isResizing, setIsResizing] = useState(false);
+  const [resizeDimensions, setResizeDimensions] = useState<{ w: number; h: number } | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
-  const startRef = useRef<{ x: number; width: number }>({ x: 0, width: 0 });
+  const startRef = useRef<{ x: number; y: number; width: number; height: number; aspectRatio: number }>({ x: 0, y: 0, width: 0, height: 0, aspectRatio: 1 });
 
   // Show upload popover when src is empty
   useEffect(() => {
@@ -42,26 +43,43 @@ export function ImageNodeView({ node, updateAttributes, selected, editor }: Node
       if (!imgRef.current) return;
 
       const startX = e.clientX;
+      const startY = e.clientY;
       const startWidth = imgRef.current.offsetWidth;
-      startRef.current = { x: startX, width: startWidth };
+      const startHeight = imgRef.current.offsetHeight;
+      const aspectRatio = startWidth / startHeight;
+      startRef.current = { x: startX, y: startY, width: startWidth, height: startHeight, aspectRatio };
       setIsResizing(true);
+      setResizeDimensions({ w: startWidth, h: startHeight });
 
       const onMouseMove = (ev: globalThis.MouseEvent) => {
         const diff = ev.clientX - startRef.current.x;
         const newWidth = Math.max(100, startRef.current.width + diff);
+        let newHeight: number;
+
+        if (ev.shiftKey) {
+          // Shift+drag locks aspect ratio
+          newHeight = Math.round(newWidth / startRef.current.aspectRatio);
+        } else {
+          // Free resize: height follows vertical mouse movement
+          const diffY = ev.clientY - startRef.current.y;
+          newHeight = Math.max(50, startRef.current.height + diffY);
+        }
+
         if (imgRef.current) {
           imgRef.current.style.width = `${newWidth}px`;
         }
+        setResizeDimensions({ w: Math.round(newWidth), h: newHeight });
       };
 
       const onMouseUp = (ev: globalThis.MouseEvent) => {
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
         setIsResizing(false);
+        setResizeDimensions(null);
 
         const diff = ev.clientX - startRef.current.x;
         const newWidth = Math.max(100, startRef.current.width + diff);
-        updateAttributes({ width: `${newWidth}px` });
+        updateAttributes({ width: newWidth });
       };
 
       document.addEventListener("mousemove", onMouseMove);
@@ -120,9 +138,32 @@ export function ImageNodeView({ node, updateAttributes, selected, editor }: Node
             ref={imgRef}
             src={src}
             alt={alt}
-            style={{ width: width || undefined, maxWidth: "100%" }}
+            style={{ width: typeof width === "number" ? `${width}px` : (width || undefined), maxWidth: "100%" }}
             draggable={false}
           />
+
+          {/* Size badge during resize */}
+          {isResizing && resizeDimensions && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: 8,
+                left: "50%",
+                transform: "translateX(-50%)",
+                background: "rgba(0, 0, 0, 0.75)",
+                color: "#fff",
+                padding: "2px 8px",
+                borderRadius: 4,
+                fontSize: 11,
+                fontWeight: 500,
+                whiteSpace: "nowrap",
+                zIndex: 30,
+                pointerEvents: "none",
+              }}
+            >
+              {resizeDimensions.w} x {resizeDimensions.h}
+            </div>
+          )}
 
           {/* Resize handles - visible on selection */}
           {selected && !isResizing && (
@@ -188,6 +229,42 @@ export function ImageNodeView({ node, updateAttributes, selected, editor }: Node
             </div>
           )}
         </div>
+
+        {/* Caption */}
+        {src && (
+          <div className="w-full" contentEditable={false}>
+            <input
+              type="text"
+              value={alt || ""}
+              onChange={(e) => updateAttributes({ alt: e.target.value })}
+              placeholder="캡션 추가..."
+              className="w-full text-center text-xs py-1 outline-none"
+              style={{
+                color: "var(--text-tertiary)",
+                backgroundColor: "transparent",
+              }}
+            />
+          </div>
+        )}
+
+        {/* Alignment controls (shown on hover/select) */}
+        {selected && src && (
+          <div className="flex items-center gap-1 justify-center mt-1" contentEditable={false}>
+            {(["left", "center", "right"] as const).map((align) => (
+              <button
+                key={align}
+                onClick={() => updateAttributes({ alignment: align })}
+                className="p-1 rounded hover:bg-notion-bg-hover"
+                style={{
+                  color: alignment === align ? "#2383e2" : "var(--text-tertiary)",
+                }}
+                title={align === "left" ? "왼쪽" : align === "center" ? "가운데" : "오른쪽"}
+              >
+                {align === "left" ? "◧" : align === "center" ? "◻" : "◨"}
+              </button>
+            ))}
+          </div>
+        )}
       </figure>
     </NodeViewWrapper>
   );

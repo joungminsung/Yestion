@@ -3,6 +3,7 @@ import { getServerSession } from "@/server/auth/session";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { CommandPalette } from "@/components/layout/command-palette";
+import { QuickNoteButton } from "@/components/layout/quick-note-button";
 
 export default async function MainLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession();
@@ -16,6 +17,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
         <div className="flex-1 overflow-y-auto">{children}</div>
       </main>
       <CommandPalette />
+      <QuickNoteButton />
     </div>
   );
 }

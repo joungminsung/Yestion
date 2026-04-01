@@ -50,15 +50,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           mutations: {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            onError: (error: any) => {
+            onError: (error: Error) => {
               const message = error?.message || "요청에 실패했습니다";
               useToastStore.getState().addToast({ message, type: "error" });
             },
           },
           queries: {
             retry: 1,
-            staleTime: 30000,
+            staleTime: 60000,
+            refetchOnWindowFocus: false,
           },
         },
       })

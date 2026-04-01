@@ -18,7 +18,9 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
 
   const login = trpc.auth.login.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Set cookie client-side to ensure it's always applied
+      document.cookie = `session-token=${data.token}; path=/; max-age=${30 * 24 * 60 * 60}; samesite=lax`;
       router.push("/");
       router.refresh();
     },
@@ -52,10 +54,15 @@ export function LoginForm() {
           {isLoading ? t("loggingIn") : t("login")}
         </Button>
       </form>
-      <p className="text-center text-sm mt-4" style={{ color: "var(--text-secondary)" }}>
-        {t("noAccount")}{" "}
-        <Link href="/signup" className="underline hover:no-underline" style={{ color: "var(--color-blue)" }}>{t("signup")}</Link>
-      </p>
+      <div className="flex items-center justify-between mt-4">
+        <Link href="/reset-password" className="text-sm underline hover:no-underline" style={{ color: "var(--text-secondary)" }}>
+          비밀번호 찾기
+        </Link>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          {t("noAccount")}{" "}
+          <Link href="/signup" className="underline hover:no-underline" style={{ color: "var(--color-blue)" }}>{t("signup")}</Link>
+        </p>
+      </div>
     </div>
   );
 }

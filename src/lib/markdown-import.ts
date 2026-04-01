@@ -1,11 +1,19 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Converts Markdown content to Tiptap-compatible JSON blocks.
  */
 
-export function markdownToBlocks(markdown: string): any[] {
+type TiptapMark = { type: string; attrs?: Record<string, unknown> };
+type TiptapNode = {
+  type: string;
+  attrs?: Record<string, unknown>;
+  content?: TiptapNode[];
+  text?: string;
+  marks?: TiptapMark[];
+};
+
+export function markdownToBlocks(markdown: string): TiptapNode[] {
   const lines = markdown.split("\n");
-  const blocks: any[] = [];
+  const blocks: TiptapNode[] = [];
   let i = 0;
 
   while (i < lines.length) {
@@ -128,8 +136,8 @@ export function markdownToBlocks(markdown: string): any[] {
   return blocks;
 }
 
-function parseInline(text: string): any[] {
-  const result: any[] = [];
+function parseInline(text: string): TiptapNode[] {
+  const result: TiptapNode[] = [];
   // Regex to match inline formatting: **bold**, *italic*, `code`, ~~strike~~, [link](url)
   const regex =
     /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(\~\~(.+?)\~\~)|(\[([^\]]+)\]\(([^)]+)\))/g;
