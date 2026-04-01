@@ -1,17 +1,62 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { X, Search } from "lucide-react";
 
-const EMOJI_LIST = [
-  "😀","😃","😄","😁","😆","😅","🤣","😂","🙂","🙃",
-  "😉","😊","😇","🥰","😍","🤩","😘","😗","😚","😙",
-  "😋","😛","😜","🤪","😝","🤑","🤗","🤭","🤫","🤔",
-  "😐","😑","😶","😏","😒","🙄","😬","🤥","😌","😔",
-  "😪","🤤","😴","😷","🤒","🤕","🤢","🤮","🤧","🥵",
-  "🥶","🥴","😵","🤯","🤠","🥳","😎","🤓","🧐","😕",
-  "📄","📝","📚","📖","📕","📗","📘","📙","📓","📒",
-  "💡","🔥","⭐","🎯","🚀","💎","🔑","🔒","🔔","📌",
+const EMOJI_CATEGORIES: { name: string; emoji: string[] }[] = [
+  {
+    name: "Smileys",
+    emoji: ["😀","😃","😄","😁","😆","😅","🤣","😂","🙂","🙃","😉","😊","😇","🥰","😍","🤩","😘","😗","😚","😙","😋","😛","😜","🤪","😝","🤑","🤗","🤭","🤫","🤔"],
+  },
+  {
+    name: "People",
+    emoji: ["👋","🤚","🖐","✋","🖖","👌","🤌","🤏","✌️","🤞","🫰","🤟","🤘","🤙","👈","👉","👆","👇","☝️","👍","👎","✊","👊","🤛","🤜","👏","🙌","🫶","👐","🤝"],
+  },
+  {
+    name: "Objects",
+    emoji: ["📄","📝","📚","📖","📕","📗","📘","📙","📓","📒","📰","📑","🔖","💼","📁","📂","🗂","📅","📆","📇","📋","📌","📍","📎","🖇","📏","📐","🗃","🗄","🗑"],
+  },
+  {
+    name: "Symbols",
+    emoji: ["💡","🔥","⭐","🌟","✨","⚡","💎","🔑","🔒","🔓","🔔","🔕","📌","📍","🎯","🚀","🏆","🎨","🎭","🎪","🎬","🎤","🎧","🎵","🎶","💻","📱","⌨️","🖥","🖨"],
+  },
+  {
+    name: "Nature",
+    emoji: ["🌸","🌺","🌻","🌹","🌷","🌼","🌱","🌿","☘️","🍀","🌵","🌴","🌳","🌲","🍃","🍂","🍁","🌾","🌈","☀️","🌤","⛅","🌥","☁️","🌧","⛈","🌩","❄️","🌊","💧"],
+  },
+  {
+    name: "Food",
+    emoji: ["🍎","🍐","🍊","🍋","🍌","🍉","🍇","🍓","🫐","🍒","🍑","🥭","🍍","🥥","🥝","🍅","🥑","🥦","🥬","🥒","🌶","🫑","🌽","🥕","🫒","🧄","🧅","🥔","🍠","🥐"],
+  },
+  {
+    name: "Travel",
+    emoji: ["🚗","🚕","🚙","🚌","🚎","🏎","🚓","🚑","🚒","🚐","🛻","🚚","🚛","🚜","🏍","🛵","🚲","🛴","🚏","🛣","🛤","🚆","🚇","🚈","🚉","✈️","🛩","🚀","🛸","🚁"],
+  },
+  {
+    name: "Flags",
+    emoji: ["🏁","🚩","🎌","🏴","🏳️","🇰🇷","🇺🇸","🇯🇵","🇨🇳","🇬🇧","🇫🇷","🇩🇪","🇪🇸","🇮🇹","🇧🇷","🇷🇺","🇦🇺","🇨🇦","🇮🇳","🇲🇽"],
+  },
 ];
+
+const ALL_EMOJI = EMOJI_CATEGORIES.flatMap((c) => c.emoji);
+const RECENT_KEY = "notion-recent-icons";
+const MAX_RECENT = 16;
+
+function getRecent(): string[] {
+  try {
+    const stored = localStorage.getItem(RECENT_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function addRecent(emoji: string) {
+  const recent = getRecent().filter((e) => e !== emoji);
+  recent.unshift(emoji);
+  if (recent.length > MAX_RECENT) recent.length = MAX_RECENT;
+  localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
+}
 
 type PageIconPickerProps = {
   currentIcon: string | null;
@@ -20,62 +65,170 @@ type PageIconPickerProps = {
 };
 
 export function PageIconPicker({ currentIcon, onSelect, onClose }: PageIconPickerProps) {
-  const ref = useRef<HTMLDivElement>(null);
+  const [search, setSearch] = useState("");
+  const [recent, setRecent] = useState<string[]>([]);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+    setRecent(getRecent());
+    inputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
         onClose();
       }
-    }
+    };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [onClose]);
 
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  const filteredEmoji = useMemo(() => {
+    if (!search.trim()) return null;
+    const q = search.toLowerCase();
+    return ALL_EMOJI.filter((emoji) => emoji.includes(q));
+  }, [search]);
+
+  const handleSelect = useCallback(
+    (emoji: string) => {
+      addRecent(emoji);
+      setRecent(getRecent());
+      onSelect(emoji);
+      onClose();
+    },
+    [onSelect, onClose]
+  );
+
+  const handleRemove = useCallback(() => {
+    onSelect(null);
+    onClose();
+  }, [onSelect, onClose]);
+
   return (
     <div
-      ref={ref}
-      className="absolute z-50 rounded-lg p-3 dropdown-enter"
+      ref={pickerRef}
+      className="absolute z-50 rounded-xl shadow-lg border overflow-hidden dropdown-enter"
       style={{
+        width: "340px",
+        maxHeight: "420px",
         backgroundColor: "var(--bg-primary)",
+        borderColor: "var(--border-default)",
         boxShadow: "var(--shadow-popup)",
-        border: "1px solid var(--border-default)",
-        width: "320px",
       }}
     >
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-          아이콘
-        </span>
-        {currentIcon && (
-          <button
-            onClick={() => { onSelect(null); onClose(); }}
-            className="text-xs px-2 py-0.5 rounded hover:bg-notion-bg-hover"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            제거
+      {/* Search bar */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: "var(--border-default)" }}>
+        <Search size={14} style={{ color: "var(--text-tertiary)" }} />
+        <input
+          ref={inputRef}
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search emoji..."
+          className="flex-1 bg-transparent text-sm outline-none"
+          style={{ color: "var(--text-primary)" }}
+        />
+        {search && (
+          <button onClick={() => setSearch("")} className="hover:opacity-70">
+            <X size={14} style={{ color: "var(--text-tertiary)" }} />
           </button>
         )}
       </div>
-      <div
-        className="grid gap-0.5"
-        style={{ gridTemplateColumns: "repeat(10, 1fr)" }}
-      >
-        {EMOJI_LIST.map((emoji) => (
+
+      {/* Emoji grid */}
+      <div className="overflow-y-auto px-2 py-2" style={{ maxHeight: "320px" }}>
+        {filteredEmoji ? (
+          filteredEmoji.length > 0 ? (
+            <div className="grid grid-cols-8 gap-0.5">
+              {filteredEmoji.map((emoji, i) => (
+                <button
+                  key={`search-${i}`}
+                  className="w-8 h-8 flex items-center justify-center rounded text-xl hover:bg-notion-bg-hover transition-colors"
+                  style={{ backgroundColor: emoji === currentIcon ? "var(--bg-active)" : undefined }}
+                  onClick={() => handleSelect(emoji)}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-sm py-4" style={{ color: "var(--text-tertiary)" }}>
+              No results
+            </p>
+          )
+        ) : (
+          <>
+            {/* Recent */}
+            {recent.length > 0 && (
+              <div className="mb-3">
+                <h4 className="text-xs font-medium px-1 mb-1" style={{ color: "var(--text-tertiary)" }}>
+                  Recent
+                </h4>
+                <div className="grid grid-cols-8 gap-0.5">
+                  {recent.map((emoji, i) => (
+                    <button
+                      key={`recent-${i}`}
+                      className="w-8 h-8 flex items-center justify-center rounded text-xl hover:bg-notion-bg-hover transition-colors"
+                      style={{ backgroundColor: emoji === currentIcon ? "var(--bg-active)" : undefined }}
+                      onClick={() => handleSelect(emoji)}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Categories */}
+            {EMOJI_CATEGORIES.map((category) => (
+              <div key={category.name} className="mb-3">
+                <h4 className="text-xs font-medium px-1 mb-1" style={{ color: "var(--text-tertiary)" }}>
+                  {category.name}
+                </h4>
+                <div className="grid grid-cols-8 gap-0.5">
+                  {category.emoji.map((emoji, i) => (
+                    <button
+                      key={`${category.name}-${i}`}
+                      className="w-8 h-8 flex items-center justify-center rounded text-xl hover:bg-notion-bg-hover transition-colors"
+                      style={{ backgroundColor: emoji === currentIcon ? "var(--bg-active)" : undefined }}
+                      onClick={() => handleSelect(emoji)}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between px-3 py-2 border-t" style={{ borderColor: "var(--border-default)" }}>
+        {currentIcon ? (
           <button
-            key={emoji}
-            onClick={() => { onSelect(emoji); onClose(); }}
-            className="flex items-center justify-center rounded hover:bg-notion-bg-hover cursor-pointer"
-            style={{
-              width: "28px",
-              height: "28px",
-              fontSize: "18px",
-              backgroundColor: emoji === currentIcon ? "var(--bg-active)" : undefined,
-            }}
+            className="text-xs px-2 py-1 rounded hover:bg-notion-bg-hover"
+            style={{ color: "var(--color-red)" }}
+            onClick={handleRemove}
           >
-            {emoji}
+            Remove icon
           </button>
-        ))}
+        ) : (
+          <span />
+        )}
+        <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+          {ALL_EMOJI.length} emoji
+        </span>
       </div>
     </div>
   );
