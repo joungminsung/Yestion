@@ -92,7 +92,10 @@ export function WorkspaceSwitcher({ currentWorkspaceId }: Props) {
             className="w-full flex items-center gap-2 px-3 py-2 hover:bg-notion-bg-hover text-left"
             style={{ fontSize: "14px", color: "var(--text-secondary)" }}
             onClick={() => {
+              // Clear session cookie
+              document.cookie = "session-token=; path=/; max-age=0; samesite=lax";
               router.push("/login");
+              router.refresh();
               setIsOpen(false);
             }}
           >

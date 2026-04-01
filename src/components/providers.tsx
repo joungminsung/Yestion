@@ -11,6 +11,7 @@ import { ScrollToTop } from "@/components/ui/scroll-to-top";
 import { ShortcutsHelpModal } from "@/components/shortcuts-help-modal";
 import { QuickActions } from "@/components/quick-actions";
 import { useToastStore } from "@/stores/toast";
+import { ResponsiveProvider } from "@/components/providers/responsive-provider";
 
 function OfflineBanner() {
   const [isOffline, setIsOffline] = useState(false);
@@ -78,7 +79,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
         <OfflineBanner />
-        <ShortcutsProvider>{children}</ShortcutsProvider>
+        <ResponsiveProvider>
+          <ShortcutsProvider>{children}</ShortcutsProvider>
+        </ResponsiveProvider>
         <ToastContainer />
         <ScrollToTop />
         <ShortcutsHelpModal />
