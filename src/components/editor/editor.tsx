@@ -63,6 +63,7 @@ const BlockMenu = lazy(() => import("./block-menu").then(m => ({ default: m.Bloc
 const BlockContextMenu = lazy(() => import("./block-context-menu").then(m => ({ default: m.BlockContextMenu })));
 const AiPrompt = lazy(() => import("./ai/ai-prompt").then(m => ({ default: m.AiPrompt })));
 import { SelectionActionBar } from "./selection-action-bar";
+import { EmptyPageGuide } from "./empty-page-guide";
 import "./utils/editor-styles.css";
 import "./cursor-styles.css";
 
@@ -290,6 +291,7 @@ export const NotionEditor = forwardRef<
       </Suspense>
       <SelectionActionBar editor={editor} />
       <EditorContent editor={editor} />
+      {editor && <EmptyPageGuide editor={editor} />}
       {editor.view && (
         <Suspense fallback={null}>
           <InlineToolbar editor={editor} onAddComment={onAddComment} />
