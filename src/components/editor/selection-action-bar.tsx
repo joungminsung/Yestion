@@ -84,6 +84,44 @@ export function SelectionActionBar({ editor }: Props) {
     editor.view.dispatch(tr);
   };
 
+  const handleTurnInto = (targetType: string, attrs?: Record<string, unknown>) => {
+    const state = BLOCK_SELECTION_KEY.getState(editor.state);
+    if (!state) return;
+    const positions = [...state.selectedBlocks].sort((a, b) => a - b);
+
+    let tr = editor.state.tr;
+
+    for (const pos of positions) {
+      const node = tr.doc.nodeAt(pos);
+      if (!node) continue;
+
+      const nodeType = editor.schema.nodes[targetType];
+      if (!nodeType) continue;
+
+      try {
+        // For heading, set the level attribute
+        if (targetType === "heading" && attrs?.level) {
+          tr = tr.setNodeMarkup(pos, nodeType, { ...node.attrs, ...attrs });
+        }
+        // For paragraph, callout, blockquote — just change the type
+        else if (targetType === "paragraph" || targetType === "blockquote" || targetType === "callout") {
+          tr = tr.setNodeMarkup(pos, nodeType, { ...node.attrs, ...attrs });
+        }
+        // For list types, we need to wrap content differently
+        // For now, convert to paragraph first (list conversion is complex)
+        else {
+          tr = tr.setNodeMarkup(pos, nodeType, { ...node.attrs, ...attrs });
+        }
+      } catch {
+        // Some conversions may fail for certain node types — skip silently
+      }
+    }
+
+    tr = tr.setMeta(BLOCK_SELECTION_KEY, { selectedBlocks: [], anchorBlock: null });
+    editor.view.dispatch(tr);
+    setShowTurnInto(false);
+  };
+
   return (
     <div
       className="sticky top-0 z-50 flex items-center gap-2 px-3 py-1.5 mx-auto w-fit rounded-lg shadow-md border"
@@ -122,7 +160,7 @@ export function SelectionActionBar({ editor }: Props) {
                 key={opt.type + ("attrs" in opt && opt.attrs && "level" in opt.attrs ? opt.attrs.level : "")}
                 className="w-full text-left px-3 py-1.5 text-sm hover:bg-notion-bg-hover"
                 style={{ color: "var(--text-primary)" }}
-                onClick={() => { setShowTurnInto(false); }}
+                onClick={() => handleTurnInto(opt.type, "attrs" in opt ? opt.attrs as Record<string, unknown> : undefined)}
               >
                 {opt.label}
               </button>
