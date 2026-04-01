@@ -1,8 +1,28 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import type { Editor } from "@tiptap/react";
 import { useAiStore } from "@/stores/ai";
+import {
+  Trash2,
+  Copy,
+  Scissors,
+  Clipboard,
+  ClipboardPaste,
+  Link,
+  Palette,
+  List,
+  ListChecks,
+  Quote,
+  FileText,
+  MessageSquare,
+  Sparkles,
+  MoveUp,
+  MoveDown,
+  ChevronRight,
+  Heading1,
+  Heading2,
+} from "lucide-react";
 
 const TEXT_COLORS = [
   { name: "기본", value: "default", css: "var(--text-primary)" },
@@ -38,7 +58,7 @@ type ContextMenuProps = {
 
 type MenuItem = {
   label: string;
-  icon: string;
+  icon: React.ReactNode;
   shortcut?: string;
   action: () => void;
   divider?: boolean;
@@ -106,7 +126,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
   const items: MenuItem[] = [
     {
       label: "삭제",
-      icon: "\u{1F5D1}",
+      icon: <Trash2 size={14} />,
       shortcut: "Del",
       action: () => {
         editor.chain().focus().deleteSelection().run();
@@ -115,7 +135,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     },
     {
       label: "복제",
-      icon: "\u{1F4CB}",
+      icon: <Copy size={14} />,
       shortcut: "\u2318D",
       action: () => {
         const { from, to } = editor.state.selection;
@@ -130,7 +150,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     },
     {
       label: "잘라내기",
-      icon: "\u2702\uFE0F",
+      icon: <Scissors size={14} />,
       shortcut: "\u2318X",
       action: () => {
         const { from, to } = editor.state.selection;
@@ -142,7 +162,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     },
     {
       label: "복사",
-      icon: "\u{1F4C4}",
+      icon: <Clipboard size={14} />,
       shortcut: "\u2318C",
       action: () => {
         const { from, to } = editor.state.selection;
@@ -153,7 +173,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     },
     {
       label: "붙여넣기",
-      icon: "\u{1F4CB}",
+      icon: <ClipboardPaste size={14} />,
       shortcut: "\u2318V",
       action: () => {
         navigator.clipboard.readText().then((text) => {
@@ -164,7 +184,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     },
     {
       label: "링크 복사",
-      icon: "\u{1F517}",
+      icon: <Link size={14} />,
       action: () => {
         const url = window.location.href;
         navigator.clipboard.writeText(url).catch(() => {});
@@ -174,7 +194,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     { label: "", icon: "", action: () => {}, divider: true },
     {
       label: "색상",
-      icon: "\u{1F3A8}",
+      icon: <Palette size={14} />,
       action: () => {
         setShowColorSubmenu((prev) => !prev);
       },
@@ -191,7 +211,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     },
     {
       label: "제목 1로 변환",
-      icon: "H1",
+      icon: <Heading1 size={14} />,
       action: () => {
         editor.chain().focus().toggleHeading({ level: 1 }).run();
         setPosition(null);
@@ -199,7 +219,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     },
     {
       label: "제목 2로 변환",
-      icon: "H2",
+      icon: <Heading2 size={14} />,
       action: () => {
         editor.chain().focus().toggleHeading({ level: 2 }).run();
         setPosition(null);
@@ -207,7 +227,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     },
     {
       label: "글머리 기호",
-      icon: "\u2022",
+      icon: <List size={14} />,
       action: () => {
         editor.chain().focus().toggleBulletList().run();
         setPosition(null);
@@ -223,7 +243,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     },
     {
       label: "할 일",
-      icon: "\u2611",
+      icon: <ListChecks size={14} />,
       action: () => {
         editor.chain().focus().toggleTaskList().run();
         setPosition(null);
@@ -231,7 +251,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     },
     {
       label: "인용으로 변환",
-      icon: "\u275D",
+      icon: <Quote size={14} />,
       action: () => {
         editor.chain().focus().toggleBlockquote().run();
         setPosition(null);
@@ -248,7 +268,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     { label: "", icon: "", action: () => {}, divider: true },
     {
       label: "페이지로 변환",
-      icon: "\u{1F4C4}",
+      icon: <FileText size={14} />,
       action: () => {
         if (!onTurnIntoPage) { setPosition(null); return; }
         const { from } = editor.state.selection;
@@ -263,7 +283,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     },
     {
       label: "댓글 추가",
-      icon: "\u{1F4AC}",
+      icon: <MessageSquare size={14} />,
       action: () => {
         const { from, to } = editor.state.selection;
         if (onAddComment && from !== to) {
@@ -278,7 +298,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     },
     {
       label: "AI에게 요청",
-      icon: "\u2728",
+      icon: <Sparkles size={14} />,
       action: () => {
         const { from } = editor.state.selection;
         const $from = editor.state.doc.resolve(from);
@@ -292,7 +312,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     { label: "", icon: "", action: () => {}, divider: true },
     {
       label: "위로 이동",
-      icon: "\u2191",
+      icon: <MoveUp size={14} />,
       shortcut: "\u2318\u21E7\u2191",
       action: () => {
         try {
@@ -320,7 +340,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
     },
     {
       label: "아래로 이동",
-      icon: "\u2193",
+      icon: <MoveDown size={14} />,
       shortcut: "\u2318\u21E7\u2193",
       action: () => {
         try {
@@ -410,7 +430,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
                 className="text-xs"
                 style={{ color: "var(--text-tertiary)" }}
               >
-                {"\u25B6"}
+                <ChevronRight size={12} />
               </span>
             )}
           </button>
