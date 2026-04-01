@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "@/server/trpc/init";
 
+async function verifyProjectMembership(db: any, projectId: string, userId: string) {
+  const member = await db.projectMember.findFirst({
+    where: { projectId, userId },
+  });
+  if (!member) throw new Error("Not authorized: not a project member");
+  return member;
+}
+
 export const taskRouter = router({
   list: protectedProcedure
     .input(z.object({
@@ -90,6 +98,7 @@ export const taskRouter = router({
       const { id, ...data } = input;
       const old = await ctx.db.task.findUnique({ where: { id } });
       if (!old) throw new Error("Task not found");
+      await verifyProjectMembership(ctx.db, old.projectId, ctx.session.user.id);
 
       const task = await ctx.db.task.update({ where: { id }, data });
 
@@ -125,6 +134,9 @@ export const taskRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      const task = await ctx.db.task.findUnique({ where: { id: input.id } });
+      if (!task) throw new Error("Task not found");
+      await verifyProjectMembership(ctx.db, task.projectId, ctx.session.user.id);
       return ctx.db.task.delete({ where: { id: input.id } });
     }),
 
@@ -135,9 +147,40 @@ export const taskRouter = router({
       position: z.number(),
     }))
     .mutation(async ({ ctx, input }) => {
-      return ctx.db.task.update({
-        where: { id: input.id },
-        data: { status: input.status, position: input.position },
-      });
+      const task = await ctx.db.task.findUniqueOrThrow({ where: { id: input.id } });
+      await verifyProjectMembership(ctx.db, task.projectId, ctx.session.user.id);
+
+      await ctx.db.$transaction([
+        // Shift tasks in target column at or above insertion point
+        ctx.db.task.updateMany({
+          where: {
+            projectId: task.projectId,
+            status: input.status,
+            position: { gte: input.position },
+            id: { not: input.id },
+          },
+          data: { position: { increment: 1 } },
+        }),
+        // Move the task
+        ctx.db.task.update({
+          where: { id: input.id },
+          data: { status: input.status, position: input.position },
+        }),
+      ]);
+
+      // Log status change if status changed
+      if (task.status !== input.status) {
+        await ctx.db.taskActivity.create({
+          data: {
+            taskId: input.id,
+            userId: ctx.session.user.id,
+            action: "status_changed",
+            oldValue: task.status,
+            newValue: input.status,
+          },
+        });
+      }
+
+      return ctx.db.task.findUnique({ where: { id: input.id } });
     }),
 });

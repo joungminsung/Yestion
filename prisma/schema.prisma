@@ -408,7 +408,7 @@ model Task {
   updatedAt      DateTime  @updatedAt
 
   project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  parentTask     Task?     @relation("SubTasks", fields: [parentTaskId], references: [id])
+  parentTask     Task?     @relation("SubTasks", fields: [parentTaskId], references: [id], onDelete: SetNull)
   subtasks       Task[]    @relation("SubTasks")
   activities     TaskActivity[]
 

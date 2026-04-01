@@ -21,6 +21,7 @@ export function BoardView({ projectId }: Props) {
   const { data: tasks, refetch } = trpc.task.list.useQuery({ projectId });
   const createTask = trpc.task.create.useMutation({ onSuccess: () => refetch() });
   const updateTask = trpc.task.update.useMutation({ onSuccess: () => refetch() });
+  const reorderTask = trpc.task.reorder.useMutation({ onSuccess: () => refetch() });
   const [addingTo, setAddingTo] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
 
@@ -36,9 +37,18 @@ export function BoardView({ projectId }: Props) {
     e.preventDefault();
     const taskId = e.dataTransfer.getData("text/task-id");
     if (!taskId) return;
+
+    // Find the task being dragged
+    const draggedTask = tasks?.find(t => t.id === taskId);
+    if (!draggedTask) return;
+
     const statusTasks = tasksByStatus(targetStatus);
     const newPosition = statusTasks.length;
-    updateTask.mutate({ id: taskId, status: targetStatus, position: newPosition });
+
+    // Skip if dropping in same column at the end (effectively same position)
+    if (draggedTask.status === targetStatus && draggedTask.position >= statusTasks.length - 1) return;
+
+    reorderTask.mutate({ id: taskId, status: targetStatus, position: newPosition });
   };
 
   const handleDragOver = (e: React.DragEvent) => {

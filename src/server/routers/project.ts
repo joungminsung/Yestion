@@ -55,6 +55,14 @@ export const projectRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
+      const project = await ctx.db.project.findUnique({ where: { id } });
+      if (!project) throw new Error("Project not found");
+      const member = await ctx.db.projectMember.findFirst({
+        where: { projectId: id, userId: ctx.session.user.id },
+      });
+      if (!member || (member.role !== "owner" && member.role !== "admin")) {
+        throw new Error("Not authorized");
+      }
       return ctx.db.project.update({ where: { id }, data });
     }),
 
