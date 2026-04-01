@@ -1,5 +1,5 @@
 import { Extension } from "@tiptap/core";
-import { Plugin, PluginKey, EditorState } from "@tiptap/pm/state";
+import { Plugin, PluginKey, EditorState, TextSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, EditorView } from "@tiptap/pm/view";
 import { Node as PmNode, DOMSerializer } from "@tiptap/pm/model";
 
@@ -206,6 +206,8 @@ export const BlockSelection = Extension.create({
               if (!lastNode) return false;
               let insertAt = lastPos + lastNode.nodeSize;
 
+              // Positions are read from the original doc (view.state.doc).
+              // Insertions happen after all selected blocks, so original positions remain valid.
               for (const pos of positions) {
                 const node = view.state.doc.nodeAt(pos);
                 if (node) {
@@ -227,29 +229,25 @@ export const BlockSelection = Extension.create({
                 const $from = view.state.doc.resolve(from);
                 const blockPos = $from.before(1);
                 const node = view.state.doc.nodeAt(blockPos);
-                if (!node || blockPos === 0) return true; // already at top
+                if (!node) return true;
 
-                // Find previous block
-                const $blockStart = view.state.doc.resolve(blockPos);
-                if ($blockStart.index(0) === 0) return true; // first block
-                const prevBlockPos = $blockStart.before(1) - view.state.doc.resolve(blockPos - 1).parent.nodeSize;
+                // Find previous sibling using index
+                const $block = view.state.doc.resolve(blockPos);
+                const indexInParent = $block.index(0);
+                if (indexInParent === 0) return true; // already first block
 
-                // Actually, simpler: the previous block ends at blockPos, so previous starts at blockPos - prevNode.nodeSize
-                let prevPos = blockPos;
-                view.state.doc.forEach((n, offset) => {
-                  if (offset + n.nodeSize === blockPos) {
-                    prevPos = offset;
-                  }
+                // Previous block position
+                let prevPos = 0;
+                let idx = 0;
+                view.state.doc.forEach((_n, offset) => {
+                  if (idx === indexInParent - 1) prevPos = offset;
+                  idx++;
                 });
 
-                if (prevPos === blockPos) return true; // no previous block found
-
                 let tr = view.state.tr;
-                // Delete current block, insert before previous
                 tr = tr.delete(blockPos, blockPos + node.nodeSize);
                 tr = tr.insert(prevPos, node);
-                // Keep cursor in moved block
-                tr = tr.setSelection(view.state.selection.constructor.near(tr.doc.resolve(prevPos + 1)));
+                tr = tr.setSelection(TextSelection.near(tr.doc.resolve(prevPos + 1)));
                 view.dispatch(tr);
               } catch { /* ignore */ }
               return true;
@@ -280,7 +278,7 @@ export const BlockSelection = Extension.create({
                 const newInsertPos = nextEnd - node.nodeSize;
                 tr = tr.insert(newInsertPos, node);
                 // Keep cursor in moved block
-                tr = tr.setSelection(view.state.selection.constructor.near(tr.doc.resolve(newInsertPos + 1)));
+                tr = tr.setSelection(TextSelection.near(tr.doc.resolve(newInsertPos + 1)));
                 view.dispatch(tr);
               } catch { /* ignore */ }
               return true;

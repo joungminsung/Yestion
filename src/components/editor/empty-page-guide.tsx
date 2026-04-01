@@ -17,33 +17,23 @@ const QUICK_TEMPLATES = [
 
 export function EmptyPageGuide({ editor, onOpenTemplates }: Props) {
   const [visible, setVisible] = useState(true);
-  const [hasShown, setHasShown] = useState(false);
 
   useEffect(() => {
     const checkContent = () => {
       const doc = editor.state.doc;
-      // Page is "empty" if it has only one empty paragraph (or is completely empty)
       const isEmpty = doc.childCount === 0 ||
         (doc.childCount === 1 && doc.firstChild?.isTextblock && doc.firstChild.content.size === 0);
-
-      if (isEmpty && !hasShown) {
-        setVisible(true);
-        setHasShown(true);
-      } else if (!isEmpty) {
-        setVisible(false);
-      }
+      setVisible(isEmpty);
     };
 
     checkContent();
     editor.on("update", checkContent);
     return () => { editor.off("update", checkContent); };
-  }, [editor, hasShown]);
+  }, [editor]);
 
   if (!visible) return null;
 
   const insertTemplate = (type: string) => {
-    setVisible(false);
-
     if (type === "notes") {
       editor.chain().focus()
         .insertContent([
