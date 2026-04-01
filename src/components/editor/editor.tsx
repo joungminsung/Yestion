@@ -62,6 +62,7 @@ const DragHandle = lazy(() => import("./drag-handle").then(m => ({ default: m.Dr
 const BlockMenu = lazy(() => import("./block-menu").then(m => ({ default: m.BlockMenu })));
 const BlockContextMenu = lazy(() => import("./block-context-menu").then(m => ({ default: m.BlockContextMenu })));
 const AiPrompt = lazy(() => import("./ai/ai-prompt").then(m => ({ default: m.AiPrompt })));
+import { SelectionActionBar } from "./selection-action-bar";
 import "./utils/editor-styles.css";
 import "./cursor-styles.css";
 
@@ -287,6 +288,7 @@ export const NotionEditor = forwardRef<
       <Suspense fallback={null}>
         <FindReplace editor={editor} />
       </Suspense>
+      <SelectionActionBar editor={editor} />
       <EditorContent editor={editor} />
       {editor.view && (
         <Suspense fallback={null}>
