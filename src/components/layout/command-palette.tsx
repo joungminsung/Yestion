@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useCommandPaletteStore } from "@/stores/command-palette";
 import { trpc } from "@/server/trpc/client";
 import { useTranslations } from "next-intl";
+import { Search, FileText, Plus, Settings, Moon, Sun } from "lucide-react";
+import { useThemeStore } from "@/stores/theme";
 
 export function CommandPalette() {
   const t = useTranslations("commandPalette");
@@ -57,6 +59,47 @@ export function CommandPalette() {
     router.push(`/${workspaceId}/${pageId}`);
   };
 
+  const { resolvedTheme, setTheme } = useThemeStore();
+
+  const createPage = trpc.page.create.useMutation({
+    onSuccess: (newPage) => {
+      close();
+      if (workspaceId) router.push(`/${workspaceId}/${newPage.id}`);
+    },
+  });
+
+  const quickActions = [
+    {
+      id: "new-page",
+      label: "New page",
+      icon: <Plus size={16} />,
+      action: () => {
+        close();
+        if (workspaceId) {
+          createPage.mutate({ workspaceId, title: "" });
+        }
+      },
+    },
+    {
+      id: "toggle-theme",
+      label: resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode",
+      icon: resolvedTheme === "dark" ? <Sun size={16} /> : <Moon size={16} />,
+      action: () => {
+        setTheme(resolvedTheme === "dark" ? "light" : "dark");
+        close();
+      },
+    },
+    {
+      id: "settings",
+      label: "Open settings",
+      icon: <Settings size={16} />,
+      action: () => {
+        close();
+        if (workspaceId) router.push(`/${workspaceId}/settings`);
+      },
+    },
+  ];
+
   if (!isOpen) return null;
 
   return (
@@ -76,9 +119,7 @@ export function CommandPalette() {
         }}
       >
         <div className="flex items-center px-4 py-3 border-b" style={{ borderColor: "var(--border-default)" }}>
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>
-            <path d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" fill="currentColor" />
-          </svg>
+          <Search size={18} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
           <input
             ref={inputRef}
             type="text"
@@ -109,9 +150,7 @@ export function CommandPalette() {
               >
                 <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center" style={{ fontSize: "14px" }}>
                   {page.icon || (
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style={{ color: "var(--text-tertiary)" }}>
-                      <path d="M4.35 2.67h7.3c.93 0 1.68.75 1.68 1.68v7.3c0 .93-.75 1.68-1.68 1.68h-7.3c-.93 0-1.68-.75-1.68-1.68v-7.3c0-.93.75-1.68 1.68-1.68z" />
-                    </svg>
+                    <FileText size={16} style={{ color: "var(--text-tertiary)" }} />
                   )}
                 </span>
                 <span className="truncate flex-1">
@@ -129,6 +168,36 @@ export function CommandPalette() {
               {isSearching && isSearchLoading ? t("searching") : t("noResults")}
             </div>
           )}
+
+          {/* Quick Actions */}
+          {(() => {
+            const matchedActions = isSearching
+              ? quickActions.filter((a) => a.label.toLowerCase().includes(query.toLowerCase()))
+              : quickActions;
+
+            if (matchedActions.length === 0) return null;
+
+            return (
+              <>
+                <div className="px-4 py-2 mt-1" style={{ fontSize: "12px", color: "var(--text-tertiary)", fontWeight: 500 }}>
+                  Actions
+                </div>
+                {matchedActions.map((action) => (
+                  <button
+                    key={action.id}
+                    onClick={action.action}
+                    className="w-full flex items-center gap-3 px-4 py-2 hover:bg-notion-bg-hover text-left"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center" style={{ color: "var(--text-tertiary)" }}>
+                      {action.icon}
+                    </span>
+                    <span className="flex-1">{action.label}</span>
+                  </button>
+                ))}
+              </>
+            );
+          })()}
         </div>
       </div>
     </>
