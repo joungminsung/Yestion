@@ -48,6 +48,22 @@
   --color-pink-bg: #f4dfeb;
   --color-red-bg: #fbe4e4;
 
+  /* Accent */
+  --accent-blue: #2383e2;
+  --accent-blue-light: rgba(35, 131, 226, 0.08);
+  --accent-blue-hover: rgba(35, 131, 226, 0.12);
+  --accent-blue-drag: rgba(35, 131, 226, 0.05);
+
+  /* Selection */
+  --selection-bg: rgba(35, 131, 226, 0.08);
+  --selection-bg-hover: rgba(35, 131, 226, 0.12);
+  --selection-border: #2383e2;
+  --selection-drag-bg: rgba(35, 131, 226, 0.05);
+  --selection-drag-border: #2383e2;
+
+  /* Comment highlight */
+  --comment-highlight: rgba(255, 212, 0, 0.3);
+
   /* Sizing */
   --sidebar-width: 280px;
   --sidebar-min-width: 200px;
@@ -113,4 +129,17 @@
   --color-purple-bg: #443f57;
   --color-pink-bg: #533b4c;
   --color-red-bg: #594141;
+
+  --accent-blue: #2383e2;
+  --accent-blue-light: rgba(35, 131, 226, 0.15);
+  --accent-blue-hover: rgba(35, 131, 226, 0.20);
+  --accent-blue-drag: rgba(35, 131, 226, 0.08);
+
+  --selection-bg: rgba(35, 131, 226, 0.15);
+  --selection-bg-hover: rgba(35, 131, 226, 0.20);
+  --selection-border: #2383e2;
+  --selection-drag-bg: rgba(35, 131, 226, 0.08);
+  --selection-drag-border: #2383e2;
+
+  --comment-highlight: rgba(255, 212, 0, 0.25);
 }
