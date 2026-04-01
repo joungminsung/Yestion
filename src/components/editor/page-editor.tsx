@@ -5,6 +5,7 @@ import { tiptapToBlocks, blocksToTiptap, type TiptapDoc } from "./utils/block-se
 import { trpc } from "@/server/trpc/client";
 import type { BlockType, BlockContent } from "@/types/editor";
 import { useToastStore } from "@/stores/toast";
+import { Backlinks } from "./backlinks";
 
 const NotionEditor = lazy(() => import("./editor").then(m => ({ default: m.NotionEditor })));
 const CollaborativeEditor = lazy(() => import("./collaborative-editor").then(m => ({ default: m.CollaborativeEditor })));
@@ -198,6 +199,7 @@ export function PageEditor({ pageId, initialBlocks, isLocked = false, sessionTok
           editable={!isLocked}
         />
       </Suspense>
+      {pageId && <Backlinks pageId={pageId} />}
     </>
   );
 }
