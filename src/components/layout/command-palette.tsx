@@ -7,6 +7,7 @@ import { trpc } from "@/server/trpc/client";
 import { useTranslations } from "next-intl";
 import { Search, FileText, Plus, Settings, Moon, Sun } from "lucide-react";
 import { useThemeStore } from "@/stores/theme";
+import { useToastStore } from "@/stores/toast";
 
 export function CommandPalette() {
   const t = useTranslations("commandPalette");
@@ -61,10 +62,16 @@ export function CommandPalette() {
 
   const { resolvedTheme, setTheme } = useThemeStore();
 
+  const addToast = useToastStore((s) => s.addToast);
+
   const createPage = trpc.page.create.useMutation({
     onSuccess: (newPage) => {
       close();
       if (workspaceId) router.push(`/${workspaceId}/${newPage.id}`);
+    },
+    onError: (err) => {
+      close();
+      addToast({ message: err.message, type: "error" });
     },
   });
 
@@ -74,7 +81,6 @@ export function CommandPalette() {
       label: "New page",
       icon: <Plus size={16} />,
       action: () => {
-        close();
         if (workspaceId) {
           createPage.mutate({ workspaceId, title: "" });
         }
