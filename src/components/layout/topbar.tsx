@@ -489,162 +489,199 @@ export function Topbar() {
         )}
 
         {/* Back/Forward buttons (2.15) */}
-        <button
-          onClick={() => {
-            const url = navStore.goBack();
-            if (url) router.push(url);
-          }}
-          disabled={!navStore.canGoBack()}
-          className="p-1 rounded hover:bg-notion-bg-hover disabled:opacity-30 flex-shrink-0"
-          style={{ color: "var(--text-secondary)" }}
-          aria-label="이전 페이지"
-          title="뒤로 (Alt+←)"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M10.354 3.354a.5.5 0 00-.708-.708l-5 5a.5.5 0 000 .708l5 5a.5.5 0 00.708-.708L5.707 8l4.647-4.646z" />
-          </svg>
-        </button>
-        <button
-          onClick={() => {
-            const url = navStore.goForward();
-            if (url) router.push(url);
-          }}
-          disabled={!navStore.canGoForward()}
-          className="p-1 rounded hover:bg-notion-bg-hover disabled:opacity-30 flex-shrink-0"
-          style={{ color: "var(--text-secondary)" }}
-          aria-label="다음 페이지"
-          title="앞으로 (Alt+→)"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M5.646 3.354a.5.5 0 01.708-.708l5 5a.5.5 0 010 .708l-5 5a.5.5 0 01-.708-.708L10.293 8 5.646 3.354z" />
-          </svg>
-        </button>
+        {!isMobile && (
+          <button
+            onClick={() => {
+              const url = navStore.goBack();
+              if (url) router.push(url);
+            }}
+            disabled={!navStore.canGoBack()}
+            className="p-1 rounded hover:bg-notion-bg-hover disabled:opacity-30 flex-shrink-0"
+            style={{ color: "var(--text-secondary)" }}
+            aria-label="이전 페이지"
+            title="뒤로 (Alt+←)"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M10.354 3.354a.5.5 0 00-.708-.708l-5 5a.5.5 0 000 .708l5 5a.5.5 0 00.708-.708L5.707 8l4.647-4.646z" />
+            </svg>
+          </button>
+        )}
+        {!isMobile && (
+          <button
+            onClick={() => {
+              const url = navStore.goForward();
+              if (url) router.push(url);
+            }}
+            disabled={!navStore.canGoForward()}
+            className="p-1 rounded hover:bg-notion-bg-hover disabled:opacity-30 flex-shrink-0"
+            style={{ color: "var(--text-secondary)" }}
+            aria-label="다음 페이지"
+            title="앞으로 (Alt+→)"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M5.646 3.354a.5.5 0 01.708-.708l5 5a.5.5 0 010 .708l-5 5a.5.5 0 01-.708-.708L10.293 8 5.646 3.354z" />
+            </svg>
+          </button>
+        )}
 
         {/* Breadcrumbs with child dropdown (2.8) */}
         <div className="flex items-center gap-1 px-1 min-w-0">
-          {crumbs.length > 0 ? (
-            crumbs.map((crumb, i) => (
-              <span key={crumb.id} className="relative flex items-center gap-0.5 min-w-0">
-                {i > 0 && (
-                  <span style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>/</span>
-                )}
-                {i < crumbs.length - 1 ? (
-                  <Link
-                    href={`/${workspaceId}/${crumb.id}`}
-                    className="truncate hover:underline"
-                    style={{
-                      color: "var(--text-secondary)",
-                      maxWidth: "150px",
-                    }}
-                  >
-                    {crumb.icon && <span className="mr-1">{crumb.icon}</span>}
-                    {crumb.title || "제목 없음"}
-                  </Link>
-                ) : (
+          {isMobile ? (
+            /* Mobile: show only the current page title (last crumb), truncated */
+            crumbs.length > 0 ? (
+              (() => {
+                const lastCrumb = crumbs[crumbs.length - 1]!;
+                const title = lastCrumb.title || "제목 없음";
+                const truncated = title.length > 25 ? title.slice(0, 25) + "…" : title;
+                return (
                   <span
-                    className="truncate"
-                    style={{
-                      color: "var(--text-primary)",
-                      fontWeight: 500,
-                      maxWidth: "250px",
-                    }}
+                    className="truncate max-w-[200px]"
+                    style={{ color: "var(--text-primary)", fontWeight: 500 }}
                   >
-                    {crumb.icon && <span className="mr-1">{crumb.icon}</span>}
-                    {crumb.title || "제목 없음"}
+                    {lastCrumb.icon && <span className="mr-1">{lastCrumb.icon}</span>}
+                    {truncated}
                   </span>
-                )}
-                {/* Child dropdown toggle */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpenDropdown(crumb.id === openDropdown ? null : crumb.id);
-                  }}
-                  className="flex-shrink-0 p-0.5 rounded hover:bg-notion-bg-hover"
-                  style={{ color: "var(--text-tertiary)", fontSize: "10px", lineHeight: 1 }}
-                >
-                  ▼
-                </button>
-                {openDropdown === crumb.id && workspaceId && (
-                  <ChildDropdown
-                    pageId={crumb.id}
-                    workspaceId={workspaceId}
-                    onClose={() => setOpenDropdown(null)}
-                  />
-                )}
+                );
+              })()
+            ) : (
+              <span style={{ color: "var(--text-secondary)" }}>
+                {pageId ? "..." : ""}
               </span>
-            ))
+            )
           ) : (
-            <span style={{ color: "var(--text-secondary)" }}>
-              {pageId ? "..." : ""}
-            </span>
+            /* Desktop: full breadcrumb path */
+            crumbs.length > 0 ? (
+              crumbs.map((crumb, i) => (
+                <span key={crumb.id} className="relative flex items-center gap-0.5 min-w-0">
+                  {i > 0 && (
+                    <span style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>/</span>
+                  )}
+                  {i < crumbs.length - 1 ? (
+                    <Link
+                      href={`/${workspaceId}/${crumb.id}`}
+                      className="truncate hover:underline"
+                      style={{
+                        color: "var(--text-secondary)",
+                        maxWidth: "150px",
+                      }}
+                    >
+                      {crumb.icon && <span className="mr-1">{crumb.icon}</span>}
+                      {crumb.title || "제목 없음"}
+                    </Link>
+                  ) : (
+                    <span
+                      className="truncate"
+                      style={{
+                        color: "var(--text-primary)",
+                        fontWeight: 500,
+                        maxWidth: "250px",
+                      }}
+                    >
+                      {crumb.icon && <span className="mr-1">{crumb.icon}</span>}
+                      {crumb.title || "제목 없음"}
+                    </span>
+                  )}
+                  {/* Child dropdown toggle */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenDropdown(crumb.id === openDropdown ? null : crumb.id);
+                    }}
+                    className="flex-shrink-0 p-0.5 rounded hover:bg-notion-bg-hover"
+                    style={{ color: "var(--text-tertiary)", fontSize: "10px", lineHeight: 1 }}
+                  >
+                    ▼
+                  </button>
+                  {openDropdown === crumb.id && workspaceId && (
+                    <ChildDropdown
+                      pageId={crumb.id}
+                      workspaceId={workspaceId}
+                      onClose={() => setOpenDropdown(null)}
+                    />
+                  )}
+                </span>
+              ))
+            ) : (
+              <span style={{ color: "var(--text-secondary)" }}>
+                {pageId ? "..." : ""}
+              </span>
+            )
           )}
         </div>
       </div>
       <div className="flex items-center gap-0.5">
-        <PresenceAvatars users={presenceUsers} />
+        {!isMobile && <PresenceAvatars users={presenceUsers} />}
 
         {/* Notification bell */}
-        <div className="relative">
-          <button
-            onClick={() => setNotificationOpen(!notificationOpen)}
-            className="p-1.5 rounded hover:bg-notion-bg-hover relative"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 1.5A3.5 3.5 0 004.5 5v2.947l-.724 1.45A1 1 0 004.67 11h2.08a1.25 1.25 0 002.5 0h2.08a1 1 0 00.894-1.553L11.5 7.947V5A3.5 3.5 0 008 1.5z" />
-            </svg>
-            {(unreadCount?.unread ?? 0) > 0 && (
-              <span
-                className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full text-white text-[10px] font-bold px-1"
-                style={{ backgroundColor: "#eb5757" }}
-              >
-                {unreadCount!.unread > 99 ? "99+" : unreadCount!.unread}
-              </span>
+        {!isMobile && (
+          <div className="relative">
+            <button
+              onClick={() => setNotificationOpen(!notificationOpen)}
+              className="p-1.5 rounded hover:bg-notion-bg-hover relative"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 1.5A3.5 3.5 0 004.5 5v2.947l-.724 1.45A1 1 0 004.67 11h2.08a1.25 1.25 0 002.5 0h2.08a1 1 0 00.894-1.553L11.5 7.947V5A3.5 3.5 0 008 1.5z" />
+              </svg>
+              {(unreadCount?.unread ?? 0) > 0 && (
+                <span
+                  className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full text-white text-[10px] font-bold px-1"
+                  style={{ backgroundColor: "#eb5757" }}
+                >
+                  {unreadCount!.unread > 99 ? "99+" : unreadCount!.unread}
+                </span>
+              )}
+            </button>
+            {notificationOpen && (
+              <NotificationPanel onClose={() => setNotificationOpen(false)} />
             )}
-          </button>
-          {notificationOpen && (
-            <NotificationPanel onClose={() => setNotificationOpen(false)} />
-          )}
-        </div>
+          </div>
+        )}
 
-        <button
-          onClick={() => pageId && setShareOpen(true)}
-          className="px-3 py-1 rounded hover:bg-notion-bg-hover text-sm"
-          style={{ color: "var(--text-secondary)" }}
-          disabled={!pageId}
-        >
-          {t("share")}
-        </button>
+        {!isMobile && (
+          <button
+            onClick={() => pageId && setShareOpen(true)}
+            className="px-3 py-1 rounded hover:bg-notion-bg-hover text-sm"
+            style={{ color: "var(--text-secondary)" }}
+            disabled={!pageId}
+          >
+            {t("share")}
+          </button>
+        )}
         {shareOpen && pageId && (
           <ShareDialog pageId={pageId} onClose={() => setShareOpen(false)} />
         )}
 
         {/* Chat button */}
-        <button
-          onClick={() => pageId && setChatOpen(!chatOpen)}
-          className="p-1.5 rounded hover:bg-notion-bg-hover"
-          style={{ color: chatOpen ? "#2383e2" : "var(--text-secondary)" }}
-          disabled={!pageId}
-          title="채팅"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 10a1.5 1.5 0 01-1.5 1.5H5L2 14V3.5A1.5 1.5 0 013.5 2h9A1.5 1.5 0 0114 3.5z" />
-            <line x1="5" y1="6" x2="11" y2="6" />
-            <line x1="5" y1="8.5" x2="9" y2="8.5" />
-          </svg>
-        </button>
+        {!isMobile && (
+          <button
+            onClick={() => pageId && setChatOpen(!chatOpen)}
+            className="p-1.5 rounded hover:bg-notion-bg-hover"
+            style={{ color: chatOpen ? "#2383e2" : "var(--text-secondary)" }}
+            disabled={!pageId}
+            title="채팅"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 10a1.5 1.5 0 01-1.5 1.5H5L2 14V3.5A1.5 1.5 0 013.5 2h9A1.5 1.5 0 0114 3.5z" />
+              <line x1="5" y1="6" x2="11" y2="6" />
+              <line x1="5" y1="8.5" x2="9" y2="8.5" />
+            </svg>
+          </button>
+        )}
 
         {/* Comment button */}
-        <button
-          onClick={() => pageId && setCommentOpen(!commentOpen)}
-          className="p-1.5 rounded hover:bg-notion-bg-hover"
-          style={{ color: commentOpen ? "var(--accent-blue)" : "var(--text-secondary)" }}
-          disabled={!pageId}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M4.32 15.424l4.644-2.432a.5.5 0 01.235-.059h3.3A2.5 2.5 0 0015 10.433V5.5A2.5 2.5 0 0012.5 3h-9A2.5 2.5 0 001 5.5v4.933a2.5 2.5 0 002.5 2.5h.32a.5.5 0 01.5.5v1.991z" />
-          </svg>
-        </button>
+        {!isMobile && (
+          <button
+            onClick={() => pageId && setCommentOpen(!commentOpen)}
+            className="p-1.5 rounded hover:bg-notion-bg-hover"
+            style={{ color: commentOpen ? "var(--accent-blue)" : "var(--text-secondary)" }}
+            disabled={!pageId}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M4.32 15.424l4.644-2.432a.5.5 0 01.235-.059h3.3A2.5 2.5 0 0015 10.433V5.5A2.5 2.5 0 0012.5 3h-9A2.5 2.5 0 001 5.5v4.933a2.5 2.5 0 002.5 2.5h.32a.5.5 0 01.5.5v1.991z" />
+            </svg>
+          </button>
+        )}
 
         {/* More menu (2.12) */}
         <div className="relative" ref={moreMenuRef}>
