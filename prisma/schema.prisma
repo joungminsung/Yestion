@@ -431,3 +431,46 @@ model TaskActivity {
 
   @@index([taskId])
 }
+
+model Webhook {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  name          String
+  description   String?
+  type          String   // "incoming" | "outgoing"
+  url           String?  // outgoing: target URL; incoming: generated path
+  secret        String   // HMAC signing secret
+  events        String[] @default([]) // outgoing: subscribed events
+  headers       Json?    // outgoing: custom headers
+  isEnabled     Boolean  @default(true)
+  lastDelivered DateTime?
+  totalDelivered Int     @default(0)
+  failureCount  Int      @default(0)
+  createdBy     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  deliveries    WebhookDelivery[]
+
+  @@index([workspaceId])
+  @@index([type])
+}
+
+model WebhookDelivery {
+  id             String   @id @default(cuid())
+  webhookId      String
+  event          String
+  payload        Json
+  responseStatus Int?
+  responseBody   String?
+  durationMs     Int?
+  attempt        Int      @default(1)
+  status         String   // "success" | "failed" | "pending"
+  error          String?
+  deliveredAt    DateTime @default(now())
+
+  webhook        Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([deliveredAt])
+}

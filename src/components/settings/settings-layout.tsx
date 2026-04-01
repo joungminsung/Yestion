@@ -7,14 +7,16 @@ import { WorkspaceSettings } from "./workspace-settings";
 import { SessionManagement } from "./session-management";
 import { TwoFactorSettings } from "./two-factor-settings";
 import { BackupSettings } from "./backup-settings";
+import { McpSettings } from "./mcp-settings";
 
-type Tab = "account" | "workspace" | "sessions" | "2fa" | "backup";
+type Tab = "account" | "workspace" | "sessions" | "2fa" | "backup" | "integrations";
 const tabs: { id: Tab; label: string; section?: string }[] = [
   { id: "account", label: "내 계정", section: "설정" },
   { id: "workspace", label: "워크스페이스" },
   { id: "sessions", label: "세션 관리", section: "보안" },
   { id: "2fa", label: "2단계 인증" },
   { id: "backup", label: "백업 및 복원", section: "데이터" },
+  { id: "integrations", label: "통합 (MCP)", section: "통합" },
 ];
 
 export function SettingsLayout({ workspaceId }: { workspaceId: string }) {
@@ -46,6 +48,14 @@ export function SettingsLayout({ workspaceId }: { workspaceId: string }) {
         {activeTab === "sessions" && <SessionManagement />}
         {activeTab === "2fa" && <TwoFactorSettings />}
         {activeTab === "backup" && <BackupSettings workspaceId={workspaceId} />}
+        {activeTab === "integrations" && (
+          <div>
+            <h2 className="text-xl font-semibold mb-6" style={{ color: "var(--text-primary)" }}>통합</h2>
+            <section className="mb-8">
+              <McpSettings />
+            </section>
+          </div>
+        )}
       </div>
     </div>
   );

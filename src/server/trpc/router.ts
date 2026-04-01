@@ -20,6 +20,7 @@ import { chatRouter } from "@/server/routers/chat";
 import { templateRouter } from "@/server/routers/template";
 import { projectRouter } from "@/server/routers/project";
 import { taskRouter } from "@/server/routers/task";
+import { webhookRouter } from "@/server/routers/webhook";
 
 export const appRouter = router({
   auth: authRouter,
@@ -43,6 +44,7 @@ export const appRouter = router({
   template: templateRouter,
   project: projectRouter,
   task: taskRouter,
+  webhook: webhookRouter,
 });
 
 export type AppRouter = typeof appRouter;
