@@ -18,6 +18,8 @@ import { syncedBlockRouter } from "@/server/routers/synced-block";
 import { sessionRouter } from "@/server/routers/session";
 import { chatRouter } from "@/server/routers/chat";
 import { templateRouter } from "@/server/routers/template";
+import { projectRouter } from "../routers/project";
+import { taskRouter } from "../routers/task";
 
 export const appRouter = router({
   auth: authRouter,
@@ -39,6 +41,8 @@ export const appRouter = router({
   session: sessionRouter,
   chat: chatRouter,
   template: templateRouter,
+  project: projectRouter,
+  task: taskRouter,
 });
 
 export type AppRouter = typeof appRouter;
