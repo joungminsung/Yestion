@@ -1,10 +1,18 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "@/server/trpc/init";
 
+async function verifyWorkspaceMembership(db: any, workspaceId: string, userId: string) {
+  const member = await db.workspaceMember.findFirst({
+    where: { workspaceId, userId },
+  });
+  if (!member) throw new Error("Not authorized: not a workspace member");
+}
+
 export const projectRouter = router({
   list: protectedProcedure
     .input(z.object({ workspaceId: z.string() }))
     .query(async ({ ctx, input }) => {
+      await verifyWorkspaceMembership(ctx.db, input.workspaceId, ctx.session.user.id);
       return ctx.db.project.findMany({
         where: { workspaceId: input.workspaceId },
         include: { members: true, _count: { select: { tasks: true } } },
@@ -15,13 +23,15 @@ export const projectRouter = router({
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      return ctx.db.project.findUnique({
+      const project = await ctx.db.project.findUnique({
         where: { id: input.id },
-        include: {
-          members: true,
-          _count: { select: { tasks: true } },
-        },
+        include: { members: true, _count: { select: { tasks: true } } },
       });
+      if (!project) throw new Error("Not found");
+      if (!project.members.some((m: any) => m.userId === ctx.session.user.id)) {
+        throw new Error("Not authorized");
+      }
+      return project;
     }),
 
   create: protectedProcedure
@@ -79,6 +89,10 @@ export const projectRouter = router({
   stats: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
+      const project = await ctx.db.project.findUnique({ where: { id: input.id }, select: { workspaceId: true } });
+      if (!project) throw new Error("Not found");
+      await verifyWorkspaceMembership(ctx.db, project.workspaceId, ctx.session.user.id);
+
       const [total, byStatus] = await Promise.all([
         ctx.db.task.count({ where: { projectId: input.id } }),
         ctx.db.task.groupBy({

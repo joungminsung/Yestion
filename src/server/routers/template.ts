@@ -278,12 +278,8 @@ export const templateRouter = router({
       if (existing > 0) return { seeded: false, count: existing };
 
       const created = await ctx.db.template.createMany({
-        data: SYSTEM_TEMPLATES.map((t) => ({
-          ...t,
-          blocks: t.blocks,
-          isDefault: true,
-          isPublic: true,
-        })),
+        data: SYSTEM_TEMPLATES.map((t) => ({ ...t, blocks: t.blocks, isDefault: true, isPublic: true })),
+        skipDuplicates: true,
       });
       return { seeded: true, count: created.count };
     }),

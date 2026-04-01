@@ -162,7 +162,7 @@ export function NotificationPanel({ onClose }: { onClose: () => void }) {
               className="text-xs hover:underline"
               style={{ color: "var(--accent-blue)" }}
             >
-              Mark all read
+              모두 읽음
             </button>
           )}
         </div>
@@ -181,10 +181,10 @@ export function NotificationPanel({ onClose }: { onClose: () => void }) {
               }}
             >
               {tab === "all"
-                ? "All"
+                ? "전체"
                 : tab === "unread"
-                ? `Unread${unreadCount ? ` (${unreadCount})` : ""}`
-                : "Mentions"}
+                ? `안 읽음${unreadCount ? ` (${unreadCount})` : ""}`
+                : "멘션"}
             </button>
           ))}
         </div>
@@ -204,7 +204,7 @@ export function NotificationPanel({ onClose }: { onClose: () => void }) {
               {grouped.today.length > 0 && (
                 <>
                   <div className="px-3 py-1 text-xs font-medium" style={{ color: "var(--text-tertiary)" }}>
-                    Today
+                    오늘
                   </div>
                   {grouped.today.map(renderNotification)}
                 </>
@@ -212,7 +212,7 @@ export function NotificationPanel({ onClose }: { onClose: () => void }) {
               {grouped.earlier.length > 0 && (
                 <>
                   <div className="px-3 py-1 text-xs font-medium" style={{ color: "var(--text-tertiary)" }}>
-                    Earlier
+                    이전
                   </div>
                   {grouped.earlier.map(renderNotification)}
                 </>

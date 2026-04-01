@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "@/server/trpc/init";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts both PrismaClient and transaction client
 async function verifyProjectMembership(db: any, projectId: string, userId: string) {
   const member = await db.projectMember.findFirst({
     where: { projectId, userId },
@@ -18,6 +19,7 @@ export const taskRouter = router({
       priority: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
+      await verifyProjectMembership(ctx.db, input.projectId, ctx.session.user.id);
       const { projectId, ...filters } = input;
       const where: Record<string, unknown> = { projectId, parentTaskId: null };
       if (filters.status) where.status = filters.status;
@@ -34,13 +36,16 @@ export const taskRouter = router({
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      return ctx.db.task.findUnique({
+      const task = await ctx.db.task.findUnique({
         where: { id: input.id },
         include: {
           subtasks: { orderBy: { position: "asc" } },
           activities: { orderBy: { createdAt: "desc" }, take: 20 },
         },
       });
+      if (!task) throw new Error("Not found");
+      await verifyProjectMembership(ctx.db, task.projectId, ctx.session.user.id);
+      return task;
     }),
 
   create: protectedProcedure
@@ -141,18 +146,14 @@ export const taskRouter = router({
     }),
 
   reorder: protectedProcedure
-    .input(z.object({
-      id: z.string(),
-      status: z.string(),
-      position: z.number(),
-    }))
+    .input(z.object({ id: z.string(), status: z.string(), position: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      const task = await ctx.db.task.findUniqueOrThrow({ where: { id: input.id } });
-      await verifyProjectMembership(ctx.db, task.projectId, ctx.session.user.id);
+      return ctx.db.$transaction(async (tx) => {
+        const task = await tx.task.findUniqueOrThrow({ where: { id: input.id } });
+        await verifyProjectMembership(tx as any, task.projectId, ctx.session.user.id);
 
-      await ctx.db.$transaction([
-        // Shift tasks in target column at or above insertion point
-        ctx.db.task.updateMany({
+        // Shift tasks in target column
+        await tx.task.updateMany({
           where: {
             projectId: task.projectId,
             status: input.status,
@@ -160,27 +161,28 @@ export const taskRouter = router({
             id: { not: input.id },
           },
           data: { position: { increment: 1 } },
-        }),
+        });
+
         // Move the task
-        ctx.db.task.update({
+        await tx.task.update({
           where: { id: input.id },
           data: { status: input.status, position: input.position },
-        }),
-      ]);
-
-      // Log status change if status changed
-      if (task.status !== input.status) {
-        await ctx.db.taskActivity.create({
-          data: {
-            taskId: input.id,
-            userId: ctx.session.user.id,
-            action: "status_changed",
-            oldValue: task.status,
-            newValue: input.status,
-          },
         });
-      }
 
-      return ctx.db.task.findUnique({ where: { id: input.id } });
+        // Log status change inside same transaction
+        if (task.status !== input.status) {
+          await tx.taskActivity.create({
+            data: {
+              taskId: input.id,
+              userId: ctx.session.user.id,
+              action: "status_changed",
+              oldValue: task.status,
+              newValue: input.status,
+            },
+          });
+        }
+
+        return tx.task.findUnique({ where: { id: input.id } });
+      });
     }),
 });

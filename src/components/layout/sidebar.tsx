@@ -30,10 +30,8 @@ export function Sidebar() {
   const { isMobile } = useDevice();
 
   // Close sidebar on navigation change or when entering mobile mode.
-  // Intentionally excludes isOpen to avoid re-running on every toggle.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (isMobile && isOpen) {
+    if (isMobile) {
       useSidebarStore.getState().setOpen(false);
     }
   }, [pathname, isMobile]);

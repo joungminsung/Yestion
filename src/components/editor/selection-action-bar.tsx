@@ -12,10 +12,6 @@ const TURN_INTO_OPTIONS = [
   { label: "Heading 1", type: "heading", attrs: { level: 1 } },
   { label: "Heading 2", type: "heading", attrs: { level: 2 } },
   { label: "Heading 3", type: "heading", attrs: { level: 3 } },
-  { label: "Bullet list", type: "bulletList" },
-  { label: "Numbered list", type: "orderedList" },
-  { label: "To-do", type: "taskList" },
-  { label: "Toggle", type: "details" },
   { label: "Callout", type: "callout" },
   { label: "Quote", type: "blockquote" },
 ] as const;

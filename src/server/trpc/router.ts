@@ -18,8 +18,8 @@ import { syncedBlockRouter } from "@/server/routers/synced-block";
 import { sessionRouter } from "@/server/routers/session";
 import { chatRouter } from "@/server/routers/chat";
 import { templateRouter } from "@/server/routers/template";
-import { projectRouter } from "../routers/project";
-import { taskRouter } from "../routers/task";
+import { projectRouter } from "@/server/routers/project";
+import { taskRouter } from "@/server/routers/task";
 
 export const appRouter = router({
   auth: authRouter,
