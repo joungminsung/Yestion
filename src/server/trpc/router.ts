@@ -21,6 +21,7 @@ import { templateRouter } from "@/server/routers/template";
 import { projectRouter } from "@/server/routers/project";
 import { taskRouter } from "@/server/routers/task";
 import { automationRouter } from "@/server/routers/automation";
+import { webhookRouter } from "@/server/routers/webhook";
 
 export const appRouter = router({
   auth: authRouter,
@@ -45,6 +46,7 @@ export const appRouter = router({
   project: projectRouter,
   task: taskRouter,
   automation: automationRouter,
+  webhook: webhookRouter,
 });
 
 export type AppRouter = typeof appRouter;
