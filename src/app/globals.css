@@ -93,9 +93,38 @@ body {
   to { opacity: 1; transform: scaleY(1); }
 }
 
-/* 5.7 Selection animation */
+/* 5.7 Block selection */
 .notion-block-selected {
-  transition: background-color 150ms ease;
+  background-color: var(--selection-bg);
+  border-left: 3px solid var(--selection-border);
+  border-radius: 2px 0 0 2px;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.notion-block-selected:hover {
+  background-color: var(--selection-bg-hover);
+}
+
+/* Consecutive selected blocks: connect left borders */
+.notion-block-selected + .notion-block-selected {
+  margin-top: -1px;
+}
+
+/* Drag source */
+.notion-block-drag-source {
+  background-color: var(--selection-drag-bg);
+  border-left: 3px dashed var(--selection-drag-border);
+  border-radius: 2px 0 0 2px;
+  opacity: 0.7;
+}
+
+/* Lasso selection rectangle */
+.notion-lasso {
+  position: fixed;
+  border: 1px solid var(--accent-blue);
+  background-color: rgba(35, 131, 226, 0.04);
+  pointer-events: none;
+  z-index: 1000;
 }
 
 /* 5.10 Smooth scroll */
