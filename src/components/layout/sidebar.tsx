@@ -12,7 +12,7 @@ import { SidebarTrash } from "./sidebar-trash";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/server/trpc/client";
-import { Search, Settings, Plus, FileText, LayoutTemplate } from "lucide-react";
+import { Search, Settings, Plus, FileText, LayoutTemplate, BarChart3 } from "lucide-react";
 import { useSidebarKeyboardNav } from "./sidebar-keyboard-nav";
 import { PageTemplatePicker } from "@/components/page/page-template-picker";
 import { useTranslations } from "next-intl";
@@ -197,6 +197,16 @@ export function Sidebar() {
             <Search size={16} />
             <span>{t("search")}</span>
             <span className="ml-auto text-xs opacity-50">⌘K</span>
+          </button>
+
+          {/* Projects */}
+          <button
+            onClick={() => router.push(`/${workspaceId}/projects`)}
+            className="flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto"
+            style={{ fontSize: "14px", color: "var(--text-secondary)" }}
+          >
+            <BarChart3 size={16} />
+            <span>Projects</span>
           </button>
 
           {/* Settings */}
