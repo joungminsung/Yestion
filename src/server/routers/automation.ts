@@ -1,7 +1,23 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "@/server/trpc/init";
-import { getTriggerDefinitions } from "@/lib/automation/triggers";
+import { getTriggerDefinitions, hasTrigger } from "@/lib/automation/triggers";
 import { getActionDefinitions } from "@/lib/automation/actions";
+
+/** Verify the calling user is a member of the workspace that owns the automation */
+async function verifyAutomationAccess(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any,
+  automationId: string,
+  userId: string
+) {
+  const automation = await db.automation.findUnique({ where: { id: automationId } });
+  if (!automation) throw new Error("Automation not found");
+  const member = await db.workspaceMember.findFirst({
+    where: { workspaceId: automation.workspaceId, userId },
+  });
+  if (!member) throw new Error("Not authorized");
+  return automation;
+}
 
 export const automationRouter = router({
   list: protectedProcedure
@@ -17,6 +33,7 @@ export const automationRouter = router({
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
+      await verifyAutomationAccess(ctx.db, input.id, ctx.session.user.id);
       return ctx.db.automation.findUnique({
         where: { id: input.id },
         include: {
@@ -55,6 +72,15 @@ export const automationRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const member = await ctx.db.workspaceMember.findFirst({
+        where: { workspaceId: input.workspaceId, userId: ctx.session.user.id },
+      });
+      if (!member) throw new Error("Not authorized: not a workspace member");
+
+      if (!hasTrigger(input.trigger.type)) {
+        throw new Error(`Unknown trigger type: ${input.trigger.type}`);
+      }
+
       return ctx.db.automation.create({
         data: {
           ...input,
@@ -96,6 +122,7 @@ export const automationRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await verifyAutomationAccess(ctx.db, input.id, ctx.session.user.id);
       const { id, ...data } = input;
       return ctx.db.automation.update({ where: { id }, data });
     }),
@@ -103,6 +130,7 @@ export const automationRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      await verifyAutomationAccess(ctx.db, input.id, ctx.session.user.id);
       return ctx.db.automation.delete({ where: { id: input.id } });
     }),
 

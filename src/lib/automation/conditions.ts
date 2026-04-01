@@ -13,38 +13,58 @@ export function evaluateConditions(
   return conditions.every((condition) => {
     const fieldValue = data[condition.field];
 
+    // Coerce string values for numeric operators
+    let conditionValue = condition.value;
+    if (
+      ["gt", "gte", "lt", "lte"].includes(condition.operator) &&
+      typeof conditionValue === "string"
+    ) {
+      const parsed = Number(conditionValue);
+      if (!isNaN(parsed)) conditionValue = parsed;
+    }
+    if (
+      condition.operator === "equals" ||
+      condition.operator === "not_equals"
+    ) {
+      // Loose comparison for equals to handle string/number mismatch
+      if (typeof fieldValue === "number" && typeof conditionValue === "string") {
+        const parsed = Number(conditionValue);
+        if (!isNaN(parsed)) conditionValue = parsed;
+      }
+    }
+
     switch (condition.operator) {
       case "equals":
-        return fieldValue === condition.value;
+        return fieldValue === conditionValue;
       case "not_equals":
-        return fieldValue !== condition.value;
+        return fieldValue !== conditionValue;
       case "contains":
-        return typeof fieldValue === "string" && typeof condition.value === "string"
-          ? fieldValue.includes(condition.value)
-          : Array.isArray(fieldValue) && condition.value !== undefined
-            ? fieldValue.includes(condition.value)
+        return typeof fieldValue === "string" && typeof conditionValue === "string"
+          ? fieldValue.includes(conditionValue)
+          : Array.isArray(fieldValue) && conditionValue !== undefined
+            ? fieldValue.includes(conditionValue)
             : false;
       case "not_contains":
-        return typeof fieldValue === "string" && typeof condition.value === "string"
-          ? !fieldValue.includes(condition.value)
-          : Array.isArray(fieldValue) && condition.value !== undefined
-            ? !fieldValue.includes(condition.value)
+        return typeof fieldValue === "string" && typeof conditionValue === "string"
+          ? !fieldValue.includes(conditionValue)
+          : Array.isArray(fieldValue) && conditionValue !== undefined
+            ? !fieldValue.includes(conditionValue)
             : true;
       case "gt":
-        return typeof fieldValue === "number" && typeof condition.value === "number"
-          ? fieldValue > condition.value
+        return typeof fieldValue === "number" && typeof conditionValue === "number"
+          ? fieldValue > conditionValue
           : false;
       case "gte":
-        return typeof fieldValue === "number" && typeof condition.value === "number"
-          ? fieldValue >= condition.value
+        return typeof fieldValue === "number" && typeof conditionValue === "number"
+          ? fieldValue >= conditionValue
           : false;
       case "lt":
-        return typeof fieldValue === "number" && typeof condition.value === "number"
-          ? fieldValue < condition.value
+        return typeof fieldValue === "number" && typeof conditionValue === "number"
+          ? fieldValue < conditionValue
           : false;
       case "lte":
-        return typeof fieldValue === "number" && typeof condition.value === "number"
-          ? fieldValue <= condition.value
+        return typeof fieldValue === "number" && typeof conditionValue === "number"
+          ? fieldValue <= conditionValue
           : false;
       case "is_empty":
         return (

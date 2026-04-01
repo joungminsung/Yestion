@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { Calendar } from "lucide-react";
-import { formatDistanceToNow, format, isPast, isToday, isTomorrow } from "date-fns";
+import { format, isPast, isToday, isTomorrow } from "date-fns";
 
 type Props = {
   date: string; // ISO date string

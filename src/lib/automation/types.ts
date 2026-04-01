@@ -69,7 +69,9 @@ export type AutomationContext = {
   workspaceId: string;
   userId: string;
   triggerData: Record<string, unknown>;
-  db: any; // Prisma client
+  // Using 'any' because this accepts both PrismaClient and transaction clients
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any;
 };
 
 /** Result of executing an action */

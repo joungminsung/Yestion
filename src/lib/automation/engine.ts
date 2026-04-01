@@ -22,6 +22,8 @@ type AutomationRule = {
  * @returns Array of execution results
  */
 export async function processAutomationEvent(
+  // Using 'any' because this accepts both PrismaClient and transaction clients
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any,
   workspaceId: string,
   eventType: string,

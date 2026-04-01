@@ -6,6 +6,44 @@ import type {
   ActionResult,
 } from "../types";
 
+/** Validate webhook URL to prevent SSRF attacks */
+function validateWebhookUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    // Require HTTPS
+    if (parsed.protocol !== "https:") return false;
+    // Block private/internal hostnames
+    const hostname = parsed.hostname.toLowerCase();
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname === "0.0.0.0" ||
+      hostname.endsWith(".local") ||
+      hostname.endsWith(".internal") ||
+      /^10\./.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+      /^192\.168\./.test(hostname) ||
+      /^169\.254\./.test(hostname)
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Allowlist of task fields that automation is permitted to update */
+const ALLOWED_TASK_FIELDS = new Set([
+  "status",
+  "priority",
+  "assigneeId",
+  "dueDate",
+  "labels",
+  "title",
+]);
+
 /** Action handler function type */
 type ActionHandler = (
   config: ActionConfig,
@@ -89,6 +127,13 @@ registerAction(
     },
   },
   async (config, context) => {
+    if (!ALLOWED_TASK_FIELDS.has(String(config.field))) {
+      return {
+        type: "update_property" as const,
+        success: false,
+        error: `Field '${config.field}' is not allowed for automation updates`,
+      };
+    }
     // Generic property update — caller provides entity type in triggerData
     const entityType = context.triggerData.entityType as string;
     const entityId = context.triggerData.entityId as string;
@@ -139,22 +184,43 @@ registerAction(
     },
   },
   async (config, context) => {
-    const response = await fetch(String(config.url), {
-      method: String(config.method || "POST"),
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        automation: "notion-web",
-        timestamp: new Date().toISOString(),
-        data: context.triggerData,
-      }),
-    });
-    if (!response.ok) {
+    const url = String(config.url);
+    if (!validateWebhookUrl(url)) {
       return {
-        type: "call_webhook",
+        type: "call_webhook" as const,
         success: false,
-        error: `HTTP ${response.status}`,
+        error: "Invalid or blocked URL. Only HTTPS URLs to public hosts are allowed.",
       };
     }
-    return { type: "call_webhook", success: true };
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    try {
+      const response = await fetch(url, {
+        method: String(config.method || "POST"),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          automation: "notion-web",
+          timestamp: new Date().toISOString(),
+          data: context.triggerData,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (!response.ok) {
+        return {
+          type: "call_webhook" as const,
+          success: false,
+          error: `HTTP ${response.status}`,
+        };
+      }
+      return { type: "call_webhook", success: true };
+    } catch (err) {
+      clearTimeout(timeout);
+      return {
+        type: "call_webhook" as const,
+        success: false,
+        error: err instanceof Error ? err.message : "Request failed",
+      };
+    }
   }
 );

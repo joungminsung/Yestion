@@ -25,8 +25,6 @@ export function Backlinks({ pageId }: Props) {
   // Filter out self-references
   const filteredLinks = backlinks?.filter((p) => p.id !== pageId) ?? [];
 
-  if (filteredLinks.length === 0 && !isOpen) return null;
-
   return (
     <div
       className="mt-8 pt-4 border-t"
