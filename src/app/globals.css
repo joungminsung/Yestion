@@ -220,3 +220,83 @@ html[data-transitioning] * {
 .follow-mode-avatar {
   animation: followPulse 2s ease-in-out infinite;
 }
+
+/* Mobile responsive editor */
+@media (max-width: 767px) {
+  /* Reduce editor padding */
+  .ProseMirror {
+    padding-left: var(--page-padding-x-mobile) !important;
+    padding-right: var(--page-padding-x-mobile) !important;
+  }
+
+  /* Increase block spacing for touch targets */
+  .ProseMirror > * {
+    margin-top: 4px;
+    margin-bottom: 4px;
+  }
+
+  /* Stack columns vertically */
+  .column-list {
+    flex-direction: column !important;
+  }
+
+  .column-list > .column {
+    width: 100% !important;
+    min-width: 100% !important;
+  }
+
+  /* Full-width images */
+  .ProseMirror img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Horizontal scroll for tables */
+  .ProseMirror .tableWrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Horizontal scroll for code blocks */
+  .ProseMirror pre {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    font-size: 13px;
+  }
+
+  /* Embeds maintain aspect ratio */
+  .ProseMirror iframe {
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    height: auto;
+  }
+
+  /* Hide drag handle on mobile (use long-press instead) */
+  .drag-handle-mobile-hidden {
+    display: none !important;
+  }
+
+  /* Page title area */
+  .page-header-wrapper {
+    padding-left: var(--page-padding-x-mobile) !important;
+    padding-right: var(--page-padding-x-mobile) !important;
+  }
+}
+
+/* Tablet responsive */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .ProseMirror {
+    padding-left: 48px !important;
+    padding-right: 48px !important;
+  }
+
+  /* Stack 3+ columns */
+  .column-list:has(> .column:nth-child(3)) {
+    flex-direction: column !important;
+  }
+
+  .column-list:has(> .column:nth-child(3)) > .column {
+    width: 100% !important;
+    min-width: 100% !important;
+  }
+}
