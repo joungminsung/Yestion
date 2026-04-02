@@ -552,4 +552,66 @@ export const databaseRouter = router({
         orderBy: { createdAt: "asc" },
       });
     }),
+
+  // ── Relations ────────────────────────────────────────────
+
+  searchRelationRows: protectedProcedure
+    .input(
+      z.object({
+        databaseId: z.string(),
+        query: z.string().default(""),
+        limit: z.number().default(20),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await verifyDatabaseAccess(ctx.db, ctx.session.user.id, input.databaseId);
+
+      const rows = await ctx.db.row.findMany({
+        where: {
+          databaseId: input.databaseId,
+          page: {
+            isDeleted: false,
+            ...(input.query
+              ? { title: { contains: input.query, mode: "insensitive" } }
+              : {}),
+          },
+        },
+        include: {
+          page: { select: { id: true, title: true, icon: true } },
+        },
+        take: input.limit,
+        orderBy: { createdAt: "desc" },
+      });
+
+      return rows.map((r) => ({
+        rowId: r.id,
+        pageId: r.page.id,
+        title: r.page.title || "Untitled",
+        icon: r.page.icon,
+      }));
+    }),
+
+  getRelatedRows: protectedProcedure
+    .input(
+      z.object({
+        rowIds: z.array(z.string()),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      if (input.rowIds.length === 0) return [];
+
+      const rows = await ctx.db.row.findMany({
+        where: { id: { in: input.rowIds } },
+        include: {
+          page: { select: { id: true, title: true, icon: true } },
+        },
+      });
+
+      return rows.map((r) => ({
+        rowId: r.id,
+        pageId: r.page.id,
+        title: r.page.title || "Untitled",
+        icon: r.page.icon,
+      }));
+    }),
 });

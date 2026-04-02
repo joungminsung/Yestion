@@ -166,6 +166,33 @@ export function PropertyEditor({
         </div>
       )}
 
+      {/* Relation config */}
+      {type === "relation" && (
+        <div className="border-b p-2" style={{ borderColor: "var(--border-default)" }}>
+          <div className="space-y-2">
+            <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+              Related Database
+            </label>
+            <input
+              type="text"
+              value={(config.relatedDatabaseId as string) || ""}
+              onChange={(e) =>
+                setConfig({ ...config, relatedDatabaseId: e.target.value })
+              }
+              placeholder="Enter database ID..."
+              className="w-full px-2 py-1.5 rounded border text-sm bg-transparent outline-none"
+              style={{
+                color: "var(--text-primary)",
+                borderColor: "var(--border-default)",
+              }}
+            />
+            <p className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>
+              Paste the target database ID to create a relation
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Visibility toggle */}
       <div className="flex items-center justify-between border-b p-2" style={{ borderColor: "var(--border-default)" }}>
         <span className="text-sm text-[var(--text-primary)]">Visible</span>
