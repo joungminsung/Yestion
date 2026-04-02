@@ -584,3 +584,59 @@ model WebhookDelivery {
   @@index([webhookId])
   @@index([deliveredAt])
 }
+
+model Workflow {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  isEnabled   Boolean  @default(false)
+  nodes       Json     @default("[]") // WorkflowNode[]
+  edges       Json     @default("[]") // WorkflowEdge[]
+  variables   Json     @default("{}") // default variable values
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  executions  WorkflowExecution[]
+
+  @@index([workspaceId])
+  @@index([isEnabled])
+}
+
+model WorkflowExecution {
+  id          String    @id @default(cuid())
+  workflowId  String
+  status      String    @default("running") // "running" | "completed" | "failed" | "waiting" | "cancelled"
+  triggerData Json?
+  variables   Json      @default("{}")
+  nodeStates  Json      @default("{}") // { [nodeId]: { status, output, error, startedAt, endedAt } }
+  currentNode String?
+  error       String?
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  workflow    Workflow   @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  approvals   WorkflowApproval[]
+
+  @@index([workflowId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+model WorkflowApproval {
+  id          String    @id @default(cuid())
+  executionId String
+  nodeId      String
+  status      String    @default("pending") // "pending" | "approved" | "rejected"
+  assigneeId  String?
+  decidedBy   String?
+  decidedAt   DateTime?
+  comment     String?
+  createdAt   DateTime  @default(now())
+
+  execution   WorkflowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@index([executionId])
+  @@index([assigneeId, status])
+}
