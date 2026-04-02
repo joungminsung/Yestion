@@ -687,4 +687,138 @@ export const databaseRouter = router({
 
       return { value: result, items: targetValues };
     }),
+
+  // ── Row Templates ─────────────────────────────────────────
+
+  listRowTemplates: protectedProcedure
+    .input(z.object({ databaseId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await verifyDatabaseAccess(ctx.db, ctx.session.user.id, input.databaseId);
+      return ctx.db.rowTemplate.findMany({
+        where: { databaseId: input.databaseId },
+        orderBy: { position: "asc" },
+      });
+    }),
+
+  createRowTemplate: protectedProcedure
+    .input(
+      z.object({
+        databaseId: z.string(),
+        name: z.string().min(1),
+        icon: z.string().nullish(),
+        values: z.record(z.string(), z.any()).default({}),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await verifyDatabaseAccess(ctx.db, ctx.session.user.id, input.databaseId);
+
+      const last = await ctx.db.rowTemplate.findFirst({
+        where: { databaseId: input.databaseId },
+        orderBy: { position: "desc" },
+        select: { position: true },
+      });
+      const position = (last?.position ?? -1) + 1;
+
+      return ctx.db.rowTemplate.create({
+        data: {
+          databaseId: input.databaseId,
+          name: input.name,
+          icon: input.icon ?? null,
+          values: input.values as Prisma.InputJsonValue,
+          position,
+          createdBy: ctx.session.user.id,
+        },
+      });
+    }),
+
+  updateRowTemplate: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string().optional(),
+        icon: z.string().nullish(),
+        values: z.record(z.string(), z.any()).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const template = await ctx.db.rowTemplate.findUnique({
+        where: { id: input.id },
+        include: { database: { include: { page: { select: { workspaceId: true } } } } },
+      });
+      if (!template) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Template not found" });
+      }
+      await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, template.database.page.workspaceId);
+
+      const { id, ...data } = input;
+      return ctx.db.rowTemplate.update({
+        where: { id },
+        data: {
+          ...data,
+          values: data.values ? (data.values as Prisma.InputJsonValue) : undefined,
+        },
+      });
+    }),
+
+  deleteRowTemplate: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const template = await ctx.db.rowTemplate.findUnique({
+        where: { id: input.id },
+        include: { database: { include: { page: { select: { workspaceId: true } } } } },
+      });
+      if (!template) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Template not found" });
+      }
+      await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, template.database.page.workspaceId);
+      return ctx.db.rowTemplate.delete({ where: { id: input.id } });
+    }),
+
+  addRowFromTemplate: protectedProcedure
+    .input(
+      z.object({
+        databaseId: z.string(),
+        templateId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const database = await verifyDatabaseAccess(ctx.db, ctx.session.user.id, input.databaseId);
+      const template = await ctx.db.rowTemplate.findUnique({
+        where: { id: input.templateId },
+      });
+      if (!template || template.databaseId !== input.databaseId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Template not found" });
+      }
+
+      const templateValues = (template.values as Record<string, unknown>) ?? {};
+
+      // Find title property to derive page title
+      const titleProp = await ctx.db.property.findFirst({
+        where: { databaseId: input.databaseId, type: "title" },
+      });
+      const pageTitle = titleProp && templateValues[titleProp.id]
+        ? String(templateValues[titleProp.id])
+        : template.name;
+
+      const page = await ctx.db.page.create({
+        data: {
+          workspaceId: database.page.workspaceId,
+          title: pageTitle,
+          parentId: database.pageId,
+          createdBy: ctx.session.user.id,
+          lastEditedBy: ctx.session.user.id,
+        },
+      });
+
+      return ctx.db.row.create({
+        data: {
+          databaseId: input.databaseId,
+          pageId: page.id,
+          values: templateValues as Prisma.InputJsonValue,
+        },
+        include: {
+          page: { select: { id: true, title: true, icon: true } },
+        },
+      });
+    }),
 });

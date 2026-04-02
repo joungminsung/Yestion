@@ -173,10 +173,11 @@ model Database {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  page       Page       @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  properties Property[]
-  views      DatabaseView[]
-  rows       Row[]
+  page         Page           @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  properties   Property[]
+  views        DatabaseView[]
+  rows         Row[]
+  rowTemplates RowTemplate[]
 
   @@index([pageId])
 }
@@ -222,6 +223,22 @@ model Row {
 
   @@index([databaseId])
   @@index([pageId])
+}
+
+model RowTemplate {
+  id         String   @id @default(cuid())
+  databaseId String
+  name       String
+  icon       String?
+  values     Json     @default("{}")
+  position   Int      @default(0)
+  createdBy  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  database Database @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+  @@index([databaseId])
 }
 
 model PagePermission {
