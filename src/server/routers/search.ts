@@ -223,4 +223,68 @@ export const searchRouter = router({
         nextCursor: hasMore ? input.cursor + input.limit : null,
       };
     }),
+
+  getPageGraph: protectedProcedure
+    .input(z.object({ workspaceId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const member = await ctx.db.workspaceMember.findUnique({
+        where: {
+          userId_workspaceId: {
+            userId: ctx.session.user.id,
+            workspaceId: input.workspaceId,
+          },
+        },
+      });
+      if (!member) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "No access to this workspace" });
+      }
+
+      // Get all pages as nodes
+      const pages = await ctx.db.page.findMany({
+        where: { workspaceId: input.workspaceId, isDeleted: false },
+        select: {
+          id: true,
+          title: true,
+          icon: true,
+          parentId: true,
+          updatedAt: true,
+        },
+      });
+
+      // Build nodes
+      const nodes = pages.map((p) => ({
+        id: p.id,
+        title: p.title || "Untitled",
+        icon: p.icon,
+        updatedAt: p.updatedAt,
+      }));
+
+      // Build edges from parent-child relationships
+      const edges: { source: string; target: string; type: "parent" }[] = [];
+      for (const p of pages) {
+        if (p.parentId && pages.some((n) => n.id === p.parentId)) {
+          edges.push({ source: p.parentId, target: p.id, type: "parent" });
+        }
+      }
+
+      // Also find mention links (link-to-page blocks)
+      const linkBlocks = await ctx.db.block.findMany({
+        where: {
+          page: { workspaceId: input.workspaceId, isDeleted: false },
+          type: { in: ["linkToPage", "mention"] },
+        },
+        select: { pageId: true, content: true },
+      });
+
+      const pageIdSet = new Set(pages.map((p) => p.id));
+      for (const block of linkBlocks) {
+        const content = block.content as Record<string, unknown>;
+        const targetId = (content.pageId as string) || (content.targetId as string);
+        if (targetId && pageIdSet.has(targetId) && targetId !== block.pageId) {
+          edges.push({ source: block.pageId, target: targetId, type: "parent" });
+        }
+      }
+
+      return { nodes, edges };
+    }),
 });
