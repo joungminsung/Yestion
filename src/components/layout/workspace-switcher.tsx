@@ -3,26 +3,74 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { trpc } from "@/server/trpc/client";
-import { LayoutList } from "lucide-react";
+import { LayoutList, Plus, LogOut, Trash2, DoorOpen, Settings } from "lucide-react";
+import { useToastStore } from "@/stores/toast";
 
 type Props = { currentWorkspaceId: string };
 
 export function WorkspaceSwitcher({ currentWorkspaceId }: Props) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newIcon, setNewIcon] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState("");
   const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
+  const addToast = useToastStore((s) => s.addToast);
+  const utils = trpc.useUtils();
   const { data: memberships } = trpc.workspace.list.useQuery();
+
+  const createWorkspace = trpc.workspace.create.useMutation({
+    onSuccess: (ws) => {
+      utils.workspace.list.invalidate();
+      router.push(`/${ws.id}`);
+      setShowCreate(false);
+      setNewName("");
+      setNewIcon("");
+      addToast({ message: "워크스페이스가 생성되었습니다", type: "success" });
+    },
+    onError: (err) => addToast({ message: err.message, type: "error" }),
+  });
+
+  const deleteWorkspace = trpc.workspace.delete.useMutation({
+    onSuccess: () => {
+      utils.workspace.list.invalidate();
+      const other = memberships?.find((m) => m.workspaceId !== currentWorkspaceId);
+      if (other) router.push(`/${other.workspaceId}`);
+      setShowDelete(false);
+      setDeleteConfirm("");
+      addToast({ message: "워크스페이스가 삭제되었습니다", type: "success" });
+    },
+    onError: (err) => addToast({ message: err.message, type: "error" }),
+  });
+
+  const leaveWorkspace = trpc.workspace.leave.useMutation({
+    onSuccess: () => {
+      utils.workspace.list.invalidate();
+      const other = memberships?.find((m) => m.workspaceId !== currentWorkspaceId);
+      if (other) router.push(`/${other.workspaceId}`);
+      setIsOpen(false);
+      addToast({ message: "워크스페이스에서 나갔습니다", type: "success" });
+    },
+    onError: (err) => addToast({ message: err.message, type: "error" }),
+  });
 
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setIsOpen(false);
+        setShowCreate(false);
+        setShowDelete(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [isOpen]);
 
   const currentWs = memberships?.find((m) => m.workspaceId === currentWorkspaceId);
+  const currentRole = currentWs?.role;
 
   return (
     <div className="relative" ref={ref}>
@@ -56,8 +104,10 @@ export function WorkspaceSwitcher({ currentWorkspaceId }: Props) {
             backgroundColor: "var(--bg-primary)",
             boxShadow: "var(--shadow-popup)",
             zIndex: 100,
+            minWidth: "260px",
           }}
         >
+          {/* Workspace List */}
           <div
             className="px-3 py-1"
             style={{ fontSize: "11px", color: "var(--text-tertiary)", fontWeight: 500 }}
@@ -80,26 +130,162 @@ export function WorkspaceSwitcher({ currentWorkspaceId }: Props) {
                 <span style={{ color: "var(--color-blue)" }}>✓</span>
               )}
               <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-                {m.role}
+                {m.role === "OWNER" ? "소유자" : m.role === "ADMIN" ? "관리자" : m.role === "GUEST" ? "게스트" : "멤버"}
               </span>
             </button>
           ))}
-          <div
-            className="mx-2 my-1"
-            style={{ height: "1px", backgroundColor: "var(--border-divider)" }}
-          />
+
+          <div className="mx-2 my-1" style={{ height: "1px", backgroundColor: "var(--border-divider)" }} />
+
+          {/* Create Workspace */}
+          {showCreate ? (
+            <div className="px-3 py-2">
+              <div className="flex gap-2 mb-2">
+                <input
+                  value={newIcon}
+                  onChange={(e) => setNewIcon(e.target.value)}
+                  placeholder="🏢"
+                  className="w-10 text-center rounded border px-1 py-1 text-lg"
+                  style={{ borderColor: "var(--border-default)", backgroundColor: "var(--bg-primary)" }}
+                  maxLength={2}
+                />
+                <input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="워크스페이스 이름"
+                  className="flex-1 rounded border px-2 py-1 text-sm"
+                  style={{ borderColor: "var(--border-default)", backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newName.trim()) {
+                      createWorkspace.mutate({ name: newName.trim(), icon: newIcon || undefined });
+                    }
+                    if (e.key === "Escape") setShowCreate(false);
+                  }}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowCreate(false)}
+                  className="flex-1 text-xs py-1 rounded hover:bg-notion-bg-hover"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  취소
+                </button>
+                <button
+                  onClick={() => {
+                    if (newName.trim()) createWorkspace.mutate({ name: newName.trim(), icon: newIcon || undefined });
+                  }}
+                  disabled={!newName.trim() || createWorkspace.isPending}
+                  className="flex-1 text-xs py-1 rounded text-white disabled:opacity-50"
+                  style={{ backgroundColor: "#2383e2" }}
+                >
+                  {createWorkspace.isPending ? "생성 중..." : "생성"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowCreate(true)}
+              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-notion-bg-hover text-left"
+              style={{ fontSize: "14px", color: "var(--text-secondary)" }}
+            >
+              <Plus size={16} />
+              <span>새 워크스페이스</span>
+            </button>
+          )}
+
+          {/* Settings */}
+          <button
+            onClick={() => {
+              router.push(`/${currentWorkspaceId}/settings`);
+              setIsOpen(false);
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-notion-bg-hover text-left"
+            style={{ fontSize: "14px", color: "var(--text-secondary)" }}
+          >
+            <Settings size={16} />
+            <span>설정</span>
+          </button>
+
+          {/* Leave Workspace (non-owner, or owner with other owners) */}
+          {currentRole !== "OWNER" && (
+            <button
+              onClick={() => {
+                if (confirm("이 워크스페이스에서 나가시겠습니까?")) {
+                  leaveWorkspace.mutate({ workspaceId: currentWorkspaceId });
+                }
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-notion-bg-hover text-left"
+              style={{ fontSize: "14px", color: "var(--text-secondary)" }}
+            >
+              <DoorOpen size={16} />
+              <span>워크스페이스 나가기</span>
+            </button>
+          )}
+
+          {/* Delete Workspace (owner only) */}
+          {currentRole === "OWNER" && (
+            showDelete ? (
+              <div className="px-3 py-2">
+                <p className="text-xs mb-2" style={{ color: "#e74c3c" }}>
+                  삭제하려면 워크스페이스 이름을 입력하세요:
+                  <strong> {currentWs?.workspace.name}</strong>
+                </p>
+                <input
+                  value={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.value)}
+                  placeholder="워크스페이스 이름 입력"
+                  className="w-full rounded border px-2 py-1 text-sm mb-2"
+                  style={{ borderColor: "#e74c3c", backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === "Escape") { setShowDelete(false); setDeleteConfirm(""); } }}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setShowDelete(false); setDeleteConfirm(""); }}
+                    className="flex-1 text-xs py-1 rounded hover:bg-notion-bg-hover"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={() => deleteWorkspace.mutate({ id: currentWorkspaceId })}
+                    disabled={deleteConfirm !== currentWs?.workspace.name || deleteWorkspace.isPending}
+                    className="flex-1 text-xs py-1 rounded text-white disabled:opacity-50"
+                    style={{ backgroundColor: "#e74c3c" }}
+                  >
+                    {deleteWorkspace.isPending ? "삭제 중..." : "삭제"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowDelete(true)}
+                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-notion-bg-hover text-left"
+                style={{ fontSize: "14px", color: "#e74c3c" }}
+              >
+                <Trash2 size={16} />
+                <span>워크스페이스 삭제</span>
+              </button>
+            )
+          )}
+
+          <div className="mx-2 my-1" style={{ height: "1px", backgroundColor: "var(--border-divider)" }} />
+
+          {/* Logout */}
           <button
             className="w-full flex items-center gap-2 px-3 py-2 hover:bg-notion-bg-hover text-left"
             style={{ fontSize: "14px", color: "var(--text-secondary)" }}
             onClick={() => {
-              // Clear session cookie
               document.cookie = "session-token=; path=/; max-age=0; samesite=lax";
               router.push("/login");
               router.refresh();
               setIsOpen(false);
             }}
           >
-            로그아웃
+            <LogOut size={16} />
+            <span>로그아웃</span>
           </button>
         </div>
       )}
