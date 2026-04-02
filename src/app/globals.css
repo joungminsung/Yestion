@@ -167,9 +167,31 @@ html {
   opacity: 1;
 }
 
-/* Dark mode transition */
-html[data-transitioning] * {
-  transition: background-color 300ms ease, color 300ms ease, border-color 300ms ease !important;
+/* Smooth dark mode transition */
+html[data-transitioning] *,
+html[data-transitioning] *::before,
+html[data-transitioning] *::after {
+  transition:
+    background-color 0.3s ease,
+    color 0.2s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease !important;
+}
+
+/* Exclude elements that should not transition */
+html[data-transitioning] .ProseMirror,
+html[data-transitioning] video,
+html[data-transitioning] img,
+html[data-transitioning] canvas {
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-transitioning] *,
+  html[data-transitioning] *::before,
+  html[data-transitioning] *::after {
+    transition: none !important;
+  }
 }
 
 /* Block insert/delete animations (FLIP-style) */
