@@ -113,14 +113,58 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
 
   const handleMouseLeave = useCallback(() => { scheduleHide(); }, [scheduleHide]);
 
+  // Also show handle when hovering the left gutter area (where handle lives)
+  const handleGutterMouseMove = useCallback(
+    (event: MouseEvent) => {
+      cancelHide();
+      if (!editor.view) return;
+      const view = editor.view;
+
+      // Use the editor's left edge X but the mouse's Y to find the block
+      const editorRect = view.dom.getBoundingClientRect();
+      const posResult = view.posAtCoords({ left: editorRect.left + 10, top: event.clientY });
+      if (!posResult) return;
+
+      try {
+        const blockPos = resolveBlockPos(view.state.doc, posResult.pos);
+        const blockDom = view.nodeDOM(blockPos);
+        if (!blockDom || !(blockDom instanceof HTMLElement)) return;
+        lastBlockPosRef.current = blockPos;
+        const handlePosition = computeHandlePosition(blockDom);
+        show(blockPos, handlePosition);
+      } catch {}
+    },
+    [editor, show, cancelHide, computeHandlePosition]
+  );
+
+  const gutterRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     if (!editor.view) return;
     const dom = editor.view.dom;
     dom.addEventListener("mousemove", handleMouseMove);
     dom.addEventListener("mouseleave", handleMouseLeave);
+
+    // Position invisible gutter zone to the left of the editor
+    const updateGutter = () => {
+      if (!gutterRef.current) return;
+      const editorRect = dom.getBoundingClientRect();
+      const gutter = gutterRef.current;
+      gutter.style.position = "fixed";
+      gutter.style.top = `${editorRect.top}px`;
+      gutter.style.left = `${Math.max(editorRect.left - 80, 0)}px`;
+      gutter.style.width = "80px";
+      gutter.style.height = `${editorRect.height}px`;
+      gutter.style.zIndex = "40";
+    };
+    updateGutter();
+    const resizeObs = new ResizeObserver(updateGutter);
+    resizeObs.observe(dom);
+
     return () => {
       dom.removeEventListener("mousemove", handleMouseMove);
       dom.removeEventListener("mouseleave", handleMouseLeave);
+      resizeObs.disconnect();
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (hideDelayRef.current) clearTimeout(hideDelayRef.current);
     };
@@ -352,6 +396,14 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
 
   return (
     <>
+      {/* Invisible gutter zone — hovering here shows the handle for the nearest block */}
+      <div
+        ref={gutterRef}
+        onMouseMove={handleGutterMouseMove as unknown as React.MouseEventHandler}
+        onMouseLeave={handleMouseLeave as unknown as React.MouseEventHandler}
+        style={{ pointerEvents: "auto" }}
+      />
+
       {isVisible && vis.handlePosition && (
         <div
           ref={handleElRef}
