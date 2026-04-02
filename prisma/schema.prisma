@@ -312,7 +312,10 @@ model SyncedBlock {
   id            String   @id @default(cuid())
   sourceBlockId String
   sourcePageId  String
+  content       Json     @default("{}")
+  version       Int      @default(1)
   createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([sourceBlockId])
   @@index([sourcePageId])

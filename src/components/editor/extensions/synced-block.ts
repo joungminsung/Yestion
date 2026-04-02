@@ -1,16 +1,32 @@
 import { Node, mergeAttributes } from "@tiptap/core";
+import { ReactNodeViewRenderer } from "@tiptap/react";
+import { SyncedBlockView } from "../synced-block-view";
+
+declare module "@tiptap/core" {
+  interface Commands<ReturnType> {
+    syncedBlock: {
+      insertSyncedBlock: (attrs: {
+        blockId?: string;
+        sourceBlockId?: string;
+        sourcePageId?: string;
+      }) => ReturnType;
+    };
+  }
+}
 
 export const SyncedBlockNode = Node.create({
   name: "syncedBlock",
   group: "block",
-  atom: true,
+  content: "block+",
   draggable: true,
+  isolating: true,
 
   addAttributes() {
     return {
       blockId: { default: null },
       sourceBlockId: { default: null },
       sourcePageId: { default: null },
+      synced: { default: true },
     };
   },
 
@@ -25,7 +41,27 @@ export const SyncedBlockNode = Node.create({
         "data-type": "synced-block",
         class: "notion-synced-block",
       }),
-      "동기화 블록",
+      0,
     ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(SyncedBlockView);
+  },
+
+  addCommands() {
+    return {
+      insertSyncedBlock:
+        (attrs) =>
+        ({ chain }) => {
+          return chain()
+            .insertContent({
+              type: "syncedBlock",
+              attrs,
+              content: [{ type: "paragraph" }],
+            })
+            .run();
+        },
+    };
   },
 });

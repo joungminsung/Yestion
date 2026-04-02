@@ -186,7 +186,11 @@ export const SLASH_ITEMS: SlashItem[] = [
       editor
         .chain()
         .focus()
-        .insertContent({ type: "syncedBlock" })
+        .insertContent({
+          type: "syncedBlock",
+          attrs: { synced: true },
+          content: [{ type: "paragraph" }],
+        })
         .run();
     },
   },
