@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter, usePathname } from "next/navigation";
-import { Lock, Unlock, ArrowLeftRight, Star, Copy, Upload, Download, Clock, BarChart3, Bell, Eye, Trash2, FileText, Menu } from "lucide-react";
+import { Lock, Unlock, ArrowLeftRight, Star, Copy, Upload, Download, Clock, BarChart3, Bell, Eye, Trash2, FileText, Menu, LayoutTemplate } from "lucide-react";
 import { useSidebarStore } from "@/stores/sidebar";
 import { usePresenceStore, type PresenceUser } from "@/stores/presence";
 import { useNavigationStore } from "@/stores/navigation-history";
@@ -233,6 +233,12 @@ export function Topbar() {
     },
   });
 
+  const saveAsTemplateMutation = trpc.template.create.useMutation({
+    onSuccess: () => {
+      addToast({ type: "success", message: "템플릿으로 저장되었습니다" });
+    },
+  });
+
   const handleExport = (format: "md" | "html" | "pdf") => {
     if (!pageId) return;
     if (format === "pdf") {
@@ -450,6 +456,32 @@ export function Topbar() {
         if (watched) localStorage.removeItem(`page-watch:${pageId}`);
         else localStorage.setItem(`page-watch:${pageId}`, "true");
         addToast({ message: watched ? "관심 페이지 해제됨" : "관심 페이지 등록됨", type: "success" });
+        setShowMoreMenu(false);
+      },
+    },
+    {
+      icon: <LayoutTemplate size={16} className="shrink-0" />,
+      label: "템플릿으로 저장",
+      action: async () => {
+        if (!pageId || !currentPage || !workspaceId) return;
+        try {
+          const blocks = await utils.block.list.fetch({ pageId });
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const blockJson = blocks.map((b: any) => ({
+            type: b.type as string,
+            content: b.content as object,
+          }));
+          saveAsTemplateMutation.mutate({
+            workspaceId,
+            name: currentPage.title || "Untitled Template",
+            description: `Template from page: ${currentPage.title}`,
+            icon: currentPage.icon || undefined,
+            blocks: blockJson,
+            category: "custom",
+          });
+        } catch {
+          addToast({ message: "템플릿 저장에 실패했습니다", type: "error" });
+        }
         setShowMoreMenu(false);
       },
     },
