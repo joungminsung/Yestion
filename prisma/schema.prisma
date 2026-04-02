@@ -640,3 +640,38 @@ model WorkflowApproval {
   @@index([executionId])
   @@index([assigneeId, status])
 }
+
+enum IntegrationService {
+  SLACK
+  GITHUB
+  GOOGLE_CALENDAR
+  EMAIL
+}
+
+enum IntegrationStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+  PENDING
+}
+
+model Integration {
+  id            String              @id @default(cuid())
+  workspaceId   String
+  service       IntegrationService
+  status        IntegrationStatus   @default(PENDING)
+  accessToken   String?             // encrypted OAuth access token
+  refreshToken  String?             // encrypted OAuth refresh token
+  tokenExpiry   DateTime?
+  externalId    String?             // external account/team ID
+  externalName  String?             // display name (e.g. Slack workspace name)
+  config        Json                @default("{}") // per-service config (channels, repos, calendars)
+  webhookSecret String?             // secret for verifying inbound webhooks
+  connectedBy   String
+  connectedAt   DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@unique([workspaceId, service])
+  @@index([workspaceId])
+  @@index([service, status])
+}
