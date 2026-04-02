@@ -324,3 +324,15 @@ html[data-transitioning] canvas {
     min-width: 100% !important;
   }
 }
+
+/* Skeleton pulse */
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes skeletonPulse {
+    0%, 100% { opacity: 0.7; }
+  }
+}

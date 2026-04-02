@@ -3,8 +3,11 @@ import { cn } from "@/lib/utils";
 export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("animate-pulse rounded", className)}
-      style={{ backgroundColor: "var(--bg-tertiary, #e8e7e4)" }}
+      className={cn("rounded", className)}
+      style={{
+        backgroundColor: "var(--bg-tertiary, #e8e7e4)",
+        animation: "skeletonPulse 1.5s ease-in-out infinite",
+      }}
       {...props}
     />
   );
