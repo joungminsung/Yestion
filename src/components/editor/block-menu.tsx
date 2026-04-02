@@ -66,11 +66,20 @@ export function BlockMenu({ editor, pos, coords, onClose, onTurnIntoPage }: Bloc
     } },
   ];
 
+  // Position menu to the left of the handle, clamped to viewport
+  const menuWidth = 260;
+  const menuMaxHeight = 400;
+  const menuLeft = Math.max(8, coords.left - menuWidth - 8);
+  // If not enough space on the left, show below the handle instead
+  const showBelow = coords.left - menuWidth - 8 < 8;
+  const menuTop = showBelow ? coords.top + 28 : coords.top;
+
   return (
     <div ref={menuRef} className="fixed rounded-lg overflow-hidden py-1 dropdown-enter" style={{
-      top: `${coords.top}px`, left: `${coords.left}px`,
+      top: `${Math.min(menuTop, window.innerHeight - menuMaxHeight - 8)}px`,
+      left: `${showBelow ? coords.left : menuLeft}px`,
       zIndex: "var(--z-dropdown)", backgroundColor: "var(--bg-primary)",
-      boxShadow: "var(--shadow-popup)", width: "260px", maxHeight: "400px", overflowY: "auto",
+      boxShadow: "var(--shadow-popup)", width: `${menuWidth}px`, maxHeight: `${menuMaxHeight}px`, overflowY: "auto",
     }}>
       {actions.map((a) => (
         <button key={a.label} className="w-full flex items-center gap-3 px-3 py-1.5 text-sm hover:bg-notion-bg-hover text-left"
