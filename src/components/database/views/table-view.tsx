@@ -99,6 +99,28 @@ export function TableView({
   const rowHeight = viewConfig.rowHeight ?? "short";
   const effectiveRowHeight = rowHeight === "auto" ? 33 : ROW_HEIGHT_MAP[rowHeight];
 
+  // Calculate auto row height based on content
+  const getRowHeight = useCallback(
+    (row: RowData): number => {
+      if (rowHeight !== "auto") {
+        return effectiveRowHeight;
+      }
+
+      // Auto height: calculate based on content
+      const values = (row.values as Record<string, unknown>) ?? {};
+      let maxLines = 1;
+      for (const prop of properties) {
+        const val = values[prop.id];
+        if (typeof val === "string") {
+          const lines = val.split("\n").length;
+          if (lines > maxLines) maxLines = lines;
+        }
+      }
+      return Math.max(33, maxLines * 22 + 11); // 22px per line + padding
+    },
+    [rowHeight, effectiveRowHeight, properties],
+  );
+
   // Sort properties: title first, then by position; filter hidden
   const visibleProperties = useMemo(() => {
     const hidden = new Set(
@@ -326,7 +348,10 @@ export function TableView({
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollContainerRef.current,
-    estimateSize: () => effectiveRowHeight,
+    estimateSize: (index) =>
+      rowHeight === "auto" && rows[index]
+        ? getRowHeight(rows[index]!)
+        : effectiveRowHeight,
     overscan: 10,
   });
 

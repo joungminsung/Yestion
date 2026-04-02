@@ -18,8 +18,16 @@ type CellEditorProps = {
  */
 export function CellEditor({ value, type, config, onChange, onClose, onNavigate }: CellEditorProps) {
   switch (type) {
-    case "title":
     case "text":
+      return (
+        <MultilineTextCellEditor
+          value={String(value ?? "")}
+          onChange={onChange}
+          onClose={onClose}
+        />
+      );
+
+    case "title":
     case "url":
     case "email":
     case "phone":
@@ -155,6 +163,65 @@ function TextCellEditor({
         borderColor: "var(--border-default)",
         color: "var(--text-primary)",
       }}
+    />
+  );
+}
+
+// ── Multiline Text Editor ──────────────────────────────────
+
+function MultilineTextCellEditor({
+  value,
+  onChange,
+  onClose,
+}: {
+  value: string;
+  onChange: (v: unknown) => void;
+  onClose: () => void;
+}) {
+  const [localValue, setLocalValue] = useState(value);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    textareaRef.current?.focus();
+    // Move cursor to end
+    const len = textareaRef.current?.value.length ?? 0;
+    textareaRef.current?.setSelectionRange(len, len);
+  }, []);
+
+  const commit = useCallback(() => {
+    onChange(localValue);
+  }, [localValue, onChange]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          commit();
+          onClose();
+        }
+        if (e.key === "Escape") {
+          onClose();
+        }
+        // Shift+Enter inserts a line break (default textarea behavior)
+      }}
+      onBlur={() => {
+        commit();
+        onClose();
+      }}
+      className="w-full rounded border px-2 py-1 text-sm outline-none resize-none focus:border-[#2383e2]"
+      style={{
+        backgroundColor: "var(--bg-primary)",
+        borderColor: "var(--border-default)",
+        color: "var(--text-primary)",
+        minHeight: "33px",
+        maxHeight: "200px",
+        overflow: "auto",
+      }}
+      rows={String(localValue ?? "").split("\n").length || 1}
     />
   );
 }
