@@ -1,3 +1,20 @@
+/* AI Draft Block — purple left border + light bg while streaming/pending */
+.ai-draft-block {
+  border-left: 3px solid #a855f7;
+  background-color: #a855f708;
+  padding: 8px 12px;
+  margin: 4px 0;
+  border-radius: 0 6px 6px 0;
+  opacity: 0.85;
+  transition: opacity 0.3s, background-color 0.3s;
+}
+.ai-draft-block:empty::before {
+  content: "AI가 작성 중...";
+  color: #a855f7;
+  font-size: 14px;
+  opacity: 0.6;
+}
+
 .notion-editor {
   font-family: var(--notion-font-family);
   color: var(--text-primary);
