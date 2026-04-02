@@ -47,6 +47,12 @@ const config: Config = {
         "dropdown": "var(--z-dropdown)",
         "tooltip": "var(--z-tooltip)",
       },
+      transitionDuration: {
+        DEFAULT: "150ms",
+      },
+      transitionTimingFunction: {
+        DEFAULT: "cubic-bezier(0.4, 0, 0.2, 1)",
+      },
       maxWidth: {
         "page": "var(--page-max-width)",
       },

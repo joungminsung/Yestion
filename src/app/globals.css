@@ -138,6 +138,12 @@ html {
   transition: background-color 100ms ease;
 }
 
+/* Consistent button/interactive hover */
+button:not([disabled]),
+[role="button"]:not([disabled]) {
+  transition: background-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
 /* 5.13 Focus ring (keyboard only) */
 *:focus-visible {
   outline: 2px solid #2383e2;
