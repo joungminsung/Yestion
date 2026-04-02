@@ -159,7 +159,7 @@ export const sprintRouter = router({
       const totalDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / msPerDay));
 
       for (let d = new Date(start); d <= end; d = new Date(d.getTime() + msPerDay)) {
-        const dateStr = d.toISOString().split("T")[0];
+        const dateStr = d.toISOString().split("T")[0] ?? "";
         const completedByDate = sprint.tasks.filter(
           (t: any) => t.status === "done" && t.updatedAt <= d
         ).length;
