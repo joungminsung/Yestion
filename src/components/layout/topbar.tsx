@@ -19,6 +19,7 @@ import { htmlToBlocks } from "@/lib/html-import";
 import { useToastStore } from "@/stores/toast";
 import { useTranslations } from "next-intl";
 import { useDevice } from "@/components/providers/responsive-provider";
+import { FollowModeBanner } from "@/components/editor/follow-mode-banner";
 
 function getInitials(name: string): string {
   return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
@@ -498,10 +499,12 @@ export function Topbar() {
   ];
 
   return (
-    <header
-      role="banner"
-      aria-label="페이지 탑바"
-      className="sticky top-0 flex items-center justify-between px-3"
+    <>
+      <FollowModeBanner />
+      <header
+        role="banner"
+        aria-label="페이지 탑바"
+        className="sticky top-0 flex items-center justify-between px-3"
       style={{
         height: "var(--topbar-height)",
         zIndex: "var(--z-topbar)",
@@ -905,5 +908,6 @@ export function Topbar() {
         </div>
       )}
     </header>
+    </>
   );
 }
