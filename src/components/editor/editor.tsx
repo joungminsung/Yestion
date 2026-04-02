@@ -30,7 +30,9 @@ import TableHeader from "@tiptap/extension-table-header";
 import TableCell from "@tiptap/extension-table-cell";
 import { common, createLowlight } from "lowlight";
 import Collaboration from "@tiptap/extension-collaboration";
-import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
+// CollaborationCursor removed — y-prosemirror cursor-plugin crashes when
+// awareness.doc is undefined (e.g. Hocuspocus server not running).
+// Cursor presence is handled via awareness state in collaborative-editor.tsx.
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import type { Doc as YDoc } from "yjs";
 import { BlockId } from "./extensions/block-id";
@@ -171,16 +173,6 @@ export const NotionEditor = forwardRef<
       LinkPreviewExtension,
       ...(collaboration ? [
         Collaboration.configure({ document: collaboration.ydoc }),
-        // Only mount CollaborationCursor when the provider's awareness instance
-        // already has the ydoc attached (doc !== undefined). Accessing
-        // awareness.doc before it is set causes cursor-plugin.js:87 to throw
-        // "Cannot read 'doc' of undefined".
-        ...(collaboration.provider.awareness?.doc
-          ? [CollaborationCursor.configure({
-              provider: collaboration.provider,
-              user: { name: collaboration.user.name, color: collaboration.user.color },
-            })]
-          : []),
       ] : []),
     ],
     content: collaboration ? undefined : (initialContent || {
