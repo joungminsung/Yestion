@@ -4,8 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { trpc } from "@/server/trpc/client";
 import { useToastStore } from "@/stores/toast";
 
@@ -19,7 +17,6 @@ export function LoginForm() {
 
   const login = trpc.auth.login.useMutation({
     onSuccess: (data) => {
-      // Set cookie client-side to ensure it's always applied
       document.cookie = `session-token=${data.token}; path=/; max-age=${30 * 24 * 60 * 60}; samesite=lax`;
       router.push("/");
       router.refresh();
@@ -38,29 +35,96 @@ export function LoginForm() {
 
   return (
     <div>
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>{t("login")}</h1>
+      <div className="mb-6 text-center">
+        <h1
+          className="text-[22px] font-bold"
+          style={{ color: "#37352f" }}
+        >
+          {t("login")}
+        </h1>
+        <p
+          className="mt-1 text-[13px]"
+          style={{ color: "#9b9a97" }}
+        >
+          Yestion 계정으로 로그인하세요
+        </p>
       </div>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
-          <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>{t("email")}</label>
-          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("emailPlaceholder")} required autoFocus />
+          <label
+            className="mb-1.5 block text-[13px] font-medium"
+            style={{ color: "#37352f" }}
+          >
+            {t("email")}
+          </label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder={t("emailPlaceholder")}
+            required
+            autoFocus
+            className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition-all focus:border-[#2383e2] focus:ring-2 focus:ring-[#2383e2]/20"
+            style={{
+              borderColor: "#e8e8e8",
+              color: "#37352f",
+              backgroundColor: "#ffffff",
+            }}
+          />
         </div>
+
         <div>
-          <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>{t("password")}</label>
-          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("passwordPlaceholder")} required />
+          <label
+            className="mb-1.5 block text-[13px] font-medium"
+            style={{ color: "#37352f" }}
+          >
+            {t("password")}
+          </label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={t("passwordPlaceholder")}
+            required
+            className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition-all focus:border-[#2383e2] focus:ring-2 focus:ring-[#2383e2]/20"
+            style={{
+              borderColor: "#e8e8e8",
+              color: "#37352f",
+              backgroundColor: "#ffffff",
+            }}
+          />
         </div>
-        <Button type="submit" size="lg" className="w-full mt-2" disabled={isLoading}>
+
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="mt-1 w-full rounded-lg py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-50"
+          style={{ backgroundColor: "#2383e2" }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#0b6ec5")}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#2383e2")}
+        >
           {isLoading ? t("loggingIn") : t("login")}
-        </Button>
+        </button>
       </form>
-      <div className="flex items-center justify-between mt-4">
-        <Link href="/reset-password" className="text-sm underline hover:no-underline" style={{ color: "var(--text-secondary)" }}>
+
+      <div className="mt-5 flex items-center justify-between">
+        <Link
+          href="/reset-password"
+          className="text-[13px] transition-colors hover:underline"
+          style={{ color: "#9b9a97" }}
+        >
           비밀번호 찾기
         </Link>
-        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          {t("noAccount")}{" "}
-          <Link href="/signup" className="underline hover:no-underline" style={{ color: "var(--color-blue)" }}>{t("signup")}</Link>
+        <p className="text-[13px]" style={{ color: "#9b9a97" }}>
+          계정이 없으신가요?{" "}
+          <Link
+            href="/signup"
+            className="font-medium transition-colors hover:underline"
+            style={{ color: "#2383e2" }}
+          >
+            {t("signup")}
+          </Link>
         </p>
       </div>
     </div>
