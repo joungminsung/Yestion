@@ -55,6 +55,7 @@ import { LinkPreviewExtension, LinkPreviewPopup, useLinkPreview } from "./link-p
 import { MarkdownPaste } from "./extensions/markdown-paste";
 import { ClipboardImage } from "./extensions/clipboard-image";
 import { FileDrop } from "./extensions/file-drop";
+import { TouchDragHandle } from "./extensions/touch-drag-handle";
 import { useAiStore } from "@/stores/ai";
 import type { MentionItem } from "./mention/mention-list";
 import { useDevice } from "@/components/providers/responsive-provider";
@@ -179,6 +180,7 @@ export const NotionEditor = forwardRef<
       MicroInteractions,
       FocusMode,
       LinkPreviewExtension,
+      ...(typeof window !== "undefined" && "ontouchstart" in window ? [TouchDragHandle] : []),
       ...(collaboration ? [
         Collaboration.configure({ document: collaboration.ydoc }),
       ] : []),
