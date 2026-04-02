@@ -4,6 +4,8 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { CommandPalette } from "@/components/layout/command-palette";
 import { QuickNoteButton } from "@/components/layout/quick-note-button";
+import { PageTransition } from "@/components/layout/page-transition";
+import { AppMotionConfig } from "@/lib/motion/motion-config";
 
 export default async function MainLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession();
@@ -14,7 +16,9 @@ export default async function MainLayout({ children }: { children: React.ReactNo
       <Sidebar />
       <main id="main-content" role="main" aria-label="페이지 콘텐츠" className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Topbar />
-        <div className="flex-1 overflow-y-auto">{children}</div>
+        <AppMotionConfig>
+          <PageTransition>{children}</PageTransition>
+        </AppMotionConfig>
       </main>
       <CommandPalette />
       <QuickNoteButton />
