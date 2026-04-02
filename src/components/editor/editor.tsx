@@ -57,7 +57,9 @@ import { ClipboardImage } from "./extensions/clipboard-image";
 import { FileDrop } from "./extensions/file-drop";
 import { useAiStore } from "@/stores/ai";
 import type { MentionItem } from "./mention/mention-list";
+import { useDevice } from "@/components/providers/responsive-provider";
 
+const MobileToolbar = lazy(() => import("./mobile-toolbar").then(m => ({ default: m.MobileToolbar })));
 const SlashCommand = lazy(() => import("./slash-command/slash-command").then(m => ({ default: m.SlashCommand })));
 const MentionList = lazy(() => import("./mention/mention-list").then(m => ({ default: m.MentionList })));
 const FindReplace = lazy(() => import("./find-replace").then(m => ({ default: m.FindReplace })));
@@ -108,6 +110,7 @@ export const NotionEditor = forwardRef<
 }, ref) {
   const [menuState, setMenuState] = useState<{pos: number; coords: {top: number; left: number}} | null>(null);
   const aiStore = useAiStore();
+  const { isMobile } = useDevice();
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -300,17 +303,26 @@ export const NotionEditor = forwardRef<
         </Suspense>
       )}
       {editor && <EmptyPageGuide editor={editor} />}
-      {editor.view && (
+      {!isMobile && editor.view && (
         <Suspense fallback={null}>
           <InlineToolbar editor={editor} onAddComment={onAddComment} />
-          <SlashCommand editor={editor} />
-          <MentionList editor={editor} items={mentionItems} />
-          <BlockContextMenu editor={editor} onTurnIntoPage={onTurnIntoPage} onAddComment={onAddComment} />
           <DragHandle editor={editor} onMenuOpen={(pos) => {
             if (!editor.view) return;
             const coords = editor.view.coordsAtPos(pos);
             setMenuState({ pos, coords: { top: coords.top, left: coords.left - 4 } });
           }} />
+        </Suspense>
+      )}
+      {editor.view && (
+        <Suspense fallback={null}>
+          <SlashCommand editor={editor} />
+          <MentionList editor={editor} items={mentionItems} />
+          <BlockContextMenu editor={editor} onTurnIntoPage={onTurnIntoPage} onAddComment={onAddComment} />
+        </Suspense>
+      )}
+      {isMobile && editor && (
+        <Suspense fallback={null}>
+          <MobileToolbar editor={editor} />
         </Suspense>
       )}
       {menuState && (
