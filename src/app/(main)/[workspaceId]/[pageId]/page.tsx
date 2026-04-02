@@ -5,6 +5,7 @@ import { getServerSession } from "@/server/auth/session";
 import { PageEditor } from "@/components/editor/page-editor";
 import { PageHeader } from "@/components/page/page-header";
 import { SubPagesList } from "@/components/page/sub-pages-list";
+import { OfflinePageCache } from "@/components/editor/offline-page-cache";
 import { getEffectivePermission } from "@/lib/permissions";
 
 export default async function PageView({ params }: { params: { workspaceId: string; pageId: string } }) {
@@ -48,8 +49,22 @@ export default async function PageView({ params }: { params: { workspaceId: stri
 
   const isReadOnly = effectivePermission === "view" || effectivePermission === "comment";
 
+  const serializedBlocks = page.blocks.map((b) => ({
+    id: b.id,
+    type: b.type,
+    content: b.content,
+    position: b.position,
+    parentId: b.parentId,
+  }));
+
   return (
     <div className="page-transition-enter">
+      <OfflinePageCache
+        pageId={page.id}
+        workspaceId={params.workspaceId}
+        title={page.title}
+        blocks={serializedBlocks}
+      />
       <PageHeader page={{ id: page.id, title: page.title, icon: page.icon, cover: page.cover }} />
       <div
         className="mx-auto"
@@ -62,13 +77,7 @@ export default async function PageView({ params }: { params: { workspaceId: stri
       >
         <PageEditor
           pageId={page.id}
-          initialBlocks={page.blocks.map((b) => ({
-            id: b.id,
-            type: b.type,
-            content: b.content,
-            position: b.position,
-            parentId: b.parentId,
-          }))}
+          initialBlocks={serializedBlocks}
           isLocked={page.isLocked || isReadOnly}
           sessionToken={sessionToken}
           user={{ id: session.user.id, name: session.user.name }}
