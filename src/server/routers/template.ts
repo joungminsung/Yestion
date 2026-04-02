@@ -212,9 +212,15 @@ export const templateRouter = router({
     // Import seed data
     const { SEED_TEMPLATES } = await import("@/../prisma/seed-templates");
     const created = await ctx.db.template.createMany({
-      data: SEED_TEMPLATES.map((t: Record<string, unknown>) => ({
-        ...t,
-        blocks: t.blocks as object,
+      data: SEED_TEMPLATES.map((t) => ({
+        name: t.name,
+        nameKo: t.nameKo,
+        description: t.description,
+        descriptionKo: t.descriptionKo,
+        icon: t.icon,
+        category: t.category,
+        tags: t.tags,
+        blocks: t.blocks as unknown as object,
         isDefault: true,
         isPublic: true,
       })),
