@@ -8,6 +8,7 @@ type ResponsiveContextValue = {
   isTablet: boolean;
   isDesktop: boolean;
   device: DeviceType;
+  isMounted: boolean;
 };
 
 const ResponsiveContext = createContext<ResponsiveContextValue>({
@@ -15,6 +16,7 @@ const ResponsiveContext = createContext<ResponsiveContextValue>({
   isTablet: false,
   isDesktop: true,
   device: "desktop",
+  isMounted: false,
 });
 
 export function ResponsiveProvider({ children }: { children: ReactNode }) {

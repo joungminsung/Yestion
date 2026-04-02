@@ -32,23 +32,32 @@ export type DeviceType = "mobile" | "tablet" | "desktop";
 
 /**
  * Returns current device type based on viewport width.
- * Defaults to "desktop" during SSR.
+ * Defaults to "desktop" during SSR and on the first client render to avoid
+ * hydration mismatches. `isMounted` flips to `true` after the first paint,
+ * at which point the real device values take effect.
  */
 export function useResponsive(): {
   isMobile: boolean;
   isTablet: boolean;
   isDesktop: boolean;
   device: DeviceType;
+  isMounted: boolean;
 } {
+  const [isMounted, setIsMounted] = useState(false);
   const isMobile = useMediaQuery(BREAKPOINTS.mobile);
   const isTablet = useMediaQuery(BREAKPOINTS.tablet);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const device: DeviceType = isMobile ? "mobile" : isTablet ? "tablet" : "desktop";
 
   return {
-    isMobile,
-    isTablet,
-    isDesktop: !isMobile && !isTablet,
-    device,
+    isMobile: isMounted && isMobile,
+    isTablet: isMounted && isTablet,
+    isDesktop: !isMounted || (!isMobile && !isTablet),
+    device: isMounted ? device : "desktop",
+    isMounted,
   };
 }
