@@ -22,6 +22,7 @@ import { projectRouter } from "@/server/routers/project";
 import { taskRouter } from "@/server/routers/task";
 import { automationRouter } from "@/server/routers/automation";
 import { webhookRouter } from "@/server/routers/webhook";
+import { sprintRouter } from "@/server/routers/sprint";
 
 export const appRouter = router({
   auth: authRouter,
@@ -47,6 +48,7 @@ export const appRouter = router({
   task: taskRouter,
   automation: automationRouter,
   webhook: webhookRouter,
+  sprint: sprintRouter,
 });
 
 export type AppRouter = typeof appRouter;
