@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "@/server/trpc/init";
 import type { PrismaClient } from "@prisma/client";
+import fastDiff from "fast-diff";
 
 import type { Prisma } from "@prisma/client";
 
@@ -44,6 +45,72 @@ export const historyRouter = router({
       if (!snapshot) throw new TRPCError({ code: "NOT_FOUND" });
       await verifyPageAccess(ctx.db, ctx.session.user.id, snapshot.pageId);
       return snapshot;
+    }),
+
+  diff: protectedProcedure
+    .input(
+      z.object({
+        snapshotIdA: z.string(), // older
+        snapshotIdB: z.string(), // newer
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const [snapshotA, snapshotB] = await Promise.all([
+        ctx.db.pageSnapshot.findUnique({ where: { id: input.snapshotIdA } }),
+        ctx.db.pageSnapshot.findUnique({ where: { id: input.snapshotIdB } }),
+      ]);
+
+      if (!snapshotA || !snapshotB) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Snapshot not found" });
+      }
+
+      if (snapshotA.pageId !== snapshotB.pageId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Snapshots must belong to the same page" });
+      }
+
+      await verifyPageAccess(ctx.db, ctx.session.user.id, snapshotA.pageId);
+
+      // Extract text content from blocks
+      const extractText = (blocks: unknown[]): string => {
+        return blocks
+          .map((block: unknown) => {
+            const b = block as Record<string, unknown>;
+            const content = b.content as Record<string, unknown> | undefined;
+            if (!content) return "";
+            // Extract text from common block content shapes
+            const text = (content.text as string) || (content.content as string) || "";
+            return text;
+          })
+          .filter(Boolean)
+          .join("\n");
+      };
+
+      const blocksA = (snapshotA.blocks as unknown[]) || [];
+      const blocksB = (snapshotB.blocks as unknown[]) || [];
+      const textA = extractText(blocksA);
+      const textB = extractText(blocksB);
+
+      // Compute diff
+      const diffResult = fastDiff(textA, textB);
+
+      // Structure: array of [type, text] where type is -1 (delete), 0 (equal), 1 (insert)
+      const changes = diffResult.map(([type, text]) => ({
+        type: type === fastDiff.DELETE ? ("delete" as const) : type === fastDiff.INSERT ? ("insert" as const) : ("equal" as const),
+        text,
+      }));
+
+      // Stats
+      const stats = {
+        additions: changes.filter((c) => c.type === "insert").reduce((sum, c) => sum + c.text.length, 0),
+        deletions: changes.filter((c) => c.type === "delete").reduce((sum, c) => sum + c.text.length, 0),
+      };
+
+      return {
+        snapshotA: { id: snapshotA.id, title: snapshotA.title, createdAt: snapshotA.createdAt, createdBy: snapshotA.createdBy },
+        snapshotB: { id: snapshotB.id, title: snapshotB.title, createdAt: snapshotB.createdAt, createdBy: snapshotB.createdBy },
+        changes,
+        stats,
+      };
     }),
 
   createSnapshot: protectedProcedure
