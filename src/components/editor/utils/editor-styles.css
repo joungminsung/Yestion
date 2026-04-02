@@ -547,3 +547,36 @@
     transition: none;
   }
 }
+
+/* Block Insert/Delete Animations */
+.ProseMirror > * {
+  animation: blockInsertAnim 0.2s ease-out;
+}
+
+@keyframes blockInsertAnim {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Smooth height changes for toggled content */
+.notion-toggle-content,
+.synced-block-content {
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ProseMirror > * {
+    animation: none;
+  }
+
+  .notion-toggle-content,
+  .synced-block-content {
+    transition: none;
+  }
+}
