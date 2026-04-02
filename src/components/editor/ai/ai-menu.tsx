@@ -57,11 +57,11 @@ export function AiMenu({ editor, position, onClose }: Props) {
       return;
     }
 
-    const coords = editor.view.coordsAtPos(from);
-    aiStore.open(selectedText, { top: coords.top + 30, left: coords.left });
+    // Open the inline AI draft with context + auto-trigger action
+    aiStore.open(selectedText, { top: 0, left: 0 });
     onClose();
 
-    // Trigger AI request immediately via custom event
+    // Dispatch action event for AiDraftInline to auto-start
     setTimeout(() => {
       window.dispatchEvent(
         new CustomEvent("ai-action", { detail: { action, context: selectedText } })
@@ -86,11 +86,7 @@ export function AiMenu({ editor, position, onClose }: Props) {
     >
       <div
         className="px-3 py-1.5"
-        style={{
-          fontSize: "11px",
-          color: "var(--text-tertiary)",
-          fontWeight: 500,
-        }}
+        style={{ fontSize: "11px", color: "var(--text-tertiary)", fontWeight: 500 }}
       >
         AI 작업
       </div>

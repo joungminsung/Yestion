@@ -3,8 +3,18 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Sparkles } from "lucide-react";
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function simpleMarkdownToHtml(md: string): string {
-  let html = md;
+  // Escape HTML entities first to prevent XSS, then apply markdown transforms
+  let html = escapeHtml(md);
   // Code blocks first (before other transforms)
   html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre style="background:var(--bg-tertiary);padding:8px;border-radius:4px;overflow-x:auto;font-size:12px;margin:4px 0"><code>$2</code></pre>');
   // Headings
