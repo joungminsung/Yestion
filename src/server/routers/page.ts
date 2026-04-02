@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "@/server/trpc/init";
 import type { Context } from "@/server/trpc/init";
@@ -127,7 +128,7 @@ export const pageRouter = router({
           data: input.blocks.map((block, idx) => ({
             pageId: page.id,
             type: (block.type as string) || "paragraph",
-            content: { tiptapNode: block } as Record<string, unknown>,
+            content: { tiptapNode: block } as Prisma.InputJsonValue,
             position: idx,
           })),
         });

@@ -75,6 +75,99 @@ function matchCondition(row: RowData, condition: FilterCondition): boolean {
     case "on_or_after":
       if (value == null || value === "") return false;
       return new Date(String(value)).getTime() >= new Date(String(target)).getTime();
+    // Relative date operators
+    case "is_today": {
+      if (value == null || value === "") return false;
+      const d = new Date(String(value));
+      const now = new Date();
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    }
+    case "is_yesterday": {
+      if (value == null || value === "") return false;
+      const d = new Date(String(value));
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      return d.getFullYear() === yesterday.getFullYear() && d.getMonth() === yesterday.getMonth() && d.getDate() === yesterday.getDate();
+    }
+    case "is_this_week": {
+      if (value == null || value === "") return false;
+      const d = new Date(String(value));
+      const now = new Date();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 7);
+      return d.getTime() >= startOfWeek.getTime() && d.getTime() < endOfWeek.getTime();
+    }
+    case "is_last_week": {
+      if (value == null || value === "") return false;
+      const d = new Date(String(value));
+      const now = new Date();
+      const startOfThisWeek = new Date(now);
+      startOfThisWeek.setDate(now.getDate() - now.getDay());
+      startOfThisWeek.setHours(0, 0, 0, 0);
+      const startOfLastWeek = new Date(startOfThisWeek);
+      startOfLastWeek.setDate(startOfThisWeek.getDate() - 7);
+      return d.getTime() >= startOfLastWeek.getTime() && d.getTime() < startOfThisWeek.getTime();
+    }
+    case "is_this_month": {
+      if (value == null || value === "") return false;
+      const d = new Date(String(value));
+      const now = new Date();
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }
+    case "is_last_month": {
+      if (value == null || value === "") return false;
+      const d = new Date(String(value));
+      const now = new Date();
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      return d.getFullYear() === lastMonth.getFullYear() && d.getMonth() === lastMonth.getMonth();
+    }
+    case "is_last_7_days": {
+      if (value == null || value === "") return false;
+      const d = new Date(String(value));
+      const now = new Date();
+      const sevenDaysAgo = new Date(now);
+      sevenDaysAgo.setDate(now.getDate() - 7);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+      return d.getTime() >= sevenDaysAgo.getTime() && d.getTime() <= now.getTime();
+    }
+    case "is_last_30_days": {
+      if (value == null || value === "") return false;
+      const d = new Date(String(value));
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now);
+      thirtyDaysAgo.setDate(now.getDate() - 30);
+      thirtyDaysAgo.setHours(0, 0, 0, 0);
+      return d.getTime() >= thirtyDaysAgo.getTime() && d.getTime() <= now.getTime();
+    }
+    case "is_next_7_days": {
+      if (value == null || value === "") return false;
+      const d = new Date(String(value));
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const sevenDaysLater = new Date(now);
+      sevenDaysLater.setDate(now.getDate() + 7);
+      return d.getTime() >= now.getTime() && d.getTime() <= sevenDaysLater.getTime();
+    }
+    case "is_next_30_days": {
+      if (value == null || value === "") return false;
+      const d = new Date(String(value));
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const thirtyDaysLater = new Date(now);
+      thirtyDaysLater.setDate(now.getDate() + 30);
+      return d.getTime() >= now.getTime() && d.getTime() <= thirtyDaysLater.getTime();
+    }
+    case "is_within_range": {
+      if (value == null || value === "") return false;
+      if (!Array.isArray(target) || target.length !== 2) return false;
+      const d = new Date(String(value)).getTime();
+      const start = new Date(String(target[0])).getTime();
+      const end = new Date(String(target[1])).getTime();
+      return d >= start && d <= end;
+    }
     default:
       return true;
   }

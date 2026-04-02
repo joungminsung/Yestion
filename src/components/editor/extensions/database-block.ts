@@ -1,4 +1,6 @@
 import { Node, mergeAttributes } from "@tiptap/core";
+import { ReactNodeViewRenderer } from "@tiptap/react";
+import { DatabaseBlockView } from "../node-views/database-block-view";
 
 export const DatabaseBlock = Node.create({
   name: "databaseBlock",
@@ -25,7 +27,11 @@ export const DatabaseBlock = Node.create({
         "data-type": "database-block",
         class: "notion-database-block",
       }),
-      "\uD83D\uDCCA \uB370\uC774\uD130\uBCA0\uC774\uC2A4",
+      "📊 데이터베이스",
     ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(DatabaseBlockView);
   },
 });

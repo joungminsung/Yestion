@@ -47,6 +47,25 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
   const addPropertyMutation = trpc.database.addProperty.useMutation({
     onSuccess: () => utils.database.get.invalidate({ databaseId }),
   });
+  const deleteRowMutation = trpc.database.deleteRow.useMutation({
+    onSuccess: () => utils.database.get.invalidate({ databaseId }),
+  });
+  const bulkDeleteMutation = trpc.database.bulkDeleteRows.useMutation({
+    onSuccess: () => {
+      utils.database.get.invalidate({ databaseId });
+      clearSelection();
+    },
+  });
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- exposed for programmatic bulk updates
+  const bulkUpdateMutation = trpc.database.bulkUpdateRows.useMutation({
+    onSuccess: () => {
+      utils.database.get.invalidate({ databaseId });
+      clearSelection();
+    },
+  });
+  const duplicateRowMutation = trpc.database.duplicateRow.useMutation({
+    onSuccess: () => utils.database.get.invalidate({ databaseId }),
+  });
 
   const {
     activeViewId,
@@ -56,6 +75,12 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
     setLocalSorts,
     localGroup,
     resetLocal,
+    selectedRowIds,
+    clearSelection,
+    searchQuery,
+    currentPage,
+    pageSize,
+    setCurrentPage,
   } = useDatabaseStore();
 
   // Auto-select first view
@@ -145,8 +170,30 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
     });
   }, [addPropertyMutation, databaseId]);
 
-  // Apply filter + sort
-  const processedRows = useMemo(() => {
+  const handleBulkDelete = useCallback(() => {
+    if (selectedRowIds.size === 0) return;
+    bulkDeleteMutation.mutate({
+      databaseId,
+      rowIds: Array.from(selectedRowIds),
+    });
+  }, [selectedRowIds, bulkDeleteMutation, databaseId]);
+
+  const handleDuplicateRow = useCallback(
+    (rowId: string) => {
+      duplicateRowMutation.mutate({ rowId });
+    },
+    [duplicateRowMutation],
+  );
+
+  const handleDeleteRow = useCallback(
+    (rowId: string) => {
+      deleteRowMutation.mutate({ id: rowId });
+    },
+    [deleteRowMutation],
+  );
+
+  // Apply filter + sort + search
+  const allProcessedRows = useMemo(() => {
     if (!data) return [];
     const rows = data.rows.map((r) => ({
       ...r,
@@ -154,23 +201,46 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
         ? r.values
         : {}) as Record<string, unknown>,
     }));
-    const filtered = filterRows(rows, effectiveFilter);
+    let filtered = filterRows(rows, effectiveFilter);
+
+    // Apply search query across all text values
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter((row) => {
+        // Search page title
+        if (row.page?.title?.toLowerCase().includes(q)) return true;
+        // Search all values
+        return Object.values(row.values).some((val) => {
+          if (val == null) return false;
+          return String(val).toLowerCase().includes(q);
+        });
+      });
+    }
+
     return sortRows(filtered, effectiveSorts, propertyTypes);
-  }, [data, effectiveFilter, effectiveSorts, propertyTypes]);
+  }, [data, effectiveFilter, effectiveSorts, propertyTypes, searchQuery]);
+
+  // Pagination
+  const totalRows = allProcessedRows.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const processedRows = useMemo(() => {
+    const start = currentPage * pageSize;
+    return allProcessedRows.slice(start, start + pageSize);
+  }, [allProcessedRows, currentPage, pageSize]);
 
   // ── Peek view state ──────────────────────────────────────────
   const [peekRow, setPeekRow] = useState<RowData | null>(null);
 
   const handleRowClick = useCallback(
     (pageId: string) => {
-      const row = processedRows.find((r) => r.pageId === pageId);
+      const row = allProcessedRows.find((r) => r.pageId === pageId);
       if (row) {
         setPeekRow(row);
       } else {
         router.push(`/page/${pageId}`);
       }
     },
-    [processedRows, router],
+    [allProcessedRows, router],
   );
 
   const handleOpenFullPage = useCallback(
@@ -289,6 +359,8 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
             {...viewProps}
             sorts={effectiveSorts}
             onSortChange={handleSortChange}
+            onDeleteRow={handleDeleteRow}
+            onDuplicateRow={handleDuplicateRow}
           />
         );
       case "board":
@@ -312,6 +384,8 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
             {...viewProps}
             sorts={effectiveSorts}
             onSortChange={handleSortChange}
+            onDeleteRow={handleDeleteRow}
+            onDuplicateRow={handleDuplicateRow}
           />
         );
     }
@@ -338,20 +412,32 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
   return (
     <div className="flex flex-col">
       {/* View tabs */}
-      <div className="flex items-center gap-1 border-b px-2 py-1" style={{ borderColor: "var(--border-default)" }}>
-        {data.views.map((view) => (
-          <button
-            key={view.id}
-            onClick={() => setActiveView(view.id)}
-            className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-              view.id === activeViewId
-                ? "bg-[var(--bg-hover)] text-[var(--text-primary)]"
-                : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-            }`}
-          >
-            {viewTypeIcon(view.type)} {view.name}
-          </button>
-        ))}
+      <div
+        className="flex items-center gap-0 border-b px-1"
+        style={{ borderColor: "var(--border-default)" }}
+      >
+        {data.views.map((view) => {
+          const isActive = view.id === activeViewId;
+          return (
+            <button
+              key={view.id}
+              onClick={() => setActiveView(view.id)}
+              className="relative flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium transition-colors hover:bg-[var(--bg-hover)]"
+              style={{
+                color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
+              }}
+            >
+              <span className="opacity-60">{viewTypeIcon(view.type)}</span>
+              <span>{view.name}</span>
+              {isActive && (
+                <span
+                  className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full"
+                  style={{ backgroundColor: "#2383e2" }}
+                />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Toolbar */}
@@ -382,6 +468,35 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
             style={{ color: "var(--text-secondary)" }}
           >
             Collapse all
+          </button>
+        </div>
+      )}
+
+      {/* Bulk actions bar */}
+      {selectedRowIds.size > 0 && (
+        <div
+          className="flex items-center gap-3 border-b px-3 py-1.5"
+          style={{
+            borderColor: "var(--border-default)",
+            backgroundColor: "#2383e210",
+          }}
+        >
+          <span className="text-xs font-medium" style={{ color: "#2383e2" }}>
+            {selectedRowIds.size}개 선택됨
+          </span>
+          <button
+            onClick={handleBulkDelete}
+            disabled={bulkDeleteMutation.isPending}
+            className="rounded px-2 py-0.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
+          >
+            {bulkDeleteMutation.isPending ? "삭제 중..." : "일괄 삭제"}
+          </button>
+          <button
+            onClick={clearSelection}
+            className="rounded px-2 py-0.5 text-xs transition-colors hover:bg-[var(--bg-hover)]"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            선택 해제
           </button>
         </div>
       )}
@@ -427,6 +542,39 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
           renderView(processedRows)
         )}
       </div>
+
+      {/* Pagination */}
+      {totalRows > pageSize && (
+        <div
+          className="flex items-center justify-between border-t px-3 py-2"
+          style={{ borderColor: "var(--border-default)" }}
+        >
+          <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+            {totalRows}개 중 {currentPage * pageSize + 1}-{Math.min((currentPage + 1) * pageSize, totalRows)}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
+              disabled={currentPage === 0}
+              className="rounded px-2 py-1 text-xs transition-colors hover:bg-[var(--bg-hover)] disabled:opacity-30"
+              style={{ color: "var(--text-primary)" }}
+            >
+              &larr; 이전
+            </button>
+            <span className="px-2 text-xs" style={{ color: "var(--text-secondary)" }}>
+              {currentPage + 1} / {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages - 1, currentPage + 1))}
+              disabled={currentPage >= totalPages - 1}
+              className="rounded px-2 py-1 text-xs transition-colors hover:bg-[var(--bg-hover)] disabled:opacity-30"
+              style={{ color: "var(--text-primary)" }}
+            >
+              다음 &rarr;
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Row Peek Panel */}
       {peekRow && data && (

@@ -43,3 +43,39 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     last_edited_time: database.updatedAt.toISOString(),
   });
 }
+
+// DELETE /api/v1/databases/:id — Delete database and all contents
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const auth = await authenticateApiKey(request);
+  if (!auth) return unauthorized();
+
+  const { id } = await params;
+  const database = await db.database.findUnique({
+    where: { id },
+    include: { page: { select: { workspaceId: true, id: true } } },
+  });
+
+  if (!database) return notFound("Database not found");
+  if (database.page.workspaceId !== auth.workspaceId) return forbidden();
+
+  // Delete all contents in a transaction
+  const rows = await db.row.findMany({
+    where: { databaseId: id },
+    select: { pageId: true },
+  });
+  const pageIds = rows.map((r) => r.pageId);
+
+  await db.$transaction(async (tx) => {
+    await tx.rowTemplate.deleteMany({ where: { databaseId: id } });
+    await tx.row.deleteMany({ where: { databaseId: id } });
+    await tx.databaseView.deleteMany({ where: { databaseId: id } });
+    await tx.property.deleteMany({ where: { databaseId: id } });
+    await tx.database.delete({ where: { id } });
+    if (pageIds.length > 0) {
+      await tx.page.deleteMany({ where: { id: { in: pageIds } } });
+    }
+    await tx.page.delete({ where: { id: database.page.id } });
+  });
+
+  return Response.json({ object: "database", id, deleted: true });
+}

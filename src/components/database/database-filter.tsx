@@ -42,6 +42,17 @@ const DATE_OPERATORS: { value: FilterOperator; label: string }[] = [
   { value: "after", label: "이후" },
   { value: "on_or_before", label: "이전 또는 같음" },
   { value: "on_or_after", label: "이후 또는 같음" },
+  { value: "is_today", label: "오늘" },
+  { value: "is_yesterday", label: "어제" },
+  { value: "is_this_week", label: "이번 주" },
+  { value: "is_last_week", label: "지난 주" },
+  { value: "is_this_month", label: "이번 달" },
+  { value: "is_last_month", label: "지난 달" },
+  { value: "is_last_7_days", label: "최근 7일" },
+  { value: "is_last_30_days", label: "최근 30일" },
+  { value: "is_next_7_days", label: "향후 7일" },
+  { value: "is_next_30_days", label: "향후 30일" },
+  { value: "is_within_range", label: "범위 내" },
   { value: "is_empty", label: "비어 있음" },
   { value: "is_not_empty", label: "비어 있지 않음" },
 ];
@@ -58,6 +69,15 @@ const CHECKBOX_OPERATORS: { value: FilterOperator; label: string }[] = [
   { value: "does_not_equal", label: "같지 않음" },
 ];
 
+const PERSON_OPERATORS: { value: FilterOperator; label: string }[] = [
+  { value: "equals", label: "같음" },
+  { value: "does_not_equal", label: "같지 않음" },
+  { value: "contains", label: "포함" },
+  { value: "does_not_contain", label: "포함하지 않음" },
+  { value: "is_empty", label: "비어 있음" },
+  { value: "is_not_empty", label: "비어 있지 않음" },
+];
+
 function getOperatorsForType(type: PropertyType) {
   switch (type) {
     case "number":
@@ -72,6 +92,8 @@ function getOperatorsForType(type: PropertyType) {
       return SELECT_OPERATORS;
     case "checkbox":
       return CHECKBOX_OPERATORS;
+    case "person":
+      return PERSON_OPERATORS;
     default:
       return TEXT_OPERATORS;
   }
@@ -90,11 +112,16 @@ function flatConditions(filter: FilterGroup | null): FilterCondition[] {
 
 function makeEmptyCondition(propertyId: string, type: PropertyType): FilterCondition {
   const ops = getOperatorsForType(type);
+  const operator = ops[0]?.value ?? "contains";
+  let initialValue: FilterCondition["value"] = type === "checkbox" ? true : "";
+  if (operator === "is_within_range") {
+    initialValue = ["", ""];
+  }
   return {
     id: crypto.randomUUID(),
     propertyId,
-    operator: ops[0]?.value ?? "contains",
-    value: type === "checkbox" ? true : "",
+    operator,
+    value: initialValue,
   };
 }
 
@@ -202,7 +229,12 @@ export function DatabaseFilter({
           const prop = properties.find((p) => p.id === cond.propertyId);
           const propType = prop?.type ?? "text";
           const operators = getOperatorsForType(propType);
-          const noValueOps: FilterOperator[] = ["is_empty", "is_not_empty"];
+          const noValueOps: FilterOperator[] = [
+            "is_empty", "is_not_empty",
+            "is_today", "is_yesterday", "is_this_week", "is_last_week",
+            "is_this_month", "is_last_month", "is_last_7_days", "is_last_30_days",
+            "is_next_7_days", "is_next_30_days",
+          ];
           const needsValue = !noValueOps.includes(cond.operator);
 
           return (
@@ -239,7 +271,10 @@ export function DatabaseFilter({
               <select
                 value={cond.operator}
                 onChange={(e) =>
-                  updateCondition(idx, { operator: e.target.value as FilterOperator })
+                  updateCondition(idx, {
+                    operator: e.target.value as FilterOperator,
+                    ...(e.target.value === "is_within_range" ? { value: ["", ""] } : {}),
+                  })
                 }
                 className="h-7 flex-shrink-0 rounded border px-1.5 text-xs"
                 style={{
@@ -353,7 +388,33 @@ function ConditionValueInput({
 
     case "date":
     case "created_time":
-    case "last_edited_time":
+    case "last_edited_time": {
+      // Check if the operator requires a range input
+      // We get operator from parent... pass it through
+      // Since we don't have operator here, we check value type
+      const isRange = Array.isArray(value);
+      if (isRange || (typeof value === "object" && value !== null)) {
+        const rangeValue = Array.isArray(value) ? value : ["", ""];
+        return (
+          <div className="flex items-center gap-1 flex-1">
+            <input
+              type="date"
+              value={typeof rangeValue[0] === "string" ? rangeValue[0] : ""}
+              onChange={(e) => onChange([e.target.value, rangeValue[1] ?? ""])}
+              className="h-7 min-w-0 flex-1 rounded border px-1.5 text-xs"
+              style={baseStyle}
+            />
+            <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>~</span>
+            <input
+              type="date"
+              value={typeof rangeValue[1] === "string" ? rangeValue[1] : ""}
+              onChange={(e) => onChange([rangeValue[0] ?? "", e.target.value])}
+              className="h-7 min-w-0 flex-1 rounded border px-1.5 text-xs"
+              style={baseStyle}
+            />
+          </div>
+        );
+      }
       return (
         <input
           type="date"
@@ -363,6 +424,7 @@ function ConditionValueInput({
           style={baseStyle}
         />
       );
+    }
 
     case "select":
     case "status":

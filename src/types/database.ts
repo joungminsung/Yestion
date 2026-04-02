@@ -86,7 +86,20 @@ export type FilterOperator =
   | "before"
   | "after"
   | "on_or_before"
-  | "on_or_after";
+  | "on_or_after"
+  // Relative date operators
+  | "is_today"
+  | "is_yesterday"
+  | "is_this_week"
+  | "is_last_week"
+  | "is_this_month"
+  | "is_last_month"
+  | "is_last_7_days"
+  | "is_last_30_days"
+  | "is_next_7_days"
+  | "is_next_30_days"
+  // Range
+  | "is_within_range";
 
 export type FilterCondition = {
   id?: string;
@@ -143,6 +156,8 @@ export type ViewConfig = {
   group?: GroupRule;
   visibleProperties?: string[];   // ordered property IDs
   propertyWidths?: Record<string, number>;
+  // pinned columns (sticky on horizontal scroll)
+  pinnedProperties?: string[];
   // board-specific
   boardGroupBy?: string;           // property ID for board columns
   // calendar-specific

@@ -68,6 +68,64 @@ function defaultViewConfig(type: string) {
   }
 }
 
+function remapPropertyIdsInConfig(
+  config: Record<string, unknown>,
+  propertyIdMap: Map<string, string>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...config };
+
+  // Remap known property ID fields
+  for (const key of ["boardGroupBy", "calendarDateProperty", "timelineStartProperty", "timelineEndProperty", "galleryCoverProperty"]) {
+    if (typeof result[key] === "string" && propertyIdMap.has(result[key] as string)) {
+      result[key] = propertyIdMap.get(result[key] as string);
+    }
+  }
+
+  // Remap visibleProperties array
+  if (Array.isArray(result.visibleProperties)) {
+    result.visibleProperties = (result.visibleProperties as string[]).map(
+      (id) => propertyIdMap.get(id) ?? id,
+    );
+  }
+
+  // Remap pinnedProperties array
+  if (Array.isArray(result.pinnedProperties)) {
+    result.pinnedProperties = (result.pinnedProperties as string[]).map(
+      (id) => propertyIdMap.get(id) ?? id,
+    );
+  }
+
+  // Remap propertyWidths keys
+  if (result.propertyWidths && typeof result.propertyWidths === "object") {
+    const oldWidths = result.propertyWidths as Record<string, number>;
+    const newWidths: Record<string, number> = {};
+    for (const [key, val] of Object.entries(oldWidths)) {
+      newWidths[propertyIdMap.get(key) ?? key] = val;
+    }
+    result.propertyWidths = newWidths;
+  }
+
+  // Remap columnAggregations keys
+  if (result.columnAggregations && typeof result.columnAggregations === "object") {
+    const oldAgg = result.columnAggregations as Record<string, string>;
+    const newAgg: Record<string, string> = {};
+    for (const [key, val] of Object.entries(oldAgg)) {
+      newAgg[propertyIdMap.get(key) ?? key] = val;
+    }
+    result.columnAggregations = newAgg;
+  }
+
+  // Remap group propertyId
+  if (result.group && typeof result.group === "object") {
+    const group = result.group as Record<string, unknown>;
+    if (typeof group.propertyId === "string" && propertyIdMap.has(group.propertyId)) {
+      result.group = { ...group, propertyId: propertyIdMap.get(group.propertyId) };
+    }
+  }
+
+  return result;
+}
+
 // ── Router ───────────────────────────────────────────────────
 
 export const databaseRouter = router({
@@ -877,5 +935,292 @@ export const databaseRouter = router({
           lockedAt: newLocked ? new Date() : null,
         },
       });
+    }),
+
+  bulkDeleteRows: protectedProcedure
+    .input(z.object({
+      databaseId: z.string(),
+      rowIds: z.array(z.string()).min(1).max(500),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await verifyDatabaseAccess(ctx.db, ctx.session.user.id, input.databaseId);
+      await checkDatabaseNotLocked(ctx.db, input.databaseId);
+
+      const rows = await ctx.db.row.findMany({
+        where: { id: { in: input.rowIds }, databaseId: input.databaseId },
+        select: { id: true, pageId: true },
+      });
+
+      await ctx.db.$transaction(async (tx) => {
+        const pageIds = rows.map((r) => r.pageId);
+        await tx.row.deleteMany({ where: { id: { in: rows.map((r) => r.id) } } });
+        await tx.page.deleteMany({ where: { id: { in: pageIds } } });
+      });
+
+      return { success: true, deletedCount: rows.length };
+    }),
+
+  bulkUpdateRows: protectedProcedure
+    .input(z.object({
+      databaseId: z.string(),
+      rowIds: z.array(z.string()).min(1).max(500),
+      values: z.record(z.string(), z.any()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await verifyDatabaseAccess(ctx.db, ctx.session.user.id, input.databaseId);
+      await checkDatabaseNotLocked(ctx.db, input.databaseId);
+
+      const rows = await ctx.db.row.findMany({
+        where: { id: { in: input.rowIds }, databaseId: input.databaseId },
+      });
+
+      await Promise.all(
+        rows.map((row) => {
+          const existingValues = (row.values as Record<string, unknown>) ?? {};
+          const mergedValues = { ...existingValues, ...input.values };
+          return ctx.db.row.update({
+            where: { id: row.id },
+            data: { values: mergedValues },
+          });
+        }),
+      );
+
+      return { success: true, updatedCount: rows.length };
+    }),
+
+  duplicateRow: protectedProcedure
+    .input(z.object({
+      rowId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await ctx.db.row.findUnique({
+        where: { id: input.rowId },
+        include: {
+          page: true,
+          database: { include: { page: { select: { workspaceId: true } } } },
+        },
+      });
+      if (!row) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Row not found" });
+      }
+      await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, row.database.page.workspaceId);
+      await checkDatabaseNotLocked(ctx.db, row.databaseId);
+
+      const newPage = await ctx.db.page.create({
+        data: {
+          workspaceId: row.database.page.workspaceId,
+          title: `${row.page.title} (copy)`,
+          parentId: row.database.pageId,
+          createdBy: ctx.session.user.id,
+          lastEditedBy: ctx.session.user.id,
+        },
+      });
+
+      return ctx.db.row.create({
+        data: {
+          databaseId: row.databaseId,
+          pageId: newPage.id,
+          values: row.values ?? {},
+        },
+        include: {
+          page: { select: { id: true, title: true, icon: true } },
+        },
+      });
+    }),
+
+  duplicateView: protectedProcedure
+    .input(z.object({ viewId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const view = await ctx.db.databaseView.findUnique({
+        where: { id: input.viewId },
+        include: { database: { include: { page: { select: { workspaceId: true } } } } },
+      });
+      if (!view) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "View not found" });
+      }
+      await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, view.database.page.workspaceId);
+
+      const last = await ctx.db.databaseView.findFirst({
+        where: { databaseId: view.databaseId },
+        orderBy: { position: "desc" },
+        select: { position: true },
+      });
+      const position = (last?.position ?? -1) + 1;
+
+      return ctx.db.databaseView.create({
+        data: {
+          databaseId: view.databaseId,
+          name: `${view.name} (copy)`,
+          type: view.type,
+          config: view.config ?? {},
+          position,
+        },
+      });
+    }),
+
+  duplicateDatabase: protectedProcedure
+    .input(z.object({ databaseId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const source = await ctx.db.database.findUnique({
+        where: { id: input.databaseId },
+        include: {
+          page: true,
+          properties: { orderBy: { position: "asc" } },
+          views: { orderBy: { position: "asc" } },
+          rows: { include: { page: true } },
+        },
+      });
+      if (!source) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Database not found" });
+      }
+      await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, source.page.workspaceId);
+
+      // Create new page for the database
+      const newDbPage = await ctx.db.page.create({
+        data: {
+          workspaceId: source.page.workspaceId,
+          title: `${source.page.title} (copy)`,
+          createdBy: ctx.session.user.id,
+          lastEditedBy: ctx.session.user.id,
+        },
+      });
+
+      // Create new database
+      const newDb = await ctx.db.database.create({
+        data: {
+          pageId: newDbPage.id,
+          isInline: source.isInline,
+        },
+      });
+
+      // Copy properties, build old->new ID map
+      const propertyIdMap = new Map<string, string>();
+      for (const prop of source.properties) {
+        const newProp = await ctx.db.property.create({
+          data: {
+            databaseId: newDb.id,
+            name: prop.name,
+            type: prop.type,
+            config: prop.config ?? {},
+            position: prop.position,
+            isVisible: prop.isVisible,
+          },
+        });
+        propertyIdMap.set(prop.id, newProp.id);
+      }
+
+      // Copy views (remap property IDs in config)
+      for (const view of source.views) {
+        const config = (view.config as Record<string, unknown>) ?? {};
+        const remappedConfig = remapPropertyIdsInConfig(config, propertyIdMap);
+        await ctx.db.databaseView.create({
+          data: {
+            databaseId: newDb.id,
+            name: view.name,
+            type: view.type,
+            config: remappedConfig as Prisma.InputJsonValue,
+            position: view.position,
+          },
+        });
+      }
+
+      // Copy rows (remap property IDs in values)
+      for (const row of source.rows) {
+        const oldValues = (row.values as Record<string, unknown>) ?? {};
+        const newValues: Record<string, unknown> = {};
+        for (const [key, val] of Object.entries(oldValues)) {
+          const newKey = propertyIdMap.get(key) ?? key;
+          newValues[newKey] = val;
+        }
+
+        const newRowPage = await ctx.db.page.create({
+          data: {
+            workspaceId: source.page.workspaceId,
+            title: row.page.title,
+            parentId: newDbPage.id,
+            createdBy: ctx.session.user.id,
+            lastEditedBy: ctx.session.user.id,
+          },
+        });
+
+        await ctx.db.row.create({
+          data: {
+            databaseId: newDb.id,
+            pageId: newRowPage.id,
+            values: newValues as Prisma.InputJsonValue,
+          },
+        });
+      }
+
+      return ctx.db.database.findUnique({
+        where: { id: newDb.id },
+        include: {
+          page: true,
+          properties: { orderBy: { position: "asc" } },
+          views: { orderBy: { position: "asc" } },
+        },
+      });
+    }),
+
+  deleteDatabase: protectedProcedure
+    .input(z.object({ databaseId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const database = await verifyDatabaseAccess(ctx.db, ctx.session.user.id, input.databaseId);
+
+      await ctx.db.$transaction(async (tx) => {
+        // Delete all row pages
+        const rows = await tx.row.findMany({
+          where: { databaseId: input.databaseId },
+          select: { pageId: true },
+        });
+        const pageIds = rows.map((r) => r.pageId);
+
+        await tx.rowTemplate.deleteMany({ where: { databaseId: input.databaseId } });
+        await tx.row.deleteMany({ where: { databaseId: input.databaseId } });
+        await tx.databaseView.deleteMany({ where: { databaseId: input.databaseId } });
+        await tx.property.deleteMany({ where: { databaseId: input.databaseId } });
+        await tx.database.delete({ where: { id: input.databaseId } });
+        if (pageIds.length > 0) {
+          await tx.page.deleteMany({ where: { id: { in: pageIds } } });
+        }
+        await tx.page.delete({ where: { id: database.pageId } });
+      });
+
+      return { success: true };
+    }),
+
+  reorderViews: protectedProcedure
+    .input(z.object({
+      views: z.array(z.object({ id: z.string(), position: z.number() })),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.views.length === 0) return { success: true };
+
+      const allViews = await ctx.db.databaseView.findMany({
+        where: { id: { in: input.views.map((v) => v.id) } },
+        select: { id: true, databaseId: true },
+      });
+
+      if (allViews.length !== input.views.length) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "One or more views not found" });
+      }
+
+      const uniqueDbIds = new Set(allViews.map((v) => v.databaseId));
+      if (uniqueDbIds.size !== 1) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "All views must belong to the same database" });
+      }
+
+      const databaseId = Array.from(uniqueDbIds)[0]!;
+      await verifyDatabaseAccess(ctx.db, ctx.session.user.id, databaseId);
+
+      await Promise.all(
+        input.views.map((v) =>
+          ctx.db.databaseView.update({
+            where: { id: v.id },
+            data: { position: v.position },
+          }),
+        ),
+      );
+      return { success: true };
     }),
 });

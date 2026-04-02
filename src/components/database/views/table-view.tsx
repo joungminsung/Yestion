@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { useDatabaseStore } from "@/stores/database";
 import { CellRenderer } from "../cell-renderer";
 import { CellEditor } from "../cell-editor";
 import { propertyTypeIcon } from "../property-type-icon";
@@ -16,6 +17,8 @@ type TableViewProps = {
   onUpdateRow: (rowId: string, propertyId: string, value: unknown) => void;
   onAddProperty: () => void;
   onRowClick: (pageId: string) => void;
+  onDeleteRow?: (rowId: string) => void;
+  onDuplicateRow?: (rowId: string) => void;
   sorts?: SortRule[];
   onSortChange?: (sorts: SortRule[]) => void;
   onReorderRow?: (draggedRowId: string, targetRowId: string) => void;
@@ -58,6 +61,8 @@ const AGGREGATION_OPTIONS: { value: AggregationFunction; label: string }[] = [
   { value: "range", label: "Range" },
 ];
 
+const CHECKBOX_WIDTH = 28;
+
 export function TableView({
   properties,
   rows,
@@ -66,10 +71,22 @@ export function TableView({
   onUpdateRow,
   onAddProperty,
   onRowClick,
+  onDeleteRow,
+  onDuplicateRow,
   sorts,
   onSortChange,
   onReorderRow,
 }: TableViewProps) {
+  // Row selection from store
+  const { selectedRowIds, toggleRowSelection, selectAllRows } = useDatabaseStore();
+
+  // Context menu for row actions
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    rowId: string;
+    pageId: string;
+  } | null>(null);
   const [editingCell, setEditingCell] = useState<{
     rowId: string;
     propertyId: string;
@@ -149,11 +166,30 @@ export function TableView({
     [columnWidths],
   );
 
+  // Pinned columns
+  const pinnedSet = useMemo(
+    () => new Set(viewConfig.pinnedProperties ?? []),
+    [viewConfig.pinnedProperties],
+  );
+
+  // Calculate pinned column left offsets for sticky positioning
+  const pinnedOffsets = useMemo(() => {
+    const offsets: Record<string, number> = {};
+    let left = ROW_NUMBER_WIDTH + CHECKBOX_WIDTH; // after row number + checkbox
+    for (const prop of visibleProperties) {
+      if (pinnedSet.has(prop.id)) {
+        offsets[prop.id] = left;
+        left += getColumnWidth(prop.id, prop.type);
+      }
+    }
+    return offsets;
+  }, [visibleProperties, pinnedSet, getColumnWidth]);
+
   const gridTemplateColumns = useMemo(() => {
     const cols = visibleProperties.map(
       (p) => `${getColumnWidth(p.id, p.type)}px`,
     );
-    return `${ROW_NUMBER_WIDTH}px ${cols.join(" ")} 44px`;
+    return `${CHECKBOX_WIDTH}px ${ROW_NUMBER_WIDTH}px ${cols.join(" ")} 44px`;
   }, [visibleProperties, getColumnWidth]);
 
   const handleCellClick = useCallback(
@@ -333,16 +369,28 @@ export function TableView({
     [onReorderRow],
   );
 
-  // Close aggregation dropdown on outside click
+  // Close aggregation dropdown and context menu on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (aggregationDropdown && aggDropdownRef.current && !aggDropdownRef.current.contains(e.target as Node)) {
         setAggregationDropdown(null);
       }
+      if (contextMenu) {
+        setContextMenu(null);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [aggregationDropdown]);
+  }, [aggregationDropdown, contextMenu]);
+
+  // Row context menu handler
+  const handleRowContextMenu = useCallback(
+    (e: React.MouseEvent, rowId: string, pageId: string) => {
+      e.preventDefault();
+      setContextMenu({ x: e.clientX, y: e.clientY, rowId, pageId });
+    },
+    [],
+  );
 
   // Virtual scrolling setup
   const rowVirtualizer = useVirtualizer({
@@ -388,6 +436,23 @@ export function TableView({
             display: "contents",
           }}
         >
+          {/* Select all checkbox */}
+          <div
+            className="sticky top-0 flex items-center justify-center border-b border-r"
+            style={{
+              backgroundColor: "var(--bg-secondary, #f7f6f3)",
+              borderColor: "var(--border-default)",
+              height: 33,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={rows.length > 0 && rows.every((r) => selectedRowIds.has(r.id))}
+              onChange={() => selectAllRows(rows.map((r) => r.id))}
+              className="h-3.5 w-3.5 accent-[#2383e2]"
+            />
+          </div>
+
           {/* Row number header */}
           <div
             className="sticky top-0 flex items-center justify-center border-b border-r text-xs font-medium"
@@ -401,18 +466,32 @@ export function TableView({
 
           {visibleProperties.map((property) => {
             const currentSort = sorts?.find((s) => s.propertyId === property.id);
+            const isPinned = pinnedSet.has(property.id);
             return (
               <ColumnHeader
                 key={property.id}
                 property={property}
                 width={getColumnWidth(property.id, property.type)}
                 sortDirection={currentSort?.direction}
+                isPinned={isPinned}
+                pinnedOffset={pinnedOffsets[property.id]}
                 onSortClick={onSortChange ? () => handleHeaderSortClick(property.id) : undefined}
                 onResize={(newWidth) => {
                   setColumnWidths((prev) => ({
                     ...prev,
                     [property.id]: Math.max(MIN_COLUMN_WIDTH, newWidth),
                   }));
+                }}
+                onTogglePin={() => {
+                  const current = viewConfig.pinnedProperties ?? [];
+                  const next = isPinned
+                    ? current.filter((id) => id !== property.id)
+                    : [...current, property.id];
+                  const event = new CustomEvent("database:updatePinnedProperties", {
+                    detail: { pinnedProperties: next },
+                    bubbles: true,
+                  });
+                  document.dispatchEvent(event);
                 }}
               />
             );
@@ -459,6 +538,7 @@ export function TableView({
               }}
               onMouseEnter={() => setHoveredRowId(row.id)}
               onMouseLeave={() => setHoveredRowId(null)}
+              onContextMenu={(e) => handleRowContextMenu(e, row.id, row.pageId)}
             >
               {/* Drop indicator above this row */}
               {dropTargetRowId === row.id && draggingRowId !== row.id && (
@@ -470,6 +550,31 @@ export function TableView({
                   }}
                 />
               )}
+
+              {/* Row checkbox */}
+              <div
+                className="flex items-center justify-center border-b border-r"
+                style={{
+                  borderColor: "var(--border-default)",
+                  backgroundColor:
+                    selectedRowIds.has(row.id)
+                      ? "#2383e210"
+                      : hoveredRowId === row.id
+                      ? "var(--bg-hover)"
+                      : "var(--bg-primary)",
+                  height: effectiveRowHeight,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedRowIds.has(row.id)}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    toggleRowSelection(row.id);
+                  }}
+                  className="h-3.5 w-3.5 accent-[#2383e2]"
+                />
+              </div>
 
               {/* Row number / drag handle */}
               <div
@@ -508,6 +613,7 @@ export function TableView({
                 const value = property.type === "title"
                   ? (row.page?.title ?? row.values[property.id])
                   : row.values[property.id];
+                const isPinned = pinnedSet.has(property.id);
 
                 return (
                   <div
@@ -518,7 +624,9 @@ export function TableView({
                     style={{
                       borderColor: "var(--border-default)",
                       backgroundColor:
-                        hoveredRowId === row.id
+                        selectedRowIds.has(row.id)
+                          ? "#2383e210"
+                          : hoveredRowId === row.id
                           ? "var(--bg-hover)"
                           : "var(--bg-primary)",
                       color: "var(--text-primary)",
@@ -528,6 +636,11 @@ export function TableView({
                         property.type === "title" ? "pointer" : "default",
                       outline: isFocused ? "2px solid #2383e2" : "none",
                       outlineOffset: -2,
+                      ...(isPinned ? {
+                        position: "sticky" as const,
+                        left: pinnedOffsets[property.id],
+                        zIndex: 5,
+                      } : {}),
                     }}
                     onClick={() => {
                       if (property.type === "title") {
@@ -607,6 +720,11 @@ export function TableView({
 
         {/* ── Summary Row ──────────────────────────── */}
         <div style={{ display: "contents" }}>
+          {/* Empty cell for checkbox column */}
+          <div
+            className="border-t"
+            style={{ borderColor: "var(--border-divider)", height: 36 }}
+          />
           {/* Empty cell for row number column */}
           <div
             className="border-t"
@@ -706,13 +824,14 @@ export function TableView({
         {/* ── "+ New" row ────────────────────────────── */}
         <div style={{ display: "contents" }}>
           <div style={{ height: 33 }} />
+          <div style={{ height: 33 }} />
           <button
             onClick={onAddRow}
             className="flex items-center gap-1 px-2 text-sm transition-colors hover:bg-[var(--bg-hover)]"
             style={{
               color: "var(--text-secondary)",
               height: 33,
-              gridColumn: `2 / ${visibleProperties.length + 2}`,
+              gridColumn: `3 / ${visibleProperties.length + 3}`,
             }}
           >
             <span className="text-base leading-none">+</span>
@@ -720,6 +839,59 @@ export function TableView({
           </button>
         </div>
       </div>
+
+      {/* Row context menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-[100] min-w-[160px] rounded-md border py-1 shadow-lg"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+            backgroundColor: "var(--bg-primary)",
+            borderColor: "var(--border-default)",
+          }}
+        >
+          <button
+            onClick={() => {
+              onRowClick(contextMenu.pageId);
+              setContextMenu(null);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-[var(--bg-hover)]"
+            style={{ color: "var(--text-primary)" }}
+          >
+            열기
+          </button>
+          {onDuplicateRow && (
+            <button
+              onClick={() => {
+                onDuplicateRow(contextMenu.rowId);
+                setContextMenu(null);
+              }}
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-[var(--bg-hover)]"
+              style={{ color: "var(--text-primary)" }}
+            >
+              복제
+            </button>
+          )}
+          {onDeleteRow && (
+            <>
+              <div
+                className="my-1 border-t"
+                style={{ borderColor: "var(--border-default)" }}
+              />
+              <button
+                onClick={() => {
+                  onDeleteRow(contextMenu.rowId);
+                  setContextMenu(null);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
+              >
+                삭제
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -823,14 +995,20 @@ function ColumnHeader({
   property,
   width,
   sortDirection,
+  isPinned,
+  pinnedOffset,
   onSortClick,
   onResize,
+  onTogglePin,
 }: {
   property: DatabaseData["properties"][number];
   width: number;
   sortDirection?: "asc" | "desc";
+  isPinned?: boolean;
+  pinnedOffset?: number;
   onSortClick?: () => void;
   onResize: (newWidth: number) => void;
+  onTogglePin?: () => void;
 }) {
   const headerRef = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
@@ -868,8 +1046,10 @@ function ColumnHeader({
         borderColor: "var(--border-default)",
         color: "var(--text-secondary)",
         height: 33,
-        position: "relative",
+        position: isPinned ? "sticky" : "relative",
         cursor: onSortClick ? "pointer" : "default",
+        zIndex: isPinned ? 15 : 10,
+        ...(isPinned && pinnedOffset != null ? { left: pinnedOffset } : {}),
       }}
       onClick={onSortClick}
     >
@@ -882,6 +1062,24 @@ function ColumnHeader({
       )}
       {sortDirection === "desc" && (
         <span className="shrink-0 text-[10px] text-[#2383e2]">{"\u25BC"}</span>
+      )}
+      {isPinned && (
+        <span className="shrink-0 text-[10px] text-[#2383e2]" title="Pinned">&#x1F4CC;</span>
+      )}
+
+      {/* Pin toggle button (visible on hover) */}
+      {onTogglePin && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onTogglePin();
+          }}
+          className="ml-auto shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[var(--bg-hover)]"
+          title={isPinned ? "Unpin column" : "Pin column"}
+          style={{ fontSize: "10px" }}
+        >
+          {isPinned ? "Unpin" : "Pin"}
+        </button>
       )}
 
       {/* Resize handle */}

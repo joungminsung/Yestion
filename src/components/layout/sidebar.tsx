@@ -13,7 +13,7 @@ import { WorkspaceSwitcher } from "./workspace-switcher";
 import { m } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/server/trpc/client";
-import { Search, Settings, Plus, FileText, LayoutTemplate, BarChart3, Zap, Home, Workflow, Network, Shield } from "lucide-react";
+import { Search, Settings, Plus, FileText, LayoutTemplate, BarChart3, Zap, Home, Workflow, Network, Database } from "lucide-react";
 import { useSidebarKeyboardNav } from "./sidebar-keyboard-nav";
 import { PageTemplatePicker } from "@/components/page/page-template-picker";
 import { TemplateGallery } from "@/components/page/template-gallery";
@@ -146,12 +146,33 @@ export function Sidebar() {
     },
   });
 
+  const createDatabase = trpc.database.create.useMutation({
+    onSettled: () => utils.page.list.invalidate(),
+    onSuccess: (data) => {
+      router.push(`/${workspaceId}/database/${data.id}`);
+    },
+  });
+
   const [showNewPageMenu, setShowNewPageMenu] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const newPageMenuRef = useRef<HTMLDivElement>(null);
 
   useSidebarKeyboardNav(pages || [], workspaceId);
+
+  // Listen for full-page database creation requests (from slash commands)
+  useEffect(() => {
+    function handleCreateFullPageDb() {
+      if (workspaceId) {
+        createDatabase.mutate({
+          workspaceId,
+          name: "제목 없음 데이터베이스",
+        });
+      }
+    }
+    document.addEventListener("database:createFullPage", handleCreateFullPageDb);
+    return () => document.removeEventListener("database:createFullPage", handleCreateFullPageDb);
+  }, [workspaceId, createDatabase]);
 
   return (
     <>
@@ -384,6 +405,24 @@ export function Sidebar() {
                   >
                     <LayoutTemplate size={15} style={{ color: "var(--text-tertiary)" }} />
                     <span>{t("fromTemplate")}</span>
+                  </button>
+                  <div
+                    className="mx-2 my-1"
+                    style={{ height: "1px", backgroundColor: "var(--border-divider)" }}
+                  />
+                  <button
+                    onClick={() => {
+                      setShowNewPageMenu(false);
+                      createDatabase.mutate({
+                        workspaceId,
+                        name: "제목 없음 데이터베이스",
+                      });
+                    }}
+                    className="flex items-center gap-2 w-full px-3 py-2 hover:bg-notion-bg-hover text-left"
+                    style={{ fontSize: "13px", color: "var(--text-primary)" }}
+                  >
+                    <Database size={15} style={{ color: "var(--text-tertiary)" }} />
+                    <span>데이터베이스</span>
                   </button>
                 </div>
               </>

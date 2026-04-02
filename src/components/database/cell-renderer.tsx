@@ -142,14 +142,31 @@ function renderByType(
     }
 
     case "file": {
-      const files = Array.isArray(value) ? value : [value];
+      const files = Array.isArray(value) ? value : value ? [value] : [];
+      if (files.length === 0) return <span style={{ color: "var(--text-placeholder)" }}>&mdash;</span>;
       return (
-        <div className="flex gap-1">
-          {files.map((f, i) => (
-            <span key={i} className="text-xs text-[#2383e2]">
-              {typeof f === "string" ? f : "file"}
-            </span>
-          ))}
+        <div className="flex flex-wrap gap-1">
+          {files.map((f, i) => {
+            const url = typeof f === "string" ? f : "";
+            const name = url.split("/").pop() ?? "file";
+            return (
+              <a
+                key={i}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-xs text-[#2383e2] hover:underline"
+                style={{ backgroundColor: "#2383e210" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+                {decodeURIComponent(name).slice(0, 20)}
+              </a>
+            );
+          })}
         </div>
       );
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, forwardRef, useImperativeHandle, lazy, Suspense } from "react";
+import { useState, useEffect, forwardRef, useImperativeHandle, lazy, Suspense } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";

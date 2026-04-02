@@ -420,8 +420,8 @@ export const SLASH_ITEMS: SlashItem[] = [
     keywords: ["database", "inline", "데이터베이스", "인라인", "DB"],
     command: (editor) => {
       editor.chain().focus().insertContent({
-        type: "paragraph",
-        content: [{ type: "text", text: "[인라인 데이터베이스 — 페이지에서 생성]" }],
+        type: "databaseBlock",
+        attrs: { databaseId: null },
       }).run();
     },
   },
@@ -432,10 +432,11 @@ export const SLASH_ITEMS: SlashItem[] = [
     category: "데이터베이스",
     keywords: ["database", "full", "page", "데이터베이스", "풀페이지", "DB"],
     command: (editor) => {
-      editor.chain().focus().insertContent({
-        type: "paragraph",
-        content: [{ type: "text", text: "[풀페이지 데이터베이스 — 사이드바에서 생성]" }],
-      }).run();
+      // Dispatch event for full-page database creation — handled by page/sidebar
+      const event = new CustomEvent("database:createFullPage");
+      document.dispatchEvent(event);
+      // Also remove the current empty paragraph the cursor is in
+      editor.chain().focus().run();
     },
   },
   {

@@ -19,6 +19,7 @@ export function AiDraftInline({ editor, context, insertPos, onDone }: Props) {
   const [prompt, setPrompt] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [draftRange, setDraftRange] = useState<{ from: number; to: number } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);

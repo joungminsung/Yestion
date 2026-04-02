@@ -92,6 +92,15 @@ export function CellEditor({ value, type, config, onChange, onClose, onNavigate 
         />
       );
 
+    case "file":
+      return (
+        <FileCellEditor
+          value={value}
+          onChange={onChange}
+          onClose={onClose}
+        />
+      );
+
     case "relation":
       return (
         <RelationCellEditor
@@ -620,6 +629,138 @@ function RelationCellEditor({
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ── File Editor ────────────────────────────────────────────
+
+function FileCellEditor({
+  value,
+  onChange,
+  onClose,
+}: {
+  value: unknown;
+  onChange: (v: unknown) => void;
+  onClose: () => void;
+}) {
+  const [files, setFiles] = useState<string[]>(
+    Array.isArray(value) ? value : value ? [String(value)] : [],
+  );
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+
+    setUploading(true);
+    const newFiles = [...files];
+
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i]!;
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          newFiles.push(data.url);
+        }
+      } catch {
+        // Upload failed silently
+      }
+    }
+
+    setFiles(newFiles);
+    onChange(newFiles);
+    setUploading(false);
+    e.target.value = "";
+  }, [files, onChange]);
+
+  const removeFile = useCallback((index: number) => {
+    const next = files.filter((_, i) => i !== index);
+    setFiles(next);
+    onChange(next.length > 0 ? next : null);
+  }, [files, onChange]);
+
+  const getFileName = (url: string) => {
+    try {
+      return decodeURIComponent(url.split("/").pop() ?? url);
+    } catch {
+      return url;
+    }
+  };
+
+  return (
+    <div
+      className="min-w-[250px] rounded border p-2 shadow-lg"
+      style={{
+        backgroundColor: "var(--bg-primary)",
+        borderColor: "var(--border-default)",
+      }}
+    >
+      {/* File list */}
+      {files.length > 0 && (
+        <div className="mb-2 space-y-1">
+          {files.map((file, idx) => (
+            <div
+              key={idx}
+              className="flex items-center gap-2 rounded px-2 py-1 text-xs"
+              style={{ backgroundColor: "var(--bg-secondary, #f7f6f3)" }}
+            >
+              <span className="flex-1 truncate" style={{ color: "var(--text-primary)" }}>
+                {getFileName(file)}
+              </span>
+              <a
+                href={file}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 text-[#2383e2] hover:underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Open
+              </a>
+              <button
+                onClick={() => removeFile(idx)}
+                className="shrink-0 text-red-500 hover:text-red-700"
+              >
+                &times;
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Upload button */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={handleUpload}
+      />
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="rounded px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--bg-hover)]"
+          style={{ color: "#2383e2" }}
+        >
+          {uploading ? "업로드 중..." : "+ 파일 추가"}
+        </button>
+        <button
+          onClick={onClose}
+          className="ml-auto rounded px-2 py-1 text-xs transition-colors hover:bg-[var(--bg-hover)]"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          닫기
+        </button>
       </div>
     </div>
   );
