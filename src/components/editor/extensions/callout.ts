@@ -5,7 +5,7 @@ import { CalloutNodeView } from "../callout-node-view";
 export const Callout = Node.create({
   name: "callout",
   group: "block",
-  content: "(block | inline)*",
+  content: "paragraph+",
   defining: true,
 
   addAttributes() {
