@@ -1,0 +1,55 @@
+{
+  "dashboard": {
+    "title": "Database",
+    "uid": "notion-web-database",
+    "tags": ["notion-web", "database"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "panels": [
+      {
+        "title": "Prisma Query Duration (p95)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(prisma_query_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{model}} {{operation}}"
+          }
+        ]
+      },
+      {
+        "title": "Prisma Query Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(prisma_queries_total[5m])",
+            "legendFormat": "{{model}} {{operation}}"
+          }
+        ]
+      },
+      {
+        "title": "Slow Queries (>1s)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "increase(prisma_query_duration_seconds_bucket{le=\"1.0\"}[1h])",
+            "legendFormat": "Count"
+          }
+        ]
+      },
+      {
+        "title": "Database Connection Pool",
+        "type": "gauge",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+        "targets": [
+          {
+            "expr": "prisma_pool_connections_open",
+            "legendFormat": "Open"
+          }
+        ]
+      }
+    ]
+  }
+}

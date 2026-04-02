@@ -1,0 +1,66 @@
+{
+  "dashboard": {
+    "title": "Collaboration",
+    "uid": "notion-web-collaboration",
+    "tags": ["notion-web", "collaboration"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "panels": [
+      {
+        "title": "Active WebSocket Connections",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "websocket_connections_active{app=\"notion-web\"}",
+            "legendFormat": "Active Connections"
+          }
+        ]
+      },
+      {
+        "title": "Active Collaboration Documents",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "collab_documents_active{app=\"notion-web\"}",
+            "legendFormat": "Documents"
+          }
+        ]
+      },
+      {
+        "title": "Yjs Sync Messages / sec",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "rate(collab_sync_messages_total{app=\"notion-web\"}[5m])",
+            "legendFormat": "{{type}}"
+          }
+        ]
+      },
+      {
+        "title": "Collaboration Users Online",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+        "targets": [
+          {
+            "expr": "collab_users_online{app=\"notion-web\"}",
+            "legendFormat": "Users"
+          }
+        ]
+      },
+      {
+        "title": "Awareness Updates / sec",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+        "targets": [
+          {
+            "expr": "rate(collab_awareness_updates_total{app=\"notion-web\"}[5m])",
+            "legendFormat": "Updates"
+          }
+        ]
+      }
+    ]
+  }
+}

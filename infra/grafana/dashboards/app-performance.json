@@ -1,0 +1,70 @@
+{
+  "dashboard": {
+    "title": "App Performance",
+    "uid": "notion-web-performance",
+    "tags": ["notion-web"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "panels": [
+      {
+        "title": "HTTP Request Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{app=\"notion-web\"}[5m])",
+            "legendFormat": "{{method}} {{route}} {{status}}"
+          }
+        ]
+      },
+      {
+        "title": "HTTP Request Duration (p95)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{app=\"notion-web\"}[5m]))",
+            "legendFormat": "{{route}}"
+          }
+        ]
+      },
+      {
+        "title": "Active Connections",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "websocket_connections_active{app=\"notion-web\"}",
+            "legendFormat": "Active"
+          }
+        ]
+      },
+      {
+        "title": "Error Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{app=\"notion-web\", status=~\"5..\"}[5m])",
+            "legendFormat": "{{method}} {{route}}"
+          }
+        ]
+      },
+      {
+        "title": "Memory Usage",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes{app=\"notion-web\"}",
+            "legendFormat": "RSS"
+          },
+          {
+            "expr": "process_heap_bytes{app=\"notion-web\"}",
+            "legendFormat": "Heap"
+          }
+        ]
+      }
+    ]
+  }
+}
