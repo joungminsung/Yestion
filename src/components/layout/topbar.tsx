@@ -159,6 +159,8 @@ export function Topbar() {
   const [chatOpen, setChatOpen] = useState(false);
   const addToast = useToastStore((s) => s.addToast);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [showNavHistory, setShowNavHistory] = useState(false);
+  const navHistoryRef = useRef<HTMLDivElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const params = useParams();
   const pageId = params.pageId as string | undefined;
@@ -322,6 +324,18 @@ export function Topbar() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [showMoreMenu]);
+
+  // Close nav history on outside click
+  useEffect(() => {
+    if (!showNavHistory) return;
+    const handler = (e: MouseEvent) => {
+      if (navHistoryRef.current && !navHistoryRef.current.contains(e.target as Node)) {
+        setShowNavHistory(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showNavHistory]);
 
   const isLocked = currentPage?.isLocked ?? false;
   const isFullWidth = currentPage?.isFullWidth ?? false;
@@ -522,6 +536,80 @@ export function Topbar() {
               <path d="M5.646 3.354a.5.5 0 01.708-.708l5 5a.5.5 0 010 .708l-5 5a.5.5 0 01-.708-.708L10.293 8 5.646 3.354z" />
             </svg>
           </button>
+        )}
+
+        {/* Navigation history dropdown */}
+        {!isMobile && (
+          <div className="relative" ref={navHistoryRef}>
+            <button
+              onClick={() => setShowNavHistory(!showNavHistory)}
+              className="p-1 rounded hover:bg-notion-bg-hover flex-shrink-0"
+              style={{ color: "var(--text-secondary)" }}
+              aria-label="Navigation history"
+              title="Navigation history"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 3a5 5 0 100 10A5 5 0 008 3zM2 8a6 6 0 1112 0A6 6 0 012 8z" />
+                <path d="M7.5 5v3.5H11v-1H8.5V5h-1z" />
+              </svg>
+            </button>
+            {showNavHistory && (
+              <div
+                className="absolute left-0 top-full mt-1 rounded-lg overflow-hidden py-1"
+                style={{
+                  width: "280px",
+                  maxHeight: "300px",
+                  overflowY: "auto",
+                  zIndex: 90,
+                  backgroundColor: "var(--bg-primary)",
+                  boxShadow: "var(--shadow-popup)",
+                  border: "1px solid var(--border-default)",
+                }}
+              >
+                <div
+                  className="px-3 py-1.5 text-xs font-semibold uppercase"
+                  style={{ color: "var(--text-tertiary)" }}
+                >
+                  History
+                </div>
+                {navStore.history.length === 0 ? (
+                  <div
+                    className="px-3 py-2 text-xs"
+                    style={{ color: "var(--text-tertiary)" }}
+                  >
+                    No history yet
+                  </div>
+                ) : (
+                  [...navStore.history].reverse().map((url, idx) => {
+                    const realIndex = navStore.history.length - 1 - idx;
+                    const isCurrent = realIndex === navStore.currentIndex;
+                    // Extract page name from URL
+                    const segments = url.split("/").filter(Boolean);
+                    const label = segments.length > 1 ? segments[segments.length - 1] : url;
+                    return (
+                      <button
+                        key={`${url}-${idx}`}
+                        onClick={() => {
+                          router.push(url);
+                          setShowNavHistory(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-notion-bg-hover text-left"
+                        style={{
+                          color: isCurrent ? "#2383e2" : "var(--text-primary)",
+                          fontWeight: isCurrent ? 600 : 400,
+                        }}
+                      >
+                        <span className="truncate">
+                          {isCurrent && "\u2192 "}
+                          {label?.slice(0, 8) === label ? url : `.../${label}`}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Breadcrumbs with child dropdown (2.8) */}
