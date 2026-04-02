@@ -9,6 +9,7 @@ import { AppMotionConfig } from "@/lib/motion/motion-config";
 import { TabBar } from "@/components/layout/tab-bar";
 import { SplitView } from "@/components/layout/split-view";
 import { OfflineBanner } from "@/components/ui/offline-banner";
+import { PWAInstallPrompt } from "@/components/ui/pwa-install-prompt";
 
 export default async function MainLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession();
@@ -33,6 +34,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
       <CommandPalette />
       <QuickNoteButton />
       </div>
+      <PWAInstallPrompt />
     </div>
   );
 }
