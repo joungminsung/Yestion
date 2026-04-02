@@ -35,25 +35,30 @@ const BG_COLORS = [
 export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddComment?: (content: string, range: { from: number; to: number }) => void }) {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
-  const [showColors, setShowColors] = useState(false);
-  const [showAlign, setShowAlign] = useState(false);
-  const [showAiMenu, setShowAiMenu] = useState(false);
-  const [showLinkInput, setShowLinkInput] = useState(false);
+  // Single active panel — only one can be open at a time
+  type PanelType = null | "colors" | "align" | "ai" | "link" | "comment";
+  const [activePanel, setActivePanel] = useState<PanelType>(null);
   const [linkUrl, setLinkUrl] = useState("");
-  const [showCommentInput, setShowCommentInput] = useState(false);
   const [commentRange, setCommentRange] = useState<{ from: number; to: number } | null>(null);
   const [commentText, setCommentText] = useState("");
+
+  const togglePanel = useCallback((panel: PanelType) => {
+    setActivePanel((prev) => (prev === panel ? null : panel));
+  }, []);
+
+  // Derived booleans for backward compat in JSX
+  const showColors = activePanel === "colors";
+  const showAlign = activePanel === "align";
+  const showAiMenu = activePanel === "ai";
+  const showLinkInput = activePanel === "link";
+  const showCommentInput = activePanel === "comment";
 
   const updatePosition = useCallback(() => {
     if (!editor.view || !editor.state) { setIsVisible(false); return; }
     const { from, to } = editor.state.selection;
     if (from === to) {
       setIsVisible(false);
-      setShowColors(false);
-      setShowAlign(false);
-      setShowAiMenu(false);
-      setShowLinkInput(false);
-      setShowCommentInput(false);
+      setActivePanel(null);
       return;
     }
     const start = editor.view.coordsAtPos(from);
@@ -125,12 +130,9 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
       action: () => {
         if (editor.isActive("link")) {
           editor.chain().focus().unsetLink().run();
+          setActivePanel(null);
         } else {
-          setShowLinkInput(true);
-          setShowColors(false);
-          setShowAlign(false);
-          setShowAiMenu(false);
-          // Pre-fill with existing link if any
+          togglePanel("link");
           const attrs = editor.getAttributes("link");
           setLinkUrl(attrs.href || "");
         }
@@ -140,13 +142,13 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
     {
       label: "Color",
       icon: "A",
-      action: () => { setShowColors((prev) => !prev); setShowAlign(false); setShowAiMenu(false); },
+      action: () => togglePanel("colors"),
       isActive: () => showColors,
     },
     {
       label: "Align",
       icon: <AlignLeft size={14} />,
-      action: () => { setShowAlign((prev) => !prev); setShowColors(false); setShowAiMenu(false); },
+      action: () => togglePanel("align"),
       isActive: () => showAlign,
     },
     {
@@ -154,17 +156,15 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
       icon: "\uD83D\uDCAC",
       action: () => {
         const { from, to } = editor.state.selection;
-        setShowCommentInput(true);
         setCommentRange({ from, to });
-        setShowColors(false);
-        setShowAiMenu(false);
+        togglePanel("comment");
       },
       isActive: () => showCommentInput,
     },
     {
       label: "AI",
       icon: <Sparkles size={14} />,
-      action: () => { setShowAiMenu((prev) => !prev); setShowColors(false); setShowCommentInput(false); },
+      action: () => togglePanel("ai"),
       isActive: () => showAiMenu,
     },
   ];
@@ -222,7 +222,7 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
         <AiMenu
           editor={editor}
           position={{ top: position.top + 44, left: position.left }}
-          onClose={() => setShowAiMenu(false)}
+          onClose={() => setActivePanel(null)}
         />
       )}
       {showColors && (
@@ -256,7 +256,7 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
                   if (c.value === "default")
                     editor.chain().focus().unsetColor().run();
                   else editor.chain().focus().setColor(c.css).run();
-                  setShowColors(false);
+                  setActivePanel(null);
                 }}
               >
                 A
@@ -288,7 +288,7 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
                     editor.chain().focus().unsetHighlight().run();
                   else
                     editor.chain().focus().setHighlight({ color: c.css }).run();
-                  setShowColors(false);
+                  setActivePanel(null);
                 }}
               />
             ))}
@@ -328,7 +328,7 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
               }}
               onClick={() => {
                 editor.chain().focus().setTextAlign(align.value).run();
-                setShowAlign(false);
+                setActivePanel(null);
               }}
             >
               {align.icon}
@@ -362,11 +362,11 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
             onKeyDown={(e) => {
               if (e.key === "Enter" && linkUrl.trim()) {
                 editor.chain().focus().setLink({ href: linkUrl.trim() }).run();
-                setShowLinkInput(false);
+                setActivePanel(null);
                 setLinkUrl("");
               }
               if (e.key === "Escape") {
-                setShowLinkInput(false);
+                setActivePanel(null);
                 setLinkUrl("");
               }
             }}
@@ -376,7 +376,7 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
               if (linkUrl.trim()) {
                 editor.chain().focus().setLink({ href: linkUrl.trim() }).run();
               }
-              setShowLinkInput(false);
+              setActivePanel(null);
               setLinkUrl("");
             }}
             className="px-3 py-1.5 text-sm rounded text-white"
@@ -388,7 +388,7 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
             <button
               onClick={() => {
                 editor.chain().focus().unsetLink().run();
-                setShowLinkInput(false);
+                setActivePanel(null);
                 setLinkUrl("");
               }}
               className="px-2 py-1.5 text-sm rounded hover:bg-notion-bg-hover"
@@ -424,7 +424,7 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
           />
           <div className="flex justify-end gap-2 mt-2">
             <button
-              onClick={() => { setShowCommentInput(false); setCommentText(""); }}
+              onClick={() => { setActivePanel(null); setCommentText(""); }}
               className="px-3 py-1 text-sm rounded hover:bg-notion-bg-hover"
               style={{ color: "var(--text-secondary)" }}
             >
@@ -433,7 +433,7 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
             <button
               onClick={async () => {
                 if (onAddComment) onAddComment(commentText, commentRange);
-                setShowCommentInput(false);
+                setActivePanel(null);
                 setCommentText("");
               }}
               className="px-3 py-1 text-sm rounded text-white"
