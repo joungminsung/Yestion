@@ -119,7 +119,21 @@ export type GroupRule = {
 
 export type RowHeight = "short" | "medium" | "tall" | "auto";
 
-export type AggregationFunction = "none" | "count" | "sum" | "average" | "min" | "max";
+export type AggregationFunction =
+  | "none"
+  | "count"
+  | "count_values"
+  | "count_unique"
+  | "count_empty"
+  | "count_not_empty"
+  | "percent_empty"
+  | "percent_not_empty"
+  | "sum"
+  | "average"
+  | "median"
+  | "min"
+  | "max"
+  | "range";
 
 export type DatabaseLockLevel = "none" | "structure" | "full";
 

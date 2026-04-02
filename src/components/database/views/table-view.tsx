@@ -44,10 +44,18 @@ const READ_ONLY_TYPES: PropertyType[] = [
 const AGGREGATION_OPTIONS: { value: AggregationFunction; label: string }[] = [
   { value: "none", label: "None" },
   { value: "count", label: "Count" },
+  { value: "count_values", label: "Count values" },
+  { value: "count_unique", label: "Count unique" },
+  { value: "count_empty", label: "Count empty" },
+  { value: "count_not_empty", label: "Count not empty" },
+  { value: "percent_empty", label: "Percent empty" },
+  { value: "percent_not_empty", label: "Percent not empty" },
   { value: "sum", label: "Sum" },
   { value: "average", label: "Average" },
+  { value: "median", label: "Median" },
   { value: "min", label: "Min" },
   { value: "max", label: "Max" },
+  { value: "range", label: "Range" },
 ];
 
 export function TableView({
@@ -622,9 +630,9 @@ export function TableView({
                     }}
                   >
                     {AGGREGATION_OPTIONS.map((opt) => {
-                      // Only show sum/average/min/max for number type
+                      // Only show numeric aggregations for number type
                       if (
-                        ["sum", "average", "min", "max"].includes(opt.value) &&
+                        ["sum", "average", "median", "min", "max", "range"].includes(opt.value) &&
                         prop.type !== "number"
                       ) {
                         return null;
@@ -693,6 +701,69 @@ export function TableView({
 
 // ── Aggregate Calculation ──────────────────────────────────
 
+function computeAggregation(
+  fn: AggregationFunction,
+  rows: RowData[],
+  propertyId: string,
+): string {
+  if (fn === "none") return "";
+
+  const values = rows.map((r) => {
+    const vals = (r.values as Record<string, unknown>) ?? {};
+    return vals[propertyId];
+  });
+
+  const nonEmpty = values.filter((v) => v !== null && v !== undefined && v !== "");
+  const numericValues = nonEmpty
+    .map((v) => (typeof v === "number" ? v : parseFloat(String(v))))
+    .filter((n) => !isNaN(n));
+
+  switch (fn) {
+    case "count":
+      return String(rows.length);
+    case "count_values":
+      return String(nonEmpty.length);
+    case "count_unique":
+      return String(new Set(nonEmpty.map(String)).size);
+    case "count_empty":
+      return String(values.length - nonEmpty.length);
+    case "count_not_empty":
+      return String(nonEmpty.length);
+    case "percent_empty":
+      return values.length > 0
+        ? `${(((values.length - nonEmpty.length) / values.length) * 100).toFixed(1)}%`
+        : "0%";
+    case "percent_not_empty":
+      return values.length > 0
+        ? `${((nonEmpty.length / values.length) * 100).toFixed(1)}%`
+        : "0%";
+    case "sum":
+      return numericValues.reduce((a, b) => a + b, 0).toLocaleString();
+    case "average":
+      return numericValues.length > 0
+        ? (numericValues.reduce((a, b) => a + b, 0) / numericValues.length).toFixed(2)
+        : "-";
+    case "median": {
+      if (numericValues.length === 0) return "-";
+      const sorted = [...numericValues].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 !== 0
+        ? String(sorted[mid])
+        : ((sorted[mid - 1]! + sorted[mid]!) / 2).toFixed(2);
+    }
+    case "min":
+      return numericValues.length > 0 ? String(Math.min(...numericValues)) : "-";
+    case "max":
+      return numericValues.length > 0 ? String(Math.max(...numericValues)) : "-";
+    case "range":
+      return numericValues.length > 0
+        ? String(Math.max(...numericValues) - Math.min(...numericValues))
+        : "-";
+    default:
+      return "";
+  }
+}
+
 function calculateAggregate(
   rows: RowData[],
   prop: DatabaseData["properties"][number],
@@ -716,47 +787,9 @@ function calculateAggregate(
     return "";
   }
 
-  if (aggFn === "count") {
-    const nonEmpty = rows.filter(
-      (r) => r.values[prop.id] != null && r.values[prop.id] !== "",
-    ).length;
-    return `Count: ${nonEmpty}`;
-  }
-
-  if (aggFn === "sum" && prop.type === "number") {
-    const values = rows
-      .map((r) => Number(r.values[prop.id]))
-      .filter((v) => !isNaN(v));
-    if (values.length === 0) return "Sum: 0";
-    return `Sum: ${values.reduce((a, b) => a + b, 0).toLocaleString()}`;
-  }
-
-  if (aggFn === "average" && prop.type === "number") {
-    const values = rows
-      .map((r) => Number(r.values[prop.id]))
-      .filter((v) => !isNaN(v));
-    if (values.length === 0) return "Avg: 0";
-    const avg = values.reduce((a, b) => a + b, 0) / values.length;
-    return `Avg: ${avg.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-  }
-
-  if (aggFn === "min" && prop.type === "number") {
-    const values = rows
-      .map((r) => Number(r.values[prop.id]))
-      .filter((v) => !isNaN(v));
-    if (values.length === 0) return "Min: -";
-    return `Min: ${Math.min(...values).toLocaleString()}`;
-  }
-
-  if (aggFn === "max" && prop.type === "number") {
-    const values = rows
-      .map((r) => Number(r.values[prop.id]))
-      .filter((v) => !isNaN(v));
-    if (values.length === 0) return "Max: -";
-    return `Max: ${Math.max(...values).toLocaleString()}`;
-  }
-
-  return "";
+  const label = AGGREGATION_OPTIONS.find((o) => o.value === aggFn)?.label ?? aggFn;
+  const result = computeAggregation(aggFn, rows, prop.id);
+  return result ? `${label}: ${result}` : "";
 }
 
 // ── Column Header with Resize + Sort ───────────────────────
