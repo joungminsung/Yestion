@@ -3,6 +3,35 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Sparkles } from "lucide-react";
 
+function simpleMarkdownToHtml(md: string): string {
+  let html = md;
+  // Code blocks first (before other transforms)
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre style="background:var(--bg-tertiary);padding:8px;border-radius:4px;overflow-x:auto;font-size:12px;margin:4px 0"><code>$2</code></pre>');
+  // Headings
+  html = html.replace(/^### (.+)$/gm, '<div style="font-size:14px;font-weight:600;margin:8px 0 4px">$1</div>');
+  html = html.replace(/^## (.+)$/gm, '<div style="font-size:15px;font-weight:700;margin:10px 0 4px">$1</div>');
+  html = html.replace(/^# (.+)$/gm, '<div style="font-size:16px;font-weight:700;margin:10px 0 4px">$1</div>');
+  // Checklists
+  html = html.replace(/^- \[x\] (.+)$/gm, '<div style="margin:2px 0;padding-left:4px">✅ <s style="opacity:0.6">$1</s></div>');
+  html = html.replace(/^- \[ \] (.+)$/gm, '<div style="margin:2px 0;padding-left:4px">☐ $1</div>');
+  // Unordered lists
+  html = html.replace(/^[-*] (.+)$/gm, '<div style="margin:1px 0;padding-left:12px">• $1</div>');
+  // Ordered lists
+  html = html.replace(/^(\d+)\. (.+)$/gm, '<div style="margin:1px 0;padding-left:12px">$1. $2</div>');
+  // Blockquotes
+  html = html.replace(/^> (.+)$/gm, '<div style="border-left:3px solid var(--border-default);padding-left:8px;margin:4px 0;color:var(--text-secondary);font-style:italic">$1</div>');
+  // Horizontal rules
+  html = html.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid var(--border-default);margin:8px 0">');
+  // Bold & italic
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code style="background:var(--bg-tertiary);padding:1px 4px;border-radius:3px;font-size:12px">$1</code>');
+  // Line breaks
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
 type AiAction =
   | "write"
   | "summarize"
@@ -187,10 +216,10 @@ export function AiPrompt({ context, onInsert, onReplace, onClose }: Props) {
         )}
       </div>
 
-      {/* Response area */}
+      {/* Response area — render markdown preview */}
       {hasResponse && (
         <div
-          className="mx-3 mb-2 p-3 rounded text-sm whitespace-pre-wrap overflow-y-auto"
+          className="mx-3 mb-2 p-3 rounded text-sm overflow-y-auto ai-response-preview"
           style={{
             borderLeft: "3px solid #a855f7",
             backgroundColor: "var(--bg-secondary)",
@@ -198,16 +227,15 @@ export function AiPrompt({ context, onInsert, onReplace, onClose }: Props) {
             maxHeight: "300px",
             lineHeight: "1.6",
           }}
+          dangerouslySetInnerHTML={
+            response
+              ? { __html: simpleMarkdownToHtml(response) + (isStreaming ? '<span class="inline-block w-1.5 h-4 ml-0.5 animate-pulse" style="background:#a855f7"></span>' : '') }
+              : undefined
+          }
         >
-          {response || (
+          {!response && (
             <span
               className="inline-block w-2 h-4 animate-pulse"
-              style={{ backgroundColor: "#a855f7" }}
-            />
-          )}
-          {isStreaming && (
-            <span
-              className="inline-block w-1.5 h-4 ml-0.5 animate-pulse"
               style={{ backgroundColor: "#a855f7" }}
             />
           )}

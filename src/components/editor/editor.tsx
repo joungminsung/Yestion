@@ -273,20 +273,54 @@ export const NotionEditor = forwardRef<
     return () => window.removeEventListener("ai-open", handleAiOpen);
   }, [aiStore]);
 
+  const markdownToHtml = useCallback((md: string): string => {
+    let html = md;
+    // Headings
+    html = html.replace(/^### (.+)$/gm, "<h3>$1</h3>");
+    html = html.replace(/^## (.+)$/gm, "<h2>$1</h2>");
+    html = html.replace(/^# (.+)$/gm, "<h1>$1</h1>");
+    // Bold and italic
+    html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+    // Checklists (- [ ] and - [x])
+    html = html.replace(/^- \[x\] (.+)$/gm, '<ul data-type="taskList"><li data-type="taskItem" data-checked="true"><p>$1</p></li></ul>');
+    html = html.replace(/^- \[ \] (.+)$/gm, '<ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p>$1</p></li></ul>');
+    // Unordered lists
+    html = html.replace(/^[-*] (.+)$/gm, "<li><p>$1</p></li>");
+    html = html.replace(/(<li><p>.*<\/p><\/li>\n?)+/g, (match) => `<ul>${match}</ul>`);
+    // Ordered lists
+    html = html.replace(/^\d+\. (.+)$/gm, "<li><p>$1</p></li>");
+    // Blockquotes
+    html = html.replace(/^> (.+)$/gm, "<blockquote><p>$1</p></blockquote>");
+    // Horizontal rule
+    html = html.replace(/^---$/gm, "<hr>");
+    // Code blocks
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, "<pre><code>$2</code></pre>");
+    // Paragraphs (lines that aren't already wrapped)
+    html = html.replace(/^(?!<[a-z])(.+)$/gm, "<p>$1</p>");
+    // Clean up empty paragraphs
+    html = html.replace(/<p><\/p>/g, "");
+    return html;
+  }, []);
+
   const handleAiInsert = useCallback((text: string) => {
     if (!editor) return;
-    editor.chain().focus().insertContent(text).run();
-  }, [editor]);
+    const html = markdownToHtml(text);
+    editor.chain().focus().insertContent(html).run();
+  }, [editor, markdownToHtml]);
 
   const handleAiReplace = useCallback((text: string) => {
     if (!editor) return;
+    const html = markdownToHtml(text);
     const { from, to } = editor.state.selection;
     if (from !== to) {
-      editor.chain().focus().deleteRange({ from, to }).insertContent(text).run();
+      editor.chain().focus().deleteRange({ from, to }).insertContent(html).run();
     } else {
-      editor.chain().focus().insertContent(text).run();
+      editor.chain().focus().insertContent(html).run();
     }
-  }, [editor]);
+  }, [editor, markdownToHtml]);
 
   const linkPreview = useLinkPreview(editor);
 
