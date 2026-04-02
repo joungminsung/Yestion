@@ -274,14 +274,28 @@ model Comment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  page    Page      @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  author  User      @relation(fields: [authorId], references: [id])
-  parent  Comment?  @relation("CommentThread", fields: [parentId], references: [id], onDelete: Cascade)
-  replies Comment[] @relation("CommentThread")
+  page          Page      @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  author        User      @relation(fields: [authorId], references: [id])
+  parent        Comment?  @relation("CommentThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies       Comment[] @relation("CommentThread")
+  reactions_rel CommentReaction[]
 
   @@index([pageId])
   @@index([blockId])
   @@index([parentId])
+}
+
+model CommentReaction {
+  id        String   @id @default(cuid())
+  commentId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId, emoji])
+  @@index([commentId])
 }
 
 model Notification {
