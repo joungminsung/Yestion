@@ -55,14 +55,16 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
   const computeHandlePosition = useCallback(
     (blockDom: HTMLElement) => {
       const blockRect = blockDom.getBoundingClientRect();
-      const handleWidth = 28;
-      const gap = 8;
+      const editorRect = editor.view.dom.getBoundingClientRect();
+      // Position handle at the far left edge of the editor area
+      // Use editor left edge minus handle width for consistent positioning
+      const handleWidth = 52; // + button (24) + grip button (24) + gap
       return {
         top: blockRect.top + 2,
-        left: Math.max(blockRect.left - handleWidth - gap, 8),
+        left: Math.max(editorRect.left - handleWidth - 4, 4),
       };
     },
-    []
+    [editor]
   );
 
   // Delay hide so mouse has time to travel from editor to handle
