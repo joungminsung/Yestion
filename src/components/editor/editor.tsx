@@ -66,6 +66,7 @@ const DragHandle = lazy(() => import("./drag-handle").then(m => ({ default: m.Dr
 const BlockMenu = lazy(() => import("./block-menu").then(m => ({ default: m.BlockMenu })));
 const BlockContextMenu = lazy(() => import("./block-context-menu").then(m => ({ default: m.BlockContextMenu })));
 const AiPrompt = lazy(() => import("./ai/ai-prompt").then(m => ({ default: m.AiPrompt })));
+const TableControls = lazy(() => import("./media/table-controls").then(m => ({ default: m.TableControls })));
 import { SelectionActionBar } from "./selection-action-bar";
 import { EmptyPageGuide } from "./empty-page-guide";
 import "./utils/editor-styles.css";
@@ -293,6 +294,11 @@ export const NotionEditor = forwardRef<
       </Suspense>
       <SelectionActionBar editor={editor} />
       <EditorContent editor={editor} />
+      {editor.isActive("table") && (
+        <Suspense fallback={null}>
+          <TableControls editor={editor} />
+        </Suspense>
+      )}
       {editor && <EmptyPageGuide editor={editor} />}
       {editor.view && (
         <Suspense fallback={null}>

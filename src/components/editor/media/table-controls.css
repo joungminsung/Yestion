@@ -1,0 +1,38 @@
+/* src/components/editor/media/table-controls.css */
+.table-add-row-btn {
+  opacity: 0;
+  transition: opacity 0.15s;
+  margin-top: 2px;
+}
+
+.table-add-col-btn {
+  opacity: 0;
+  transition: opacity 0.15s;
+  position: absolute;
+  right: -28px;
+  top: 0;
+  height: 100%;
+}
+
+.ProseMirror table:hover ~ .table-add-row-btn,
+.table-add-row-btn:hover,
+.ProseMirror table:hover ~ .table-add-col-btn,
+.table-add-col-btn:hover {
+  opacity: 1;
+}
+
+.table-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text-primary);
+  transition: background-color 0.1s;
+}
+
+.table-ctx-item:hover {
+  background-color: var(--bg-hover);
+}
