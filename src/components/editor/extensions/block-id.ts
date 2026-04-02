@@ -56,11 +56,15 @@ export const BlockId = Extension.create({
               node.attrs.blockId === null &&
               node.type.spec.attrs?.blockId !== undefined
             ) {
-              tr.setNodeMarkup(pos, undefined, {
-                ...node.attrs,
-                blockId: generateId(),
-              });
-              modified = true;
+              try {
+                tr.setNodeMarkup(pos, undefined, {
+                  ...node.attrs,
+                  blockId: generateId(),
+                });
+                modified = true;
+              } catch {
+                // Skip nodes where content schema prevents setNodeMarkup
+              }
             }
           });
           return modified ? tr : null;
