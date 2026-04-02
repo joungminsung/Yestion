@@ -5,7 +5,7 @@ export interface SyncOperation {
   type: "create" | "update" | "delete";
   entity: "page" | "block";
   entityId: string;
-  payload: any;
+  payload: unknown;
   timestamp: number;
   retries: number;
 }

@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@prisma/client";
 import type {
   IntegrationServiceType,
   IntegrationConfig,
@@ -48,8 +49,7 @@ export abstract class BaseIntegrationAdapter {
   abstract handleEvent(
     event: IntegrationEvent,
     config: IntegrationConfig,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    db: any
+    db: PrismaClient
   ): Promise<EventHandlerResult>;
 
   /**

@@ -2,9 +2,8 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Search, Filter, FileText, Database, Calendar, User, X, Loader2 } from "lucide-react";
+import { Search, Filter, FileText, Calendar, User, X, Loader2 } from "lucide-react";
 import { trpc } from "@/server/trpc/client";
-import { useTranslations } from "next-intl";
 
 type FilterState = {
   type: "all" | "page" | "database";

@@ -150,7 +150,7 @@ export const taskRouter = router({
     .mutation(async ({ ctx, input }) => {
       return ctx.db.$transaction(async (tx) => {
         const task = await tx.task.findUniqueOrThrow({ where: { id: input.id } });
-        await verifyProjectMembership(tx as any, task.projectId, ctx.session.user.id);
+        await verifyProjectMembership(tx, task.projectId, ctx.session.user.id);
 
         // Shift tasks in target column
         await tx.task.updateMany({

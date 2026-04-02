@@ -18,7 +18,10 @@ export function encryptToken(plaintext: string): string {
 }
 
 export function decryptToken(ciphertext: string): string {
-  const [ivHex, authTagHex, encrypted] = ciphertext.split(":");
+  const parts = ciphertext.split(":");
+  const ivHex = parts[0] ?? "";
+  const authTagHex = parts[1] ?? "";
+  const encrypted = parts[2] ?? "";
   const decipher = crypto.createDecipheriv(
     ALGORITHM,
     getKey(),

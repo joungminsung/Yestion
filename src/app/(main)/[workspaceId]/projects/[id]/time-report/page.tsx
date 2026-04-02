@@ -43,19 +43,19 @@ export default function TimeReportPage() {
 
   const totalSeconds = useMemo(() => {
     if (!report) return 0;
-    return report.reduce((sum: number, r: any) => sum + (r.totalSeconds ?? 0), 0);
+    return report.reduce((sum: number, r: Record<string, unknown>) => sum + ((r.totalSeconds as number) ?? 0), 0);
   }, [report]);
 
   const totalEntries = useMemo(() => {
     if (!report) return 0;
-    return report.reduce((sum: number, r: any) => sum + (r.count ?? 0), 0);
+    return report.reduce((sum: number, r: Record<string, unknown>) => sum + ((r.count as number) ?? 0), 0);
   }, [report]);
 
   const chartData = useMemo(() => {
     if (!report) return [];
-    return report.map((r: any) => ({
-      name: r.title ?? r.date ?? r.userId ?? "Unknown",
-      hours: Math.round((r.totalSeconds / 3600) * 100) / 100,
+    return report.map((r: Record<string, unknown>) => ({
+      name: (r.title as string) ?? (r.date as string) ?? (r.userId as string) ?? "Unknown",
+      hours: Math.round(((r.totalSeconds as number) / 3600) * 100) / 100,
     }));
   }, [report]);
 
@@ -224,20 +224,20 @@ export default function TimeReportPage() {
               No time entries in this period
             </div>
           ) : (
-            report?.map((row: any, i: number) => (
+            report?.map((row: Record<string, unknown>, i: number) => (
               <div
                 key={i}
                 className="grid grid-cols-[1fr_100px_80px] gap-2 px-4 py-2 border-t"
                 style={{ borderColor: "var(--border-light, #eee)" }}
               >
                 <span className="text-sm truncate" style={{ color: "var(--text-primary)" }}>
-                  {row.title ?? (row.date ? format(new Date(row.date), "EEE, MMM d") : row.userId)}
+                  {(row.title as string) ?? (row.date ? format(new Date(row.date as string), "EEE, MMM d") : (row.userId as string))}
                 </span>
                 <span className="text-sm font-mono" style={{ color: "var(--text-secondary)" }}>
-                  {formatDuration(row.totalSeconds)}
+                  {formatDuration(row.totalSeconds as number)}
                 </span>
                 <span className="text-sm" style={{ color: "var(--text-tertiary)" }}>
-                  {row.count}
+                  {row.count as number}
                 </span>
               </div>
             ))

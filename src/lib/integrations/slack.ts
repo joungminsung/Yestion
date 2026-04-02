@@ -1,5 +1,6 @@
 import { BaseIntegrationAdapter, registerAdapter } from "./base-adapter";
 import { signOAuthState, decryptToken } from "./crypto";
+import type { PrismaClient } from "@prisma/client";
 import type {
   IntegrationConfig,
   IntegrationEvent,
@@ -95,9 +96,11 @@ class SlackAdapter extends BaseIntegrationAdapter {
 
   async handleEvent(
     event: IntegrationEvent,
-    _config: IntegrationConfig,
-    _db: any
+    config: IntegrationConfig,
+    db: PrismaClient
   ): Promise<EventHandlerResult> {
+    void config;
+    void db;
     const eventType = event.type;
 
     // Handle slash commands
@@ -126,7 +129,7 @@ class SlackAdapter extends BaseIntegrationAdapter {
     }
   }
 
-  async disconnect(accessToken: string, _config: IntegrationConfig): Promise<void> {
+  async disconnect(accessToken: string): Promise<void> {
     const token = decryptToken(accessToken);
     // Revoke the token
     await fetch("https://slack.com/api/auth.revoke", {

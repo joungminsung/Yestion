@@ -49,16 +49,17 @@ export const activityRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const where: any = {
+      const where: Record<string, unknown> = {
         page: { workspaceId: input.workspaceId },
       };
       if (input.action) where.action = input.action;
       if (input.userId) where.userId = input.userId;
       if (input.search) where.action = { contains: input.search, mode: "insensitive" };
       if (input.from || input.to) {
-        where.createdAt = {};
-        if (input.from) where.createdAt.gte = new Date(input.from);
-        if (input.to) where.createdAt.lte = new Date(input.to);
+        const createdAt: Record<string, Date> = {};
+        if (input.from) createdAt.gte = new Date(input.from);
+        if (input.to) createdAt.lte = new Date(input.to);
+        where.createdAt = createdAt;
       }
 
       const items = await ctx.db.activityLog.findMany({

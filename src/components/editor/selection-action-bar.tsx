@@ -31,7 +31,7 @@ export function SelectionActionBar({ editor }: Props) {
 
   useEffect(() => {
     if (!showTurnInto) return;
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = () => {
       setShowTurnInto(false);
     };
     // Delay to avoid catching the click that opened it

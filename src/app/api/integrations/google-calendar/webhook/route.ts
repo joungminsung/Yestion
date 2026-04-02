@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     where: { service: "GOOGLE_CALENDAR", status: "CONNECTED" },
   });
 
-  const matchedIntegration = integrations.find((i: any) => {
+  const matchedIntegration = integrations.find((i: { config: unknown }) => {
     const config = i.config as Record<string, unknown>;
     return config.channelId === channelId || config.resourceId === resourceId;
   });

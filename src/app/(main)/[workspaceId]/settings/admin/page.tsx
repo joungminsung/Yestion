@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { trpc } from "@/server/trpc/client";
-import { Users, FileText, Database, Shield, MoreHorizontal } from "lucide-react";
+import { Users, FileText, Shield } from "lucide-react";
 
 interface StatCardProps {
   icon: React.ReactNode;
@@ -34,12 +34,12 @@ export default function AdminDashboardPage() {
   const updateRole = trpc.workspace.updateMemberRole.useMutation({ onSuccess: () => refetch() });
   const removeMember = trpc.workspace.removeMember.useMutation({ onSuccess: () => refetch() });
 
-  const filteredMembers = members?.filter((m: any) => !roleFilter || m.role === roleFilter) ?? [];
+  const filteredMembers = members?.filter((m: { role: string }) => !roleFilter || m.role === roleFilter) ?? [];
 
   const stats = {
     totalMembers: members?.length ?? 0,
-    admins: members?.filter((m: any) => m.role === "ADMIN" || m.role === "OWNER").length ?? 0,
-    guests: members?.filter((m: any) => m.role === "GUEST").length ?? 0,
+    admins: members?.filter((m: { role: string }) => m.role === "ADMIN" || m.role === "OWNER").length ?? 0,
+    guests: members?.filter((m: { role: string }) => m.role === "GUEST").length ?? 0,
   };
 
   return (
@@ -83,7 +83,7 @@ export default function AdminDashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredMembers.map((member: any) => (
+              {filteredMembers.map((member) => (
                 <tr key={member.id} className="border-t" style={{ borderColor: "var(--border-default)" }}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -99,7 +99,7 @@ export default function AdminDashboardPage() {
                   <td className="px-4 py-3">
                     <select
                       value={member.role}
-                      onChange={(e) => updateRole.mutate({ workspaceId, memberId: member.id, role: e.target.value as any })}
+                      onChange={(e) => updateRole.mutate({ workspaceId, memberId: member.id, role: e.target.value as "ADMIN" | "MEMBER" | "GUEST" })}
                       disabled={member.role === "OWNER"}
                       className="px-2 py-1 rounded text-xs border"
                       style={{ backgroundColor: "var(--bg-primary)", borderColor: "var(--border-default)", color: "var(--text-primary)" }}

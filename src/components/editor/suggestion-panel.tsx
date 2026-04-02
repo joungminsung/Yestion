@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import type { Editor } from "@tiptap/react";
-import { Check, X, ChevronDown, ChevronUp, User } from "lucide-react";
+import { Check, X, User } from "lucide-react";
 
 type Suggestion = {
   id: string;

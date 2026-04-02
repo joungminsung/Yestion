@@ -106,7 +106,7 @@ export function TabBar() {
                 <>
                   <button
                     onClick={() => {
-                      tab.isPinned ? unpinTab(tab.id) : pinTab(tab.id);
+                      if (tab.isPinned) { unpinTab(tab.id); } else { pinTab(tab.id); }
                       setContextMenu(null);
                     }}
                     className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-notion-bg-hover"

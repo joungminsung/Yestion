@@ -3,7 +3,7 @@ import { get, set, del, keys, clear } from "idb-keyval";
 export interface CachedPage {
   id: string;
   title: string;
-  content: any;
+  content: unknown;
   updatedAt: string;
   workspaceId: string;
 }

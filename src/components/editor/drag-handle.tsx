@@ -203,13 +203,14 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
       if (blocks.length === 0) return null;
 
       // Above the first block → insert at position 0 (top of document)
-      if (clientY <= blocks[0].top) {
-        return { top: blocks[0].top, blockPos: blocks[0].offset };
+      const firstBlock = blocks[0];
+      if (firstBlock && clientY <= firstBlock.top) {
+        return { top: firstBlock.top, blockPos: firstBlock.offset };
       }
 
       // Check each gap between blocks using midpoints
       for (let i = 0; i < blocks.length; i++) {
-        const block = blocks[i];
+        const block = blocks[i]!;
         const midY = (block.top + block.bottom) / 2;
 
         // Top half → insert before this block
@@ -224,7 +225,7 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
 
         // Gap between this block and next
         if (i < blocks.length - 1) {
-          const next = blocks[i + 1];
+          const next = blocks[i + 1]!;
           if (clientY > block.bottom && clientY < next.top) {
             return { top: block.bottom, blockPos: block.offset + block.nodeSize };
           }
@@ -232,7 +233,7 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
       }
 
       // Below the last block → insert at end
-      const last = blocks[blocks.length - 1];
+      const last = blocks[blocks.length - 1]!;
       return { top: last.bottom, blockPos: last.offset + last.nodeSize };
     },
     [editor]
@@ -293,13 +294,11 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
 
       lock();
 
-      let isDragging = false;
       let lastDropPos: number | null = null;
       // Track the current position of the dragged block (changes as we reorder live)
       let currentBlockPos = startPos;
 
       const handleMouseMoveForDrag = (moveEvent: MouseEvent) => {
-        isDragging = true;
         const editorRect = editor.view.dom.getBoundingClientRect();
 
         // Auto-scroll near edges

@@ -22,7 +22,7 @@ export function EmptyPageGuide({ editor, onOpenTemplates }: Props) {
     const checkContent = () => {
       const doc = editor.state.doc;
       const isEmpty = doc.childCount === 0 ||
-        (doc.childCount === 1 && doc.firstChild?.isTextblock && doc.firstChild.content.size === 0);
+        (doc.childCount === 1 && !!doc.firstChild?.isTextblock && doc.firstChild.content.size === 0);
       setVisible(isEmpty);
     };
 

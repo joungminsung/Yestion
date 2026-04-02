@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@prisma/client";
 import { BaseIntegrationAdapter, registerAdapter } from "./base-adapter";
 import { signOAuthState, decryptToken } from "./crypto";
 import type {
@@ -105,9 +106,10 @@ class GoogleCalendarAdapter extends BaseIntegrationAdapter {
 
   async handleEvent(
     event: IntegrationEvent,
-    _config: IntegrationConfig,
-    db: any
+    config: IntegrationConfig,
+    db: PrismaClient
   ): Promise<EventHandlerResult> {
+    void config;
     // Handle Google Calendar push notification
     if (event.type === "calendar.push") {
       const actions: string[] = [];
@@ -149,7 +151,7 @@ class GoogleCalendarAdapter extends BaseIntegrationAdapter {
     }
   }
 
-  async disconnect(accessToken: string, _config: IntegrationConfig): Promise<void> {
+  async disconnect(accessToken: string): Promise<void> {
     const token = decryptToken(accessToken);
     try {
       await fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, {

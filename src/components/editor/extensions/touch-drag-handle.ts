@@ -52,7 +52,7 @@ export const TouchDragHandle = Extension.create({
               return false;
             },
 
-            touchmove(_view, _event) {
+            touchmove() {
               if (longPressTimer && dragStartPos === -1) {
                 clearTimeout(longPressTimer);
                 longPressTimer = null;

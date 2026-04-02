@@ -99,7 +99,7 @@ export async function deliverWebhook(
  * Dispatch an event to all matching outgoing webhooks for a workspace.
  */
 export async function dispatchWebhookEvent(
-  db: any, // PrismaClient
+  db: import("@prisma/client").PrismaClient,
   workspaceId: string,
   event: string,
   payload: Record<string, unknown>
@@ -125,7 +125,7 @@ export async function dispatchWebhookEvent(
       data: {
         webhookId: webhook.id,
         event,
-        payload,
+        payload: payload as unknown as import("@prisma/client").Prisma.InputJsonValue,
         responseStatus: result.statusCode,
         durationMs: result.durationMs,
         status: result.success ? "success" : "failed",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, X, CheckCircle, MoreHorizontal, Trash2 } from "lucide-react";
+import { Send, CheckCircle, Trash2 } from "lucide-react";
 import { trpc } from "@/server/trpc/client";
 import type { Editor } from "@tiptap/react";
 
@@ -26,7 +26,6 @@ export function CommentPopover({
 }: CommentPopoverProps) {
   const [content, setContent] = useState("");
   const [replyContent, setReplyContent] = useState("");
-  const [showMenu, setShowMenu] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "@/server/trpc/init";
 
-async function verifyTaskAccess(db: any, taskId: string, userId: string) {
+async function verifyTaskAccess(db: import("@prisma/client").PrismaClient, taskId: string, userId: string) {
   const task = await db.task.findUnique({ where: { id: taskId } });
   if (!task) throw new Error("Task not found");
   const member = await db.projectMember.findFirst({
@@ -27,8 +27,8 @@ export const timeEntryRouter = router({
       if (input.userId) where.userId = input.userId;
       if (input.from || input.to) {
         where.startedAt = {};
-        if (input.from) (where.startedAt as any).gte = input.from;
-        if (input.to) (where.startedAt as any).lte = input.to;
+        if (input.from) (where.startedAt as Record<string, Date>).gte = input.from;
+        if (input.to) (where.startedAt as Record<string, Date>).lte = input.to;
       }
       if (input.projectId) {
         where.task = { projectId: input.projectId };

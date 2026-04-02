@@ -17,7 +17,7 @@ const SUBSCRIBABLE_EVENTS = [
   "member.joined", "member.removed",
 ] as const;
 
-async function verifyWebhookAccess(db: any, webhookId: string, userId: string) {
+async function verifyWebhookAccess(db: import("@prisma/client").PrismaClient, webhookId: string, userId: string) {
   const webhook = await db.webhook.findUnique({ where: { id: webhookId } });
   if (!webhook) throw new Error("Webhook not found");
   const member = await db.workspaceMember.findFirst({
@@ -41,7 +41,7 @@ export const webhookRouter = router({
         orderBy: { createdAt: "desc" },
         include: { _count: { select: { deliveries: true } } },
       });
-      return webhooks.map((w: any) => ({
+      return webhooks.map((w: { secret: string } & Record<string, unknown>) => ({
         ...w,
         secret: w.secret.slice(0, 8) + "..." + w.secret.slice(-4),
       }));

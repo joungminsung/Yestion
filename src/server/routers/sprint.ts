@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "@/server/trpc/init";
+import type { PrismaClient } from "@prisma/client";
 
-async function verifyProjectMembership(db: any, projectId: string, userId: string) {
+type DbClient = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">;
+
+async function verifyProjectMembership(db: DbClient, projectId: string, userId: string) {
   const member = await db.projectMember.findFirst({
     where: { projectId, userId },
   });
@@ -89,7 +92,7 @@ export const sprintRouter = router({
   complete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      return ctx.db.$transaction(async (tx: any) => {
+      return ctx.db.$transaction(async (tx) => {
         const sprint = await tx.sprint.findUnique({
           where: { id: input.id },
           include: { tasks: { where: { status: { not: "done" } } } },
@@ -161,7 +164,7 @@ export const sprintRouter = router({
       for (let d = new Date(start); d <= end; d = new Date(d.getTime() + msPerDay)) {
         const dateStr = d.toISOString().split("T")[0] ?? "";
         const completedByDate = sprint.tasks.filter(
-          (t: any) => t.status === "done" && t.updatedAt <= d
+          (t: { status: string; updatedAt: Date }) => t.status === "done" && t.updatedAt <= d
         ).length;
         const dayIndex = Math.ceil((d.getTime() - start.getTime()) / msPerDay);
         days.push({

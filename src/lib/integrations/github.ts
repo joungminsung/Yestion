@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@prisma/client";
 import { BaseIntegrationAdapter, registerAdapter } from "./base-adapter";
 import { signOAuthState, decryptToken } from "./crypto";
 import type {
@@ -44,7 +45,7 @@ class GitHubAdapter extends BaseIntegrationAdapter {
     );
   }
 
-  async exchangeCode(code: string, _redirectUri: string): Promise<OAuthTokens> {
+  async exchangeCode(code: string): Promise<OAuthTokens> {
     const response = await fetch("https://github.com/login/oauth/access_token", {
       method: "POST",
       headers: {
@@ -74,16 +75,17 @@ class GitHubAdapter extends BaseIntegrationAdapter {
     };
   }
 
-  async refreshAccessToken(_refreshToken: string): Promise<OAuthTokens> {
+  async refreshAccessToken(): Promise<OAuthTokens> {
     // GitHub personal tokens don't expire; GitHub Apps use installation tokens
     throw new Error("GitHub tokens do not support refresh");
   }
 
   async handleEvent(
     event: IntegrationEvent,
-    _config: IntegrationConfig,
-    db: any
+    config: IntegrationConfig,
+    db: PrismaClient
   ): Promise<EventHandlerResult> {
+    void config;
     const actions: string[] = [];
 
     switch (event.type) {
@@ -103,7 +105,7 @@ class GitHubAdapter extends BaseIntegrationAdapter {
               userId: member.userId,
               type: "github_issue",
               title: `New GitHub Issue: ${issue.title}`,
-              message: `${(issue as any).html_url}`,
+              message: `${issue.html_url}`,
             },
           });
         }
@@ -129,7 +131,7 @@ class GitHubAdapter extends BaseIntegrationAdapter {
               userId: member.userId,
               type: "github_pr",
               title: `PR ${statusLabel}: ${pr.title}`,
-              message: `${(pr as any).html_url}`,
+              message: `${pr.html_url}`,
             },
           });
         }
@@ -153,7 +155,7 @@ class GitHubAdapter extends BaseIntegrationAdapter {
     }
   }
 
-  async disconnect(accessToken: string, _config: IntegrationConfig): Promise<void> {
+  async disconnect(accessToken: string): Promise<void> {
     const token = decryptToken(accessToken);
     // Delete the OAuth app authorization
     try {

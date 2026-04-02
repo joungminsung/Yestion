@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { FileUpload } from "./file-upload";
-import { FileText, FileSpreadsheet, FileImage, FileVideo, FileAudio, File as FileIcon, Paperclip, Download } from "lucide-react";
+import { FileText, FileSpreadsheet, FileImage, FileVideo, FileAudio, File as FileIcon, Paperclip } from "lucide-react";
 
 function getFileIcon(name: string) {
   const ext = name.split(".").pop()?.toLowerCase() || "";

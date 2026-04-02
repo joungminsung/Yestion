@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "@/server/trpc/init";
 
-async function verifyWorkspaceMembership(db: any, workspaceId: string, userId: string) {
+async function verifyWorkspaceMembership(db: import("@prisma/client").PrismaClient, workspaceId: string, userId: string) {
   const member = await db.workspaceMember.findFirst({
     where: { workspaceId, userId },
   });
@@ -28,7 +28,7 @@ export const projectRouter = router({
         include: { members: true, _count: { select: { tasks: true } } },
       });
       if (!project) throw new Error("Not found");
-      if (!project.members.some((m: any) => m.userId === ctx.session.user.id)) {
+      if (!project.members.some((m: { userId: string }) => m.userId === ctx.session.user.id)) {
         throw new Error("Not authorized");
       }
       return project;

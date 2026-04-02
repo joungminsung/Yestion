@@ -88,7 +88,7 @@ export function PageEditor({ pageId, initialBlocks, isLocked = false, sessionTok
 
   // Flush on page unload (beforeunload) — use sendBeacon for reliability
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    const handleBeforeUnload = () => {
       if (saveTimeout.current) {
         clearTimeout(saveTimeout.current);
         saveTimeout.current = null;

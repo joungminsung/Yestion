@@ -51,7 +51,7 @@ export function IntegrationSettings({ workspaceId }: Props) {
   const handleConnect = async (service: string) => {
     const result = await connectMutation.mutateAsync({
       workspaceId,
-      service: service as any,
+      service: service as "SLACK" | "GITHUB" | "GOOGLE_CALENDAR" | "EMAIL",
     });
     if (result.oauthUrl) {
       window.location.href = result.oauthUrl;
@@ -63,7 +63,7 @@ export function IntegrationSettings({ workspaceId }: Props) {
 
   const handleDisconnect = (service: string) => {
     if (confirm("Are you sure you want to disconnect this integration?")) {
-      disconnectMutation.mutate({ workspaceId, service: service as any });
+      disconnectMutation.mutate({ workspaceId, service: service as "SLACK" | "GITHUB" | "GOOGLE_CALENDAR" | "EMAIL" });
     }
   };
 
@@ -193,7 +193,7 @@ export function IntegrationSettings({ workspaceId }: Props) {
                     onSave={(newConfig) => {
                       updateConfigMutation.mutate({
                         workspaceId,
-                        service: service as any,
+                        service: service as "SLACK" | "GITHUB" | "GOOGLE_CALENDAR" | "EMAIL",
                         config: newConfig,
                       });
                     }}

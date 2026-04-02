@@ -10,7 +10,7 @@ export async function GET() {
         "Cache-Control": "no-store",
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Failed to collect metrics" }, { status: 500 });
   }
 }

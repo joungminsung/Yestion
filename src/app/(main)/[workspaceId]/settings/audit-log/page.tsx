@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { trpc } from "@/server/trpc/client";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Download, Search, Filter } from "lucide-react";
+import { Download, Search } from "lucide-react";
 
 export default function AuditLogPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();

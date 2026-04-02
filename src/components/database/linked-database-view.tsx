@@ -9,7 +9,7 @@ type LinkedDatabaseViewProps = {
   viewId?: string | null;
 };
 
-export function LinkedDatabaseView({ databaseId, viewId }: LinkedDatabaseViewProps) {
+export function LinkedDatabaseView({ databaseId }: LinkedDatabaseViewProps) {
   const router = useRouter();
   const params = useParams();
   const workspaceId = params.workspaceId as string;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Plus, X, Trash2 } from "lucide-react";
+import { ArrowLeft, X, Trash2 } from "lucide-react";
 import { trpc } from "@/server/trpc/client";
 import { useToastStore } from "@/stores/toast";
 

@@ -52,12 +52,6 @@ export function DatabaseToolbar({
   const { localFilters, localSorts, setLocalFilters, setLocalSorts, setLocalGroup } = useDatabaseStore();
   const utils = trpc.useUtils();
 
-  const toggleLockMutation = trpc.database.toggleLock.useMutation({
-    onSuccess: () => {
-      if (databaseId) utils.database.get.invalidate({ databaseId });
-    },
-  });
-
   const addViewMutation = trpc.database.addView.useMutation({
     onSuccess: () => {
       if (databaseId) utils.database.get.invalidate({ databaseId });

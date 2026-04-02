@@ -20,7 +20,7 @@ export function VersionDiffView({
   const [selectedB, setSelectedB] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"unified" | "split">("unified");
 
-  const { data: snapshots, isLoading: loadingSnapshots } = trpc.history.list.useQuery({
+  const { data: snapshots } = trpc.history.list.useQuery({
     pageId,
     limit: 50,
   });

@@ -10,9 +10,7 @@ import Link from "next/link";
 
 export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const token = searchParams.get("token");
-  const addToast = useToastStore((s) => s.addToast);
 
   // If no token, show request form
   if (!token) return <RequestResetForm />;

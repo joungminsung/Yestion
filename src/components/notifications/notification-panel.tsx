@@ -59,7 +59,7 @@ export function NotificationPanel({ onClose }: { onClose: () => void }) {
   });
 
   const notifications = data?.items ?? [];
-  const unreadCount = countData ?? notifications.filter((n) => !n.read).length;
+  const unreadCount = countData?.unread ?? notifications.filter((n) => !n.read).length;
 
   const filteredNotifications = useMemo(() => {
     switch (activeTab) {

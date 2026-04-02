@@ -50,7 +50,7 @@ export const automationRouter = router({
         description: z.string().optional(),
         trigger: z.object({
           type: z.string(),
-          config: z.record(z.unknown()).default({}),
+          config: z.record(z.string(), z.unknown()).default({}),
         }),
         conditions: z
           .array(
@@ -84,6 +84,9 @@ export const automationRouter = router({
       return ctx.db.automation.create({
         data: {
           ...input,
+          trigger: input.trigger as unknown as import("@prisma/client").Prisma.InputJsonValue,
+          conditions: input.conditions as unknown as import("@prisma/client").Prisma.InputJsonValue,
+          actions: input.actions as unknown as import("@prisma/client").Prisma.InputJsonValue,
           createdBy: ctx.session.user.id,
         },
       });
@@ -99,7 +102,7 @@ export const automationRouter = router({
         trigger: z
           .object({
             type: z.string(),
-            config: z.record(z.unknown()).default({}),
+            config: z.record(z.string(), z.unknown()).default({}),
           })
           .optional(),
         conditions: z
@@ -123,7 +126,11 @@ export const automationRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await verifyAutomationAccess(ctx.db, input.id, ctx.session.user.id);
-      const { id, ...data } = input;
+      const { id, ...rest } = input;
+      const data: Record<string, unknown> = { ...rest };
+      if (rest.trigger) data.trigger = rest.trigger as unknown as import("@prisma/client").Prisma.InputJsonValue;
+      if (rest.conditions) data.conditions = rest.conditions as unknown as import("@prisma/client").Prisma.InputJsonValue;
+      if (rest.actions) data.actions = rest.actions as unknown as import("@prisma/client").Prisma.InputJsonValue;
       return ctx.db.automation.update({ where: { id }, data });
     }),
 

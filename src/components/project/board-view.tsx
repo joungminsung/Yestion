@@ -20,7 +20,6 @@ type Props = {
 export function BoardView({ projectId }: Props) {
   const { data: tasks, refetch } = trpc.task.list.useQuery({ projectId });
   const createTask = trpc.task.create.useMutation({ onSuccess: () => refetch() });
-  const updateTask = trpc.task.update.useMutation({ onSuccess: () => refetch() });
   const reorderTask = trpc.task.reorder.useMutation({ onSuccess: () => refetch() });
   const [addingTo, setAddingTo] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");

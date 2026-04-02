@@ -151,8 +151,6 @@ export function Sidebar() {
 
   useSidebarKeyboardNav(pages || [], workspaceId);
 
-  const sidebarVisible = isOpen || isHoverExpanded;
-
   return (
     <>
       {/* Hover zone: invisible strip on the left edge when sidebar is collapsed (desktop only) */}

@@ -10,7 +10,7 @@ const PERMISSIONS = [
   "automation.manage", "webhook.manage", "apikey.manage",
 ] as const;
 
-async function verifyWorkspaceMember(db: any, workspaceId: string, userId: string) {
+async function verifyWorkspaceMember(db: import("@prisma/client").PrismaClient, workspaceId: string, userId: string) {
   const member = await db.workspaceMember.findFirst({
     where: { workspaceId, userId },
   });
@@ -18,7 +18,7 @@ async function verifyWorkspaceMember(db: any, workspaceId: string, userId: strin
   return member;
 }
 
-async function verifyWorkspaceAdmin(db: any, workspaceId: string, userId: string) {
+async function verifyWorkspaceAdmin(db: import("@prisma/client").PrismaClient, workspaceId: string, userId: string) {
   const member = await verifyWorkspaceMember(db, workspaceId, userId);
   if (!["OWNER", "ADMIN"].includes(member.role)) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Requires OWNER or ADMIN role" });

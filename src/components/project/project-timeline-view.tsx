@@ -4,7 +4,6 @@ import { useMemo, useRef, useState } from "react";
 import { trpc } from "@/server/trpc/client";
 import {
   startOfWeek,
-  endOfWeek,
   addDays,
   differenceInDays,
   format,

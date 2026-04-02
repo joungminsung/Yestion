@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { trpc } from "@/server/trpc/client";
 import { useToastStore } from "@/stores/toast";
-import { Send, X, Trash2, MessageCircle, FileText, Vote, CheckSquare, Hash, AtSign } from "lucide-react";
+import { Send, X, Trash2, MessageCircle, FileText, Vote, CheckSquare, Hash } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────
 

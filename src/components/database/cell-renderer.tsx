@@ -16,14 +16,15 @@ type CellRendererProps = {
  * Read-only cell display, switching on property type.
  */
 export function CellRenderer({ value, type, config, rowId }: CellRendererProps) {
-  if (type === "rollup" && rowId) {
-    return <RollupCellRenderer rowId={rowId} config={config} />;
-  }
-
   const rendered = useMemo(
     () => renderByType(value, type, config),
     [value, type, config],
   );
+
+  if (type === "rollup" && rowId) {
+    return <RollupCellRenderer rowId={rowId} config={config} />;
+  }
+
   return <>{rendered}</>;
 }
 

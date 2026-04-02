@@ -18,9 +18,6 @@ const withPWA = withPWAInit({
       },
     },
   ],
-  fallbacks: {
-    document: "/offline",
-  },
 });
 
 /** @type {import('next').NextConfig} */

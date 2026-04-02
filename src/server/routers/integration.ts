@@ -204,7 +204,7 @@ export const integrationRouter = router({
             service: input.service,
           },
         },
-        data: { config: input.config as Record<string, unknown> as any },
+        data: { config: input.config as unknown as import("@prisma/client").Prisma.InputJsonValue },
       });
     }),
 });

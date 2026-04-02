@@ -16,7 +16,7 @@ export const syncedBlockRouter = router({
         data: {
           sourceBlockId: input.sourceBlockId,
           sourcePageId: input.sourcePageId,
-          content: input.content,
+          content: input.content as unknown as import("@prisma/client").Prisma.InputJsonValue,
         },
       });
     }),
@@ -64,7 +64,7 @@ export const syncedBlockRouter = router({
       return ctx.db.syncedBlock.update({
         where: { id: existing.id },
         data: {
-          content: input.content,
+          content: input.content as unknown as import("@prisma/client").Prisma.InputJsonValue,
           version: { increment: 1 },
         },
       });

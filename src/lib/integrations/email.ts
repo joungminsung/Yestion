@@ -1,7 +1,5 @@
 import { BaseIntegrationAdapter, registerAdapter } from "./base-adapter";
 import type {
-  IntegrationConfig,
-  IntegrationEvent,
   OAuthTokens,
   EventHandlerResult,
   IntegrationInfo,
@@ -30,12 +28,12 @@ class EmailAdapter extends BaseIntegrationAdapter {
     return process.env.RESEND_FROM_EMAIL ?? "noreply@example.com";
   }
 
-  getOAuthUrl(_workspaceId: string, _redirectUri: string): string {
+  getOAuthUrl(): string {
     // Email doesn't use OAuth — it uses an API key configured in env
     return "";
   }
 
-  async exchangeCode(_code: string, _redirectUri: string): Promise<OAuthTokens> {
+  async exchangeCode(): Promise<OAuthTokens> {
     // No OAuth flow; connection is validated by API key availability
     return {
       accessToken: this.apiKey,
@@ -43,20 +41,16 @@ class EmailAdapter extends BaseIntegrationAdapter {
     };
   }
 
-  async refreshAccessToken(_refreshToken: string): Promise<OAuthTokens> {
+  async refreshAccessToken(): Promise<OAuthTokens> {
     return { accessToken: this.apiKey };
   }
 
-  async handleEvent(
-    _event: IntegrationEvent,
-    _config: IntegrationConfig,
-    _db: any
-  ): Promise<EventHandlerResult> {
+  async handleEvent(): Promise<EventHandlerResult> {
     // Email adapter doesn't receive inbound events
     return { handled: false };
   }
 
-  async verifyConnection(_accessToken: string): Promise<boolean> {
+  async verifyConnection(): Promise<boolean> {
     if (!this.apiKey) return false;
     try {
       const response = await fetch("https://api.resend.com/domains", {
@@ -68,7 +62,7 @@ class EmailAdapter extends BaseIntegrationAdapter {
     }
   }
 
-  async disconnect(_accessToken: string, _config: IntegrationConfig): Promise<void> {
+  async disconnect(): Promise<void> {
     // Nothing to revoke for API key-based auth
   }
 }
