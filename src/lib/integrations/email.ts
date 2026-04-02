@@ -105,6 +105,15 @@ export async function sendEmail(options: {
   return data.id;
 }
 
+/** Escape HTML special characters to prevent XSS */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 /** Generate an HTML email for task assignment */
 export function taskAssignmentTemplate(params: {
   taskTitle: string;
@@ -112,6 +121,11 @@ export function taskAssignmentTemplate(params: {
   assignerName: string;
   taskUrl: string;
 }): string {
+  const taskTitle = escapeHtml(params.taskTitle);
+  const projectName = escapeHtml(params.projectName);
+  const assignerName = escapeHtml(params.assignerName);
+  const taskUrl = escapeHtml(params.taskUrl);
+
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px;">
       <h2 style="font-size: 18px; color: #1a1a1a; margin-bottom: 16px;">
@@ -119,13 +133,13 @@ export function taskAssignmentTemplate(params: {
       </h2>
       <div style="padding: 16px; border: 1px solid #e5e5e5; border-radius: 8px; margin-bottom: 24px;">
         <p style="font-size: 16px; font-weight: 600; color: #1a1a1a; margin: 0 0 4px;">
-          ${params.taskTitle}
+          ${taskTitle}
         </p>
         <p style="font-size: 13px; color: #666; margin: 0;">
-          in ${params.projectName} &middot; assigned by ${params.assignerName}
+          in ${projectName} &middot; assigned by ${assignerName}
         </p>
       </div>
-      <a href="${params.taskUrl}"
+      <a href="${taskUrl}"
          style="display: inline-block; padding: 10px 20px; background: #2383e2; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500;">
         View Task
       </a>
@@ -139,14 +153,17 @@ export function digestTemplate(params: {
   period: string;
   items: { title: string; description: string; url: string }[];
 }): string {
+  const workspaceName = escapeHtml(params.workspaceName);
+  const period = escapeHtml(params.period);
+
   const itemsHtml = params.items
     .map(
       (item) => `
     <div style="padding: 12px 0; border-bottom: 1px solid #f0f0f0;">
-      <a href="${item.url}" style="font-size: 14px; font-weight: 500; color: #1a1a1a; text-decoration: none;">
-        ${item.title}
+      <a href="${escapeHtml(item.url)}" style="font-size: 14px; font-weight: 500; color: #1a1a1a; text-decoration: none;">
+        ${escapeHtml(item.title)}
       </a>
-      <p style="font-size: 13px; color: #666; margin: 4px 0 0;">${item.description}</p>
+      <p style="font-size: 13px; color: #666; margin: 4px 0 0;">${escapeHtml(item.description)}</p>
     </div>
   `
     )
@@ -155,7 +172,7 @@ export function digestTemplate(params: {
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px;">
       <h2 style="font-size: 18px; color: #1a1a1a; margin-bottom: 4px;">
-        ${params.workspaceName} — ${params.period} Digest
+        ${workspaceName} — ${period} Digest
       </h2>
       <p style="font-size: 13px; color: #999; margin-bottom: 24px;">
         Here's what happened in your workspace

@@ -24,14 +24,17 @@ model User {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  memberships      WorkspaceMember[]
-  sessions         Session[]
-  favorites        Favorite[]
-  pagePermissions  PagePermission[]
-  comments         Comment[]
-  notifications    Notification[]
-  activityLogs     ActivityLog[]
-  chatMessages     ChatMessage[]
+  memberships        WorkspaceMember[]
+  sessions           Session[]
+  favorites          Favorite[]
+  pagePermissions    PagePermission[]
+  comments           Comment[]
+  notifications      Notification[]
+  activityLogs       ActivityLog[]
+  chatMessages       ChatMessage[]
+  commentReactions   CommentReaction[]
+  timeEntries        TimeEntry[]
+  workflowApprovals  WorkflowApproval[]
 }
 
 model Workspace {
@@ -41,10 +44,12 @@ model Workspace {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members     WorkspaceMember[]
-  pages       Page[]
-  apiKeys     ApiKey[]
-  customRoles CustomRole[]
+  members      WorkspaceMember[]
+  pages        Page[]
+  apiKeys      ApiKey[]
+  customRoles  CustomRole[]
+  workflows    Workflow[]
+  integrations Integration[]
 }
 
 model WorkspaceMember {
@@ -107,6 +112,7 @@ model Page {
   publicAccessToken String?  @unique
   publicAccessLevel String?
   snapshots         PageSnapshot[]
+  syncedBlocks      SyncedBlock[]
 
   @@index([workspaceId])
   @@index([parentId])
@@ -293,6 +299,7 @@ model CommentReaction {
   createdAt DateTime @default(now())
 
   comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([commentId, userId, emoji])
   @@index([commentId])
@@ -351,6 +358,8 @@ model SyncedBlock {
   version       Int      @default(1)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  sourcePage Page @relation(fields: [sourcePageId], references: [id], onDelete: Cascade)
 
   @@index([sourceBlockId])
   @@index([sourcePageId])
@@ -514,6 +523,7 @@ model TimeEntry {
   updatedAt   DateTime  @updatedAt
 
   task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
   @@index([userId])
@@ -613,6 +623,7 @@ model Workflow {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   executions  WorkflowExecution[]
 
   @@index([workspaceId])
@@ -651,6 +662,7 @@ model WorkflowApproval {
   createdAt   DateTime  @default(now())
 
   execution   WorkflowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  assignee    User?             @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
 
   @@index([executionId])
   @@index([assigneeId, status])
@@ -685,6 +697,8 @@ model Integration {
   connectedBy   String
   connectedAt   DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
+
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, service])
   @@index([workspaceId])

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "@/server/trpc/init";
+import { TRPCError } from "@trpc/server";
 
 const PERMISSIONS = [
   "page.create", "page.edit", "page.delete", "page.share",
@@ -9,10 +10,27 @@ const PERMISSIONS = [
   "automation.manage", "webhook.manage", "apikey.manage",
 ] as const;
 
+async function verifyWorkspaceMember(db: any, workspaceId: string, userId: string) {
+  const member = await db.workspaceMember.findFirst({
+    where: { workspaceId, userId },
+  });
+  if (!member) throw new TRPCError({ code: "FORBIDDEN", message: "Not a workspace member" });
+  return member;
+}
+
+async function verifyWorkspaceAdmin(db: any, workspaceId: string, userId: string) {
+  const member = await verifyWorkspaceMember(db, workspaceId, userId);
+  if (!["OWNER", "ADMIN"].includes(member.role)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Requires OWNER or ADMIN role" });
+  }
+  return member;
+}
+
 export const roleRouter = router({
   list: protectedProcedure
     .input(z.object({ workspaceId: z.string() }))
     .query(async ({ ctx, input }) => {
+      await verifyWorkspaceMember(ctx.db, input.workspaceId, ctx.session.user.id);
       return ctx.db.customRole.findMany({
         where: { workspaceId: input.workspaceId },
         orderBy: { createdAt: "asc" },
@@ -28,6 +46,7 @@ export const roleRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await verifyWorkspaceAdmin(ctx.db, input.workspaceId, ctx.session.user.id);
       return ctx.db.customRole.create({
         data: {
           workspaceId: input.workspaceId,
@@ -47,7 +66,8 @@ export const roleRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const role = await ctx.db.customRole.findUniqueOrThrow({ where: { id: input.id } });
-      if (role.isBuiltIn) throw new Error("Built-in roles cannot be modified");
+      await verifyWorkspaceAdmin(ctx.db, role.workspaceId, ctx.session.user.id);
+      if (role.isBuiltIn) throw new TRPCError({ code: "FORBIDDEN", message: "Built-in roles cannot be modified" });
       return ctx.db.customRole.update({
         where: { id: input.id },
         data: {
@@ -61,7 +81,8 @@ export const roleRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const role = await ctx.db.customRole.findUniqueOrThrow({ where: { id: input.id } });
-      if (role.isBuiltIn) throw new Error("Built-in roles cannot be deleted");
+      await verifyWorkspaceAdmin(ctx.db, role.workspaceId, ctx.session.user.id);
+      if (role.isBuiltIn) throw new TRPCError({ code: "FORBIDDEN", message: "Built-in roles cannot be deleted" });
       return ctx.db.customRole.delete({ where: { id: input.id } });
     }),
 

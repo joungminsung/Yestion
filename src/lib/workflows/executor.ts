@@ -15,6 +15,16 @@ import type { ActionType, AutomationContext } from "@/lib/automation/types";
 
 type NodeStates = Record<string, NodeExecutionState>;
 
+/** Signal thrown when a wait-delay node persists state and yields control */
+export class WaitDelaySignal extends Error {
+  readonly resumeAt: Date;
+  constructor(resumeAt: Date) {
+    super("Execution paused for delay");
+    this.name = "WaitDelaySignal";
+    this.resumeAt = resumeAt;
+  }
+}
+
 /**
  * Execute a workflow from its trigger node.
  * Walks the graph node-by-node, following edges.
@@ -53,6 +63,10 @@ export async function executeWorkflow(
     await finalizeExecution(context, nodeStates, "completed");
     return { success: true, nodeStates };
   } catch (err) {
+    if (err instanceof WaitDelaySignal) {
+      // Execution paused — state already saved to DB; return without marking as failed
+      return { success: true, nodeStates };
+    }
     const error = err instanceof Error ? err.message : "Unknown error";
     await finalizeExecution(context, nodeStates, "failed", error);
     return { success: false, nodeStates, error };
@@ -93,7 +107,7 @@ async function processNode(
         break;
 
       case "wait":
-        await executeWaitNode(node.data as WaitNodeData);
+        await executeWaitNode(nodeId, node.data as WaitNodeData, context);
         break;
 
       case "approval":
@@ -195,14 +209,33 @@ function evaluateConditionNode(
   return evaluateConditions(conditions, evalData);
 }
 
-/** Wait for the specified delay */
-async function executeWaitNode(data: WaitNodeData): Promise<void> {
+/** Wait for the specified delay — persists state to DB and returns instead of blocking */
+async function executeWaitNode(
+  nodeId: string,
+  data: WaitNodeData,
+  context: WorkflowContext
+): Promise<void> {
   if (data.waitType === "delay" && data.delayMinutes) {
-    // In production this would use a job queue; for now, capped at 5 min in-process
-    const waitMs = Math.min(data.delayMinutes * 60 * 1000, 5 * 60 * 1000);
-    await new Promise((resolve) => setTimeout(resolve, waitMs));
+    const resumeAt = new Date(Date.now() + data.delayMinutes * 60 * 1000);
+
+    // Persist the execution as WAITING_DELAY with a resumeAt timestamp
+    await context.db.workflowExecution.update({
+      where: { id: context.executionId },
+      data: {
+        status: "waiting_delay",
+        currentNode: nodeId,
+        variables: {
+          ...context.variables,
+          __resumeAt: resumeAt.toISOString(),
+        },
+      },
+    });
+
+    // Return instead of blocking — a background scheduler should pick this up
+    // when Date.now() >= resumeAt and resume execution from the next node.
+    throw new WaitDelaySignal(resumeAt);
   }
-  // "until_date" and "until_condition" would be handled by a background scheduler
+  // "until_date" and "until_condition" are also handled by the background scheduler
 }
 
 /** Create an approval request and wait for it */
