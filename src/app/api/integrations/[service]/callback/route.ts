@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db/client";
 import { getAdapter } from "@/lib/integrations/base-adapter";
+import { encryptToken, verifyOAuthState } from "@/lib/integrations/crypto";
 import type { IntegrationServiceType } from "@/lib/integrations/types";
 
 // Import adapters to trigger registration
@@ -44,13 +45,14 @@ export async function GET(
     );
   }
 
-  // Decode workspace ID from state
+  // Verify HMAC-signed state and decode workspace ID
   let workspaceId: string;
   try {
-    const decoded = JSON.parse(Buffer.from(state, "base64").toString());
-    workspaceId = decoded.workspaceId;
-  } catch {
-    return NextResponse.json({ error: "Invalid state parameter" }, { status: 400 });
+    const verified = verifyOAuthState(state);
+    workspaceId = verified.workspaceId;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Invalid state parameter";
+    return NextResponse.json({ error: msg }, { status: 400 });
   }
 
   // Find the pending integration
@@ -75,8 +77,8 @@ export async function GET(
       where: { id: integration.id },
       data: {
         status: "CONNECTED",
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
+        accessToken: encryptToken(tokens.accessToken),
+        refreshToken: tokens.refreshToken ? encryptToken(tokens.refreshToken) : undefined,
         tokenExpiry: tokens.expiresAt,
         externalId: tokens.externalId,
         externalName: tokens.externalName,

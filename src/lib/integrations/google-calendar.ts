@@ -1,4 +1,5 @@
 import { BaseIntegrationAdapter, registerAdapter } from "./base-adapter";
+import { signOAuthState, decryptToken } from "./crypto";
 import type {
   IntegrationConfig,
   IntegrationEvent,
@@ -30,7 +31,7 @@ class GoogleCalendarAdapter extends BaseIntegrationAdapter {
   }
 
   getOAuthUrl(workspaceId: string, redirectUri: string): string {
-    const state = Buffer.from(JSON.stringify({ workspaceId })).toString("base64");
+    const state = signOAuthState(workspaceId);
     const scopes = [
       "https://www.googleapis.com/auth/calendar",
       "https://www.googleapis.com/auth/calendar.events",
@@ -137,9 +138,10 @@ class GoogleCalendarAdapter extends BaseIntegrationAdapter {
 
   async verifyConnection(accessToken: string): Promise<boolean> {
     try {
+      const token = decryptToken(accessToken);
       const response = await fetch(
         "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1",
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       return response.ok;
     } catch {
@@ -148,8 +150,9 @@ class GoogleCalendarAdapter extends BaseIntegrationAdapter {
   }
 
   async disconnect(accessToken: string, _config: IntegrationConfig): Promise<void> {
+    const token = decryptToken(accessToken);
     try {
-      await fetch(`https://oauth2.googleapis.com/revoke?token=${accessToken}`, {
+      await fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       });

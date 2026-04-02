@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { db } from "@/server/db/client";
 import { slackAdapter } from "@/lib/integrations/slack";
 import type { IntegrationEvent, IntegrationConfig } from "@/lib/integrations/types";
@@ -14,7 +14,8 @@ function verifySlackSignature(
   if (!SLACK_SIGNING_SECRET) return false;
   const sigBasestring = `v0:${timestamp}:${body}`;
   const mySignature = `v0=${createHmac("sha256", SLACK_SIGNING_SECRET).update(sigBasestring).digest("hex")}`;
-  return mySignature === signature;
+  if (mySignature.length !== signature.length) return false;
+  return timingSafeEqual(Buffer.from(mySignature), Buffer.from(signature));
 }
 
 export async function POST(request: NextRequest) {

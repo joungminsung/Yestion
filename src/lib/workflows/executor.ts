@@ -67,6 +67,10 @@ export async function executeWorkflow(
       // Execution paused — state already saved to DB; return without marking as failed
       return { success: true, nodeStates };
     }
+    if (err instanceof ApprovalWaitError) {
+      // Execution paused for approval — state already persisted
+      return { success: true, nodeStates };
+    }
     const error = err instanceof Error ? err.message : "Unknown error";
     await finalizeExecution(context, nodeStates, "failed", error);
     return { success: false, nodeStates, error };
@@ -159,6 +163,10 @@ async function processNode(
       await processNode(nextId, nodeMap, edges, nodeStates, context, depth + 1);
     }
   } catch (err) {
+    // Let wait/approval signals propagate without marking the node as failed
+    if (err instanceof WaitDelaySignal || err instanceof ApprovalWaitError) {
+      throw err;
+    }
     const error = err instanceof Error ? err.message : "Unknown error";
     nodeStates[nodeId] = {
       ...nodeStates[nodeId],
@@ -238,13 +246,17 @@ async function executeWaitNode(
   // "until_date" and "until_condition" are also handled by the background scheduler
 }
 
-/** Create an approval request and wait for it */
+/**
+ * Create an approval request and persist execution state.
+ * Instead of polling, we save state and throw ApprovalWaitError to pause.
+ * The workflow resumes via `resumeExecution` when approval is granted.
+ */
 async function executeApprovalNode(
   nodeId: string,
   data: ApprovalNodeData,
   context: WorkflowContext
 ): Promise<void> {
-  const approval = await context.db.workflowApproval.create({
+  await context.db.workflowApproval.create({
     data: {
       executionId: context.executionId,
       nodeId,
@@ -270,23 +282,82 @@ async function executeApprovalNode(
     });
   }
 
-  // Poll for approval (in production, use a webhook/event-driven approach)
-  const maxWait = (data.timeoutMinutes ?? 1440) * 60 * 1000; // default 24h
-  const pollInterval = 5000;
-  const start = Date.now();
+  // Persist and return -- no polling
+  throw new ApprovalWaitError(nodeId);
+}
 
-  while (Date.now() - start < maxWait) {
-    const updated = await context.db.workflowApproval.findUnique({
-      where: { id: approval.id },
-    });
-    if (updated?.status === "approved") return;
-    if (updated?.status === "rejected") {
-      throw new Error("Approval rejected");
-    }
-    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+/** Sentinel error to signal that the workflow should pause for approval */
+class ApprovalWaitError extends Error {
+  public readonly nodeId: string;
+  constructor(nodeId: string) {
+    super("WAITING_APPROVAL");
+    this.name = "ApprovalWaitError";
+    this.nodeId = nodeId;
   }
+}
 
-  throw new Error("Approval timed out");
+/**
+ * Resume a workflow execution after an approval has been granted.
+ * Called by the workflow router's `approve` procedure.
+ */
+export async function resumeExecution(
+  executionId: string,
+  db: any // eslint-disable-line @typescript-eslint/no-explicit-any
+): Promise<void> {
+  const execution = await db.workflowExecution.findUnique({
+    where: { id: executionId },
+    include: { workflow: true },
+  });
+
+  if (!execution || execution.status !== "waiting") return;
+
+  const workflow = execution.workflow;
+  const nodes = workflow.nodes as WorkflowNode[];
+  const edges = workflow.edges as WorkflowEdge[];
+  const currentNodeId = execution.currentNode;
+
+  if (!currentNodeId) return;
+
+  const context: WorkflowContext = {
+    workspaceId: workflow.workspaceId,
+    userId: workflow.createdBy,
+    executionId: execution.id,
+    variables: (execution.variables as Record<string, unknown>) ?? {},
+    triggerData: (execution.triggerData as Record<string, unknown>) ?? {},
+    db,
+  };
+
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  const nodeStates: NodeStates = (execution.nodeStates as NodeStates) ?? {};
+
+  // Mark the approval node as completed
+  nodeStates[currentNodeId] = {
+    ...nodeStates[currentNodeId],
+    status: "completed",
+    endedAt: new Date().toISOString(),
+  };
+
+  // Update execution status back to running
+  await db.workflowExecution.update({
+    where: { id: executionId },
+    data: { status: "running", nodeStates, currentNode: currentNodeId },
+  });
+
+  try {
+    // Continue from the approval node's outgoing edges
+    const nextNodeIds = getOutgoingNodeIds(edges, currentNodeId);
+    for (const nextId of nextNodeIds) {
+      await processNode(nextId, nodeMap, edges, nodeStates, context, 0);
+    }
+    await finalizeExecution(context, nodeStates, "completed");
+  } catch (err) {
+    if (err instanceof ApprovalWaitError || err instanceof WaitDelaySignal) {
+      // Another pause node encountered -- state already persisted
+      return;
+    }
+    const error = err instanceof Error ? err.message : "Unknown error";
+    await finalizeExecution(context, nodeStates, "failed", error);
+  }
 }
 
 /** Execute a loop node, iterating over a collection */

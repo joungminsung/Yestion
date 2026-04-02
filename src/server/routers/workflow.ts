@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "@/server/trpc/init";
-import { executeWorkflow } from "@/lib/workflows/executor";
+import { executeWorkflow, resumeExecution } from "@/lib/workflows/executor";
 import type { WorkflowNode, WorkflowEdge, WorkflowContext } from "@/lib/workflows/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -156,7 +156,7 @@ export const workflowRouter = router({
         ctx.session.user.id
       );
 
-      return ctx.db.workflowApproval.update({
+      const updated = await ctx.db.workflowApproval.update({
         where: { id: input.approvalId },
         data: {
           status: input.decision,
@@ -165,6 +165,25 @@ export const workflowRouter = router({
           comment: input.comment,
         },
       });
+
+      // If approved, resume the paused workflow execution
+      if (input.decision === "approved") {
+        resumeExecution(approval.execution.id, ctx.db).catch((err) =>
+          console.error("Failed to resume workflow execution:", err)
+        );
+      } else {
+        // If rejected, mark execution as failed
+        await ctx.db.workflowExecution.update({
+          where: { id: approval.execution.id },
+          data: {
+            status: "failed",
+            error: "Approval rejected",
+            completedAt: new Date(),
+          },
+        });
+      }
+
+      return updated;
     }),
 
   /** Get execution history for a workflow */

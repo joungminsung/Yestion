@@ -1,4 +1,5 @@
 import { BaseIntegrationAdapter, registerAdapter } from "./base-adapter";
+import { signOAuthState, decryptToken } from "./crypto";
 import type {
   IntegrationConfig,
   IntegrationEvent,
@@ -31,7 +32,7 @@ class GitHubAdapter extends BaseIntegrationAdapter {
   }
 
   getOAuthUrl(workspaceId: string, redirectUri: string): string {
-    const state = Buffer.from(JSON.stringify({ workspaceId })).toString("base64");
+    const state = signOAuthState(workspaceId);
     const scopes = "repo,read:org,write:repo_hook";
 
     return (
@@ -142,8 +143,9 @@ class GitHubAdapter extends BaseIntegrationAdapter {
 
   async verifyConnection(accessToken: string): Promise<boolean> {
     try {
+      const token = decryptToken(accessToken);
       const response = await fetch("https://api.github.com/user", {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       return response.ok;
     } catch {
@@ -152,6 +154,7 @@ class GitHubAdapter extends BaseIntegrationAdapter {
   }
 
   async disconnect(accessToken: string, _config: IntegrationConfig): Promise<void> {
+    const token = decryptToken(accessToken);
     // Delete the OAuth app authorization
     try {
       await fetch(
@@ -162,7 +165,7 @@ class GitHubAdapter extends BaseIntegrationAdapter {
             Authorization: `Basic ${Buffer.from(`${this.clientId}:${this.clientSecret}`).toString("base64")}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ access_token: accessToken }),
+          body: JSON.stringify({ access_token: token }),
         }
       );
     } catch {

@@ -1,4 +1,5 @@
 import { BaseIntegrationAdapter, registerAdapter } from "./base-adapter";
+import { signOAuthState, decryptToken } from "./crypto";
 import type {
   IntegrationConfig,
   IntegrationEvent,
@@ -30,7 +31,7 @@ class SlackAdapter extends BaseIntegrationAdapter {
   }
 
   getOAuthUrl(workspaceId: string, redirectUri: string): string {
-    const state = Buffer.from(JSON.stringify({ workspaceId })).toString("base64");
+    const state = signOAuthState(workspaceId);
     const scopes = [
       "chat:write",
       "channels:read",
@@ -114,8 +115,9 @@ class SlackAdapter extends BaseIntegrationAdapter {
 
   async verifyConnection(accessToken: string): Promise<boolean> {
     try {
+      const token = decryptToken(accessToken);
       const response = await fetch("https://slack.com/api/auth.test", {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
       return data.ok === true;
@@ -125,11 +127,12 @@ class SlackAdapter extends BaseIntegrationAdapter {
   }
 
   async disconnect(accessToken: string, _config: IntegrationConfig): Promise<void> {
+    const token = decryptToken(accessToken);
     // Revoke the token
     await fetch("https://slack.com/api/auth.revoke", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
     });
