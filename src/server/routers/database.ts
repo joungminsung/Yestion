@@ -36,6 +36,22 @@ async function verifyDatabaseAccess(
   return database;
 }
 
+async function checkDatabaseNotLocked(
+  db: Context["db"],
+  databaseId: string,
+) {
+  const database = await db.database.findUnique({
+    where: { id: databaseId },
+    select: { isLocked: true },
+  });
+  if (database?.isLocked) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "This database is locked. Unlock it to make changes.",
+    });
+  }
+}
+
 function defaultViewConfig(type: string) {
   const base = {};
   switch (type) {
@@ -143,6 +159,7 @@ export const databaseRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await verifyDatabaseAccess(ctx.db, ctx.session.user.id, input.databaseId);
+      await checkDatabaseNotLocked(ctx.db, input.databaseId);
 
       // Auto-position: next after max
       const last = await ctx.db.property.findFirst({
@@ -182,6 +199,7 @@ export const databaseRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Property not found" });
       }
       await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, property.database.page.workspaceId);
+      await checkDatabaseNotLocked(ctx.db, property.databaseId);
 
       const { id, ...data } = input;
       return ctx.db.property.update({
@@ -201,6 +219,7 @@ export const databaseRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Property not found" });
       }
       await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, property.database.page.workspaceId);
+      await checkDatabaseNotLocked(ctx.db, property.databaseId);
 
       return ctx.db.property.delete({ where: { id: input.id } });
     }),
@@ -328,6 +347,7 @@ export const databaseRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const database = await verifyDatabaseAccess(ctx.db, ctx.session.user.id, input.databaseId);
+      await checkDatabaseNotLocked(ctx.db, input.databaseId);
 
       // Find the title property to derive the page title
       const titleProp = await ctx.db.property.findFirst({
@@ -376,6 +396,7 @@ export const databaseRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Row not found" });
       }
       await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, row.database.page.workspaceId);
+      await checkDatabaseNotLocked(ctx.db, row.databaseId);
 
       // Merge values
       const existingValues = (row.values as Record<string, unknown>) ?? {};
@@ -818,6 +839,42 @@ export const databaseRouter = router({
         },
         include: {
           page: { select: { id: true, title: true, icon: true } },
+        },
+      });
+    }),
+
+  // ── Database Lock ──────────────────────────────────────────
+
+  toggleLock: protectedProcedure
+    .input(z.object({ databaseId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const database = await verifyDatabaseAccess(ctx.db, ctx.session.user.id, input.databaseId);
+
+      // If locked by someone else, only admin/owner can unlock
+      if (database.isLocked && database.lockedBy !== ctx.session.user.id) {
+        const member = await ctx.db.workspaceMember.findUnique({
+          where: {
+            userId_workspaceId: {
+              userId: ctx.session.user.id,
+              workspaceId: database.page.workspaceId,
+            },
+          },
+        });
+        if (!member || !["OWNER", "ADMIN"].includes(member.role)) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only the user who locked it or admins can unlock",
+          });
+        }
+      }
+
+      const newLocked = !database.isLocked;
+      return ctx.db.database.update({
+        where: { id: input.databaseId },
+        data: {
+          isLocked: newLocked,
+          lockedBy: newLocked ? ctx.session.user.id : null,
+          lockedAt: newLocked ? new Date() : null,
         },
       });
     }),
