@@ -36,7 +36,7 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   // Single active panel — only one can be open at a time
-  type PanelType = null | "colors" | "align" | "ai" | "link" | "comment";
+  type PanelType = null | "colors" | "align" | "ai" | "link" | "comment" | "highlight";
   const [activePanel, setActivePanel] = useState<PanelType>(null);
   const [linkUrl, setLinkUrl] = useState("");
   const [commentRange, setCommentRange] = useState<{ from: number; to: number } | null>(null);
@@ -115,8 +115,8 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
     {
       label: "Highlight",
       icon: <Highlighter size={14} />,
-      action: () => editor.chain().focus().toggleHighlight({ color: "var(--color-yellow-bg)" }).run(),
-      isActive: () => editor.isActive("highlight"),
+      action: () => togglePanel("highlight"),
+      isActive: () => editor.isActive("highlight") || activePanel === "highlight",
     },
     {
       label: "Code",
@@ -442,6 +442,68 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
             >
               댓글
             </button>
+          </div>
+        </div>
+      )}
+      {activePanel === "highlight" && (
+        <div
+          className="absolute top-full left-0 mt-1 p-2 rounded-lg"
+          style={{
+            backgroundColor: "var(--bg-primary)",
+            boxShadow: "var(--shadow-popup)",
+            width: "240px",
+            zIndex: 1,
+          }}
+        >
+          <div
+            className="mb-2"
+            style={{
+              fontSize: "11px",
+              color: "var(--text-tertiary)",
+              fontWeight: 500,
+            }}
+          >
+            하이라이트 색상
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {BG_COLORS.filter((c) => c.value !== "default").map((c) => (
+              <button
+                key={c.value}
+                className="w-7 h-7 rounded-md border hover:ring-2 ring-[#2383e2] flex items-center justify-center transition-all"
+                style={{
+                  backgroundColor: c.css,
+                  borderColor: "var(--border-default)",
+                }}
+                title={c.name}
+                onClick={() => {
+                  editor.chain().focus().setHighlight({ color: c.css }).run();
+                  setActivePanel(null);
+                }}
+              >
+                {editor.isActive("highlight", { color: c.css }) && (
+                  <span style={{ fontSize: "12px" }}>&#10003;</span>
+                )}
+              </button>
+            ))}
+          </div>
+          <button
+            className="w-full mt-2 px-2 py-1.5 text-sm rounded hover:bg-notion-bg-hover text-left"
+            style={{ color: "var(--text-secondary)" }}
+            onClick={() => {
+              editor.chain().focus().unsetHighlight().run();
+              setActivePanel(null);
+            }}
+          >
+            하이라이트 제거
+          </button>
+          <div
+            className="mt-2 pt-2 text-[10px]"
+            style={{
+              borderTop: "1px solid var(--border-default)",
+              color: "var(--text-tertiary)",
+            }}
+          >
+            단축키: {"\u2318\u21E7H"}
           </div>
         </div>
       )}
