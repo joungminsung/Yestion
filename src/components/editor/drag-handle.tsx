@@ -202,30 +202,32 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
 
       if (blocks.length === 0) return null;
 
-      // Above the first block → insert at position 0
+      // Above the first block → snap to between first and second (no drop above doc start)
       if (clientY <= blocks[0].top) {
-        return { top: blocks[0].top, blockPos: blocks[0].offset };
+        if (blocks.length > 1) {
+          return { top: blocks[0].bottom, blockPos: blocks[0].offset + blocks[0].nodeSize };
+        }
+        return null; // Only one block, nowhere to drop
       }
 
-      // Check each block: if cursor is in the top half → insert before, bottom half → insert after
+      // Check each gap between blocks using midpoints
       for (let i = 0; i < blocks.length; i++) {
         const block = blocks[i];
-        const midY = (block.top + block.bottom) / 2;
 
-        if (clientY >= block.top && clientY < midY) {
-          // Top half of this block → insert before it
+        // For blocks after the first: top half → insert before
+        if (i > 0 && clientY >= block.top && clientY < (block.top + block.bottom) / 2) {
           return { top: block.top, blockPos: block.offset };
         }
-        if (clientY >= midY && clientY <= block.bottom) {
-          // Bottom half of this block → insert after it
+
+        // Bottom half → insert after
+        if (clientY >= (block.top + block.bottom) / 2 && clientY <= block.bottom) {
           return { top: block.bottom, blockPos: block.offset + block.nodeSize };
         }
 
-        // In the gap between this block and the next
+        // Gap between this block and next
         if (i < blocks.length - 1) {
           const next = blocks[i + 1];
           if (clientY > block.bottom && clientY < next.top) {
-            // Gap between blocks → insert after current block
             return { top: block.bottom, blockPos: block.offset + block.nodeSize };
           }
         }
