@@ -10,6 +10,7 @@ import { SidebarFavorites } from "./sidebar-favorites";
 import { SidebarRecent } from "./sidebar-recent";
 import { SidebarTrash } from "./sidebar-trash";
 import { WorkspaceSwitcher } from "./workspace-switcher";
+import { m } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/server/trpc/client";
 import { Search, Settings, Plus, FileText, LayoutTemplate, BarChart3, Zap } from "lucide-react";
@@ -158,21 +159,26 @@ export function Sidebar() {
         />
       )}
 
-      <aside
+      <m.aside
         role="navigation"
         aria-label="페이지 네비게이션"
         className={cn(
           "fixed top-0 left-0 bottom-0 flex flex-col bg-notion-bg-sidebar",
-          !isResizing && "transition-all duration-300 ease-in-out",
           isMobile && "z-[100]"
         )}
-        style={{
+        animate={{
           width: isMobile
-            ? MOBILE_SIDEBAR_WIDTH
-            : sidebarVisible ? `${width}px` : "0px",
-          transform: isMobile
-            ? (isOpen ? "translateX(0)" : "translateX(-100%)")
-            : undefined,
+            ? 320
+            : (isOpen || isHoverExpanded ? width : 0),
+          x: isMobile ? (isOpen ? 0 : -320) : 0,
+        }}
+        transition={{
+          type: "spring",
+          stiffness: 400,
+          damping: 32,
+          mass: 0.8,
+        }}
+        style={{
           zIndex: 100,
           overflow: "hidden",
           boxShadow: (isMobile && isOpen) || (isHoverExpanded && !isOpen)
@@ -330,7 +336,7 @@ export function Sidebar() {
         </div>
 
         {!isMobile && <SidebarResizer />}
-      </aside>
+      </m.aside>
 
       {/* Spacer — zero on mobile (overlay doesn't push content) */}
       {!isMobile && (
