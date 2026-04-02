@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { Editor } from "@tiptap/react";
 import { cn } from "@/lib/utils";
 import { AiMenu } from "./ai/ai-menu";
-import { Link as LinkIcon, Sparkles, AlignLeft, AlignCenter, AlignRight, Highlighter } from "lucide-react";
+import { Link as LinkIcon, Sparkles, AlignLeft, AlignCenter, AlignRight, Highlighter, MessageSquarePlus } from "lucide-react";
 
 const TEXT_COLORS = [
   { name: "기본", value: "default", css: "var(--text-primary)" },
@@ -41,6 +41,7 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
   const [linkUrl, setLinkUrl] = useState("");
   const [commentRange, setCommentRange] = useState<{ from: number; to: number } | null>(null);
   const [commentText, setCommentText] = useState("");
+  const [suggestingMode, setSuggestingMode] = useState(false);
 
   const togglePanel = useCallback((panel: PanelType) => {
     setActivePanel((prev) => (prev === panel ? null : panel));
@@ -150,6 +151,14 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
       icon: <AlignLeft size={14} />,
       action: () => togglePanel("align"),
       isActive: () => showAlign,
+    },
+    {
+      label: "Suggest",
+      icon: <MessageSquarePlus size={14} />,
+      action: () => {
+        setSuggestingMode(!suggestingMode);
+      },
+      isActive: () => suggestingMode,
     },
     {
       label: "Comment",
