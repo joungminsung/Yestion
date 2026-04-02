@@ -530,6 +530,7 @@ export function TableView({
                           value={value}
                           type={property.type}
                           config={property.config}
+                          rowId={row.id}
                         />
                       </div>
                     )}

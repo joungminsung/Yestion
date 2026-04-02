@@ -614,4 +614,77 @@ export const databaseRouter = router({
         icon: r.page.icon,
       }));
     }),
+
+  // ── Rollup ──────────────────────────────────────────────
+
+  computeRollup: protectedProcedure
+    .input(
+      z.object({
+        rowId: z.string(),
+        relationPropertyId: z.string(), // the relation property on this DB
+        targetPropertyId: z.string(), // the property on the target DB to aggregate
+        rollupFunction: z.enum(["count", "sum", "average", "min", "max", "show_original"]),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      // Get the row
+      const row = await ctx.db.row.findUnique({
+        where: { id: input.rowId },
+        include: { database: { include: { page: { select: { workspaceId: true } } } } },
+      });
+      if (!row) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Row not found" });
+      }
+      await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, row.database.page.workspaceId);
+
+      // Get related row IDs from the relation property value
+      const values = (row.values as Record<string, unknown>) ?? {};
+      const relatedRowIds = values[input.relationPropertyId];
+      if (!Array.isArray(relatedRowIds) || relatedRowIds.length === 0) {
+        return { value: input.rollupFunction === "count" ? 0 : null, items: [] };
+      }
+
+      // Fetch related rows
+      const relatedRows = await ctx.db.row.findMany({
+        where: { id: { in: relatedRowIds } },
+      });
+
+      // Extract target property values
+      const targetValues = relatedRows
+        .map((r) => {
+          const vals = (r.values as Record<string, unknown>) ?? {};
+          return vals[input.targetPropertyId];
+        })
+        .filter((v) => v !== null && v !== undefined);
+
+      const numericValues = targetValues
+        .map((v) => (typeof v === "number" ? v : parseFloat(String(v))))
+        .filter((n) => !isNaN(n));
+
+      let result: unknown;
+      switch (input.rollupFunction) {
+        case "count":
+          result = targetValues.length;
+          break;
+        case "sum":
+          result = numericValues.reduce((a, b) => a + b, 0);
+          break;
+        case "average":
+          result = numericValues.length > 0
+            ? numericValues.reduce((a, b) => a + b, 0) / numericValues.length
+            : null;
+          break;
+        case "min":
+          result = numericValues.length > 0 ? Math.min(...numericValues) : null;
+          break;
+        case "max":
+          result = numericValues.length > 0 ? Math.max(...numericValues) : null;
+          break;
+        case "show_original":
+          result = targetValues;
+          break;
+      }
+
+      return { value: result, items: targetValues };
+    }),
 });

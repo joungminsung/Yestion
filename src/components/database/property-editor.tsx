@@ -193,6 +193,79 @@ export function PropertyEditor({
         </div>
       )}
 
+      {/* Rollup config */}
+      {type === "rollup" && (
+        <div className="border-b p-2" style={{ borderColor: "var(--border-default)" }}>
+          <div className="space-y-2">
+            <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+              Relation Property
+            </label>
+            <select
+              value={(config.relationPropertyId as string) || ""}
+              onChange={(e) =>
+                setConfig({ ...config, relationPropertyId: e.target.value })
+              }
+              className="w-full px-2 py-1.5 rounded border text-sm bg-transparent outline-none"
+              style={{
+                color: "var(--text-primary)",
+                borderColor: "var(--border-default)",
+              }}
+            >
+              <option value="">Select relation...</option>
+              {allProperties
+                ?.filter((p) => p.type === "relation")
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+            </select>
+
+            <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+              Target Property ID
+            </label>
+            <input
+              type="text"
+              value={(config.targetPropertyId as string) || ""}
+              onChange={(e) =>
+                setConfig({ ...config, targetPropertyId: e.target.value })
+              }
+              placeholder="Property ID from related database..."
+              className="w-full px-2 py-1.5 rounded border text-sm bg-transparent outline-none"
+              style={{
+                color: "var(--text-primary)",
+                borderColor: "var(--border-default)",
+              }}
+            />
+
+            <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+              Function
+            </label>
+            <select
+              value={(config.rollupFunction as string) || "count"}
+              onChange={(e) =>
+                setConfig({
+                  ...config,
+                  rollupFunction: e.target.value as PropertyConfig["rollupFunction"],
+                })
+              }
+              className="w-full px-2 py-1.5 rounded border text-sm bg-transparent outline-none"
+              style={{
+                color: "var(--text-primary)",
+                borderColor: "var(--border-default)",
+              }}
+            >
+              <option value="count">Count</option>
+              <option value="sum">Sum</option>
+              <option value="average">Average</option>
+              <option value="min">Min</option>
+              <option value="max">Max</option>
+              <option value="show_original">Show original</option>
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* Visibility toggle */}
       <div className="flex items-center justify-between border-b p-2" style={{ borderColor: "var(--border-default)" }}>
         <span className="text-sm text-[var(--text-primary)]">Visible</span>
