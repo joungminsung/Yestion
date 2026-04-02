@@ -41,9 +41,10 @@ model Workspace {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members WorkspaceMember[]
-  pages   Page[]
-  apiKeys ApiKey[]
+  members     WorkspaceMember[]
+  pages       Page[]
+  apiKeys     ApiKey[]
+  customRoles CustomRole[]
 }
 
 model WorkspaceMember {
@@ -674,4 +675,18 @@ model Integration {
   @@unique([workspaceId, service])
   @@index([workspaceId])
   @@index([service, status])
+}
+
+model CustomRole {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  permissions Json     @default("[]")
+  isBuiltIn   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, name])
 }
