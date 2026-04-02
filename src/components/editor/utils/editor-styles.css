@@ -525,3 +525,25 @@
   animation: blockFlash 1.5s ease;
   border-radius: 4px;
 }
+
+/* Focus Mode */
+.focus-mode-dimmed {
+  opacity: 0.15;
+  transition: opacity 0.2s ease;
+}
+
+.focus-mode-dimmed:hover {
+  opacity: 0.4;
+}
+
+.focus-mode-active {
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .focus-mode-dimmed,
+  .focus-mode-active {
+    transition: none;
+  }
+}

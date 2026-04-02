@@ -49,6 +49,7 @@ import { MentionNode } from "./extensions/mention-node";
 import { MentionExtension } from "./extensions/mention-ext";
 import { BlockSelection, BLOCK_SELECTION_KEY } from "./extensions/block-selection";
 import { MicroInteractions } from "./extensions/micro-interactions";
+import { FocusMode } from "./extensions/focus-mode";
 import { LinkPreviewExtension, LinkPreviewPopup, useLinkPreview } from "./link-preview-popup";
 import { MarkdownPaste } from "./extensions/markdown-paste";
 import { ClipboardImage } from "./extensions/clipboard-image";
@@ -170,6 +171,7 @@ export const NotionEditor = forwardRef<
       MentionNode,
       MentionExtension,
       MicroInteractions,
+      FocusMode,
       LinkPreviewExtension,
       ...(collaboration ? [
         Collaboration.configure({ document: collaboration.ydoc }),
