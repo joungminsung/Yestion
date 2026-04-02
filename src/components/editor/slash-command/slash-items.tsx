@@ -72,6 +72,39 @@ export const SLASH_ITEMS: SlashItem[] = [
       editor.chain().focus().toggleHeading({ level: 3 }).run(),
   },
   {
+    title: "토글 제목 1",
+    description: "접을 수 있는 대제목",
+    icon: <ChevronRight size={18} />,
+    category: "기본 블록",
+    keywords: ["toggle", "heading", "h1", "토글", "제목"],
+    command: (editor) => {
+      (editor.commands as unknown as Record<string, (attrs: Record<string, unknown>) => boolean>)
+        .setToggleHeading({ level: 1 });
+    },
+  },
+  {
+    title: "토글 제목 2",
+    description: "접을 수 있는 중제목",
+    icon: <ChevronRight size={18} />,
+    category: "기본 블록",
+    keywords: ["toggle", "heading", "h2", "토글", "제목"],
+    command: (editor) => {
+      (editor.commands as unknown as Record<string, (attrs: Record<string, unknown>) => boolean>)
+        .setToggleHeading({ level: 2 });
+    },
+  },
+  {
+    title: "토글 제목 3",
+    description: "접을 수 있는 소제목",
+    icon: <ChevronRight size={18} />,
+    category: "기본 블록",
+    keywords: ["toggle", "heading", "h3", "토글", "제목"],
+    command: (editor) => {
+      (editor.commands as unknown as Record<string, (attrs: Record<string, unknown>) => boolean>)
+        .setToggleHeading({ level: 3 });
+    },
+  },
+  {
     title: "글머리 기호 목록",
     description: "글머리 기호로 간단한 목록을 만듭니다.",
     icon: <List size={18} />,
@@ -429,6 +462,26 @@ export const SLASH_ITEMS: SlashItem[] = [
         year: "numeric", month: "long", day: "numeric", weekday: "short",
       });
       editor.chain().focus().insertContent(tomorrow).run();
+    },
+  },
+  {
+    title: "Linked Database",
+    description: "Insert a linked view of an existing database.",
+    icon: <Database size={18} />,
+    category: "데이터베이스",
+    keywords: ["linked", "database", "view", "링크", "데이터베이스"],
+    command: (editor) => {
+      const databaseId = window.prompt("Enter database ID to link:");
+      if (databaseId) {
+        editor
+          .chain()
+          .focus()
+          .insertContent({
+            type: "linkedDatabase",
+            attrs: { databaseId },
+          })
+          .run();
+      }
     },
   },
   {
