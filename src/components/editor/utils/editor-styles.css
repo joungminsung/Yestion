@@ -580,3 +580,58 @@
     transition: none;
   }
 }
+
+/* Toggle Headings */
+.notion-toggle-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  cursor: text;
+}
+
+.notion-toggle-heading-1 .toggle-heading-content {
+  font-size: 1.875em;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.notion-toggle-heading-2 .toggle-heading-content {
+  font-size: 1.5em;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.notion-toggle-heading-3 .toggle-heading-content {
+  font-size: 1.25em;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.toggle-heading-trigger {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 3px;
+  color: var(--text-tertiary);
+  transition: background-color 0.1s;
+}
+
+.toggle-heading-trigger:hover {
+  background-color: var(--bg-hover);
+}
+
+.toggle-heading-arrow {
+  font-size: 10px;
+  transition: transform 0.15s ease;
+}
+
+.notion-toggle-heading[data-collapsed="false"] .toggle-heading-arrow {
+  transform: rotate(90deg);
+}

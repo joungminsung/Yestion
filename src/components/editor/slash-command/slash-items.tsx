@@ -78,8 +78,8 @@ export const SLASH_ITEMS: SlashItem[] = [
     category: "기본 블록",
     keywords: ["toggle", "heading", "h1", "토글", "제목"],
     command: (editor) => {
-      (editor.commands as unknown as Record<string, (attrs: Record<string, unknown>) => boolean>)
-        .setToggleHeading({ level: 1 });
+      (editor.commands as unknown as Record<string, ((attrs: Record<string, unknown>) => boolean) | undefined>)
+        .setToggleHeading?.({ level: 1 });
     },
   },
   {
@@ -89,8 +89,8 @@ export const SLASH_ITEMS: SlashItem[] = [
     category: "기본 블록",
     keywords: ["toggle", "heading", "h2", "토글", "제목"],
     command: (editor) => {
-      (editor.commands as unknown as Record<string, (attrs: Record<string, unknown>) => boolean>)
-        .setToggleHeading({ level: 2 });
+      (editor.commands as unknown as Record<string, ((attrs: Record<string, unknown>) => boolean) | undefined>)
+        .setToggleHeading?.({ level: 2 });
     },
   },
   {
@@ -100,8 +100,8 @@ export const SLASH_ITEMS: SlashItem[] = [
     category: "기본 블록",
     keywords: ["toggle", "heading", "h3", "토글", "제목"],
     command: (editor) => {
-      (editor.commands as unknown as Record<string, (attrs: Record<string, unknown>) => boolean>)
-        .setToggleHeading({ level: 3 });
+      (editor.commands as unknown as Record<string, ((attrs: Record<string, unknown>) => boolean) | undefined>)
+        .setToggleHeading?.({ level: 3 });
     },
   },
   {
