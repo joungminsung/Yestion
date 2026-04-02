@@ -34,4 +34,77 @@ export const activityRouter = router({
         },
       });
     }),
+
+  workspaceList: protectedProcedure
+    .input(
+      z.object({
+        workspaceId: z.string(),
+        action: z.string().optional(),
+        userId: z.string().optional(),
+        search: z.string().optional(),
+        from: z.string().datetime().optional(),
+        to: z.string().datetime().optional(),
+        cursor: z.string().optional(),
+        limit: z.number().min(1).max(100).default(50),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const where: any = {
+        page: { workspaceId: input.workspaceId },
+      };
+      if (input.action) where.action = input.action;
+      if (input.userId) where.userId = input.userId;
+      if (input.search) where.action = { contains: input.search, mode: "insensitive" };
+      if (input.from || input.to) {
+        where.createdAt = {};
+        if (input.from) where.createdAt.gte = new Date(input.from);
+        if (input.to) where.createdAt.lte = new Date(input.to);
+      }
+
+      const items = await ctx.db.activityLog.findMany({
+        where,
+        include: {
+          user: { select: { id: true, name: true, avatarUrl: true } },
+          page: { select: { id: true, title: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: input.limit + 1,
+        ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+      });
+
+      let nextCursor: string | undefined;
+      if (items.length > input.limit) {
+        const next = items.pop();
+        nextCursor = next?.id;
+      }
+      return { items, nextCursor };
+    }),
+
+  dailyCounts: protectedProcedure
+    .input(
+      z.object({
+        workspaceId: z.string(),
+        days: z.number().min(7).max(90).default(30),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const since = new Date();
+      since.setDate(since.getDate() - input.days);
+
+      const logs = await ctx.db.activityLog.findMany({
+        where: {
+          page: { workspaceId: input.workspaceId },
+          createdAt: { gte: since },
+        },
+        select: { createdAt: true },
+        orderBy: { createdAt: "asc" },
+      });
+
+      const counts: Record<string, number> = {};
+      logs.forEach((l) => {
+        const day = l.createdAt.toISOString().slice(0, 10);
+        counts[day] = (counts[day] || 0) + 1;
+      });
+      return Object.entries(counts).map(([date, count]) => ({ date, count }));
+    }),
 });
