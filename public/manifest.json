@@ -1,7 +1,7 @@
 {
-  "name": "Notion Web",
-  "short_name": "Notion Web",
-  "description": "A Notion-like collaborative workspace",
+  "name": "Yestion",
+  "short_name": "Yestion",
+  "description": "팀을 위한 올인원 워크스페이스",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

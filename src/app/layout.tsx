@@ -5,8 +5,8 @@ import { Providers } from "@/components/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Notion",
-  description: "Team workspace",
+  title: "Yestion",
+  description: "팀을 위한 올인원 워크스페이스",
   manifest: "/manifest.json",
   other: {
     "mobile-web-app-capable": "yes",
