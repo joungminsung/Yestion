@@ -25,6 +25,8 @@ import { webhookRouter } from "@/server/routers/webhook";
 import { sprintRouter } from "@/server/routers/sprint";
 import { timeEntryRouter } from "@/server/routers/time-entry";
 import { workflowRouter } from "@/server/routers/workflow";
+import { integrationRouter } from "@/server/routers/integration";
+import { roleRouter } from "@/server/routers/role";
 
 export const appRouter = router({
   auth: authRouter,
@@ -53,6 +55,8 @@ export const appRouter = router({
   sprint: sprintRouter,
   timeEntry: timeEntryRouter,
   workflow: workflowRouter,
+  integration: integrationRouter,
+  role: roleRouter,
 });
 
 export type AppRouter = typeof appRouter;
