@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { Search, FileText, Plus, Settings, Moon, Sun } from "lucide-react";
 import { useThemeStore } from "@/stores/theme";
 import { useToastStore } from "@/stores/toast";
+import { AnimatedDialog } from "@/components/ui/animated-dialog";
 
 export function CommandPalette() {
   const t = useTranslations("commandPalette");
@@ -106,24 +107,9 @@ export function CommandPalette() {
     },
   ];
 
-  if (!isOpen) return null;
-
   return (
-    <>
-      <div
-        className="fixed inset-0"
-        style={{ zIndex: "var(--z-command-palette)", backgroundColor: "rgba(15, 15, 15, 0.6)" }}
-        onClick={close}
-      />
-      <div
-        className="fixed left-1/2 -translate-x-1/2 w-full max-w-[620px] rounded-lg overflow-hidden"
-        style={{
-          top: "max(12vh, 80px)",
-          zIndex: "calc(var(--z-command-palette) + 1)",
-          backgroundColor: "var(--bg-primary)",
-          boxShadow: "var(--shadow-popup)",
-        }}
-      >
+    <AnimatedDialog isOpen={isOpen} onClose={close} maxWidth="max-w-[620px]">
+      <div className="rounded-lg overflow-hidden">
         <div className="flex items-center px-4 py-3 border-b" style={{ borderColor: "var(--border-default)" }}>
           <Search size={18} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
           <input
@@ -206,6 +192,6 @@ export function CommandPalette() {
           })()}
         </div>
       </div>
-    </>
+    </AnimatedDialog>
   );
 }

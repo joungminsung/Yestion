@@ -6,6 +6,7 @@ import { useToastStore } from "@/stores/toast";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PermissionRow } from "./permission-row";
+import { AnimatedDialog } from "@/components/ui/animated-dialog";
 
 type ShareDialogProps = {
   pageId: string;
@@ -116,16 +117,8 @@ export function ShareDialog({ pageId, onClose }: ShareDialogProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]" role="dialog" aria-modal="true" aria-label="공유">
-      <div className="fixed inset-0 modal-backdrop-enter" style={{ backgroundColor: "rgba(0,0,0,0.2)" }} />
-      <div
-        ref={dialogRef}
-        className="relative rounded-lg shadow-xl w-full max-w-md modal-content-enter"
-        style={{
-          backgroundColor: "var(--bg-primary)",
-          border: "1px solid var(--border-default)",
-        }}
-      >
+    <AnimatedDialog isOpen={true} onClose={onClose} maxWidth="max-w-md">
+      <div ref={dialogRef}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--border-default)" }}>
           <h2 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>공유</h2>
@@ -240,6 +233,6 @@ export function ShareDialog({ pageId, onClose }: ShareDialogProps) {
           )}
         </div>
       </div>
-    </div>
+    </AnimatedDialog>
   );
 }
