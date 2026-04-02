@@ -67,13 +67,16 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
 
   const handleMouseMove = useCallback(
     (event: MouseEvent) => {
+      // Mouse is over editor — cancel any pending hide from mouseleave
+      cancelHide();
+
       if (rafRef.current) return; // already scheduled
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
         if (!editor.view) return;
         const view = editor.view;
         const posResult = view.posAtCoords({ left: event.clientX, top: event.clientY });
-        if (!posResult) { hide(); lastBlockPosRef.current = null; return; }
+        if (!posResult) { scheduleHide(); lastBlockPosRef.current = null; return; }
 
         try {
           const blockPos = resolveBlockPos(view.state.doc, posResult.pos);
@@ -82,16 +85,33 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
           lastBlockPosRef.current = blockPos;
 
           const blockDom = view.nodeDOM(blockPos);
-          if (!blockDom || !(blockDom instanceof HTMLElement)) { hide(); return; }
+          if (!blockDom || !(blockDom instanceof HTMLElement)) { scheduleHide(); return; }
           const handlePosition = computeHandlePosition(blockDom);
           show(blockPos, handlePosition);
-        } catch { hide(); }
+        } catch { scheduleHide(); }
       });
     },
-    [editor, show, hide, computeHandlePosition]
+    [editor, show, hide, scheduleHide, cancelHide, computeHandlePosition]
   );
 
-  const handleMouseLeave = useCallback(() => { hide(); }, [hide]);
+  // Delay hide so mouse has time to travel from editor to handle
+  const hideDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleHide = useCallback(() => {
+    if (hideDelayRef.current) clearTimeout(hideDelayRef.current);
+    hideDelayRef.current = setTimeout(() => {
+      hide();
+    }, 200); // 200ms grace period to reach the handle
+  }, [hide]);
+
+  const cancelHide = useCallback(() => {
+    if (hideDelayRef.current) {
+      clearTimeout(hideDelayRef.current);
+      hideDelayRef.current = null;
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => { scheduleHide(); }, [scheduleHide]);
 
   useEffect(() => {
     if (!editor.view) return;
@@ -102,16 +122,21 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
       dom.removeEventListener("mousemove", handleMouseMove);
       dom.removeEventListener("mouseleave", handleMouseLeave);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (hideDelayRef.current) clearTimeout(hideDelayRef.current);
     };
   }, [editor, handleMouseMove, handleMouseLeave]);
 
+  // When mouse enters the handle, cancel any pending hide and lock visibility
   const onHandleMouseEnter = useCallback(() => {
-    if (vis.blockPos !== null && vis.handlePosition) {
-      show(vis.blockPos, vis.handlePosition);
-    }
-  }, [vis.blockPos, vis.handlePosition, show]);
+    cancelHide();
+    lock();
+  }, [cancelHide, lock]);
 
-  const onHandleMouseLeave = useCallback(() => { hide(); }, [hide]);
+  // When mouse leaves the handle, unlock and schedule hide
+  const onHandleMouseLeave = useCallback(() => {
+    unlock();
+    scheduleHide();
+  }, [unlock, scheduleHide]);
 
   const findDropTarget = useCallback(
     (clientY: number): { top: number; blockPos: number } | null => {
@@ -323,11 +348,13 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
           ref={handleElRef}
           className="fixed flex items-center gap-0.5 transition-opacity duration-150"
           style={{
-            top: `${vis.handlePosition.top}px`,
-            left: `${vis.handlePosition.left}px`,
+            top: `${vis.handlePosition.top - 4}px`,
+            left: `${vis.handlePosition.left - 8}px`,
             opacity,
             pointerEvents: opacity > 0 ? "auto" : "none",
             zIndex: 50,
+            // Larger hit area with padding so handle is easier to reach
+            padding: "4px 8px 4px 8px",
           }}
           onMouseEnter={onHandleMouseEnter}
           onMouseLeave={onHandleMouseLeave}
