@@ -13,7 +13,7 @@ import { WorkspaceSwitcher } from "./workspace-switcher";
 import { m } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/server/trpc/client";
-import { Search, Settings, Plus, FileText, LayoutTemplate, BarChart3, Zap } from "lucide-react";
+import { Search, Settings, Plus, FileText, LayoutTemplate, BarChart3, Zap, Home, Workflow, Network, Shield } from "lucide-react";
 import { useSidebarKeyboardNav } from "./sidebar-keyboard-nav";
 import { PageTemplatePicker } from "@/components/page/page-template-picker";
 import { useTranslations } from "next-intl";
@@ -215,31 +215,89 @@ export function Sidebar() {
             <span className="ml-auto text-xs opacity-50">⌘K</span>
           </button>
 
-          {/* Projects */}
+          {/* Home / Dashboard */}
           <button
-            onClick={() => router.push(`/${workspaceId}/projects`)}
+            onClick={() => router.push(`/${workspaceId}`)}
+            className={cn(
+              "flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto",
+              pathname === `/${workspaceId}` && "bg-notion-bg-hover font-medium"
+            )}
+            style={{ fontSize: "14px", color: pathname === `/${workspaceId}` ? "var(--text-primary)" : "var(--text-secondary)" }}
+          >
+            <Home size={16} />
+            <span>홈</span>
+          </button>
+
+          {/* Templates */}
+          <button
+            onClick={() => setShowTemplatePicker(true)}
             className="flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto"
             style={{ fontSize: "14px", color: "var(--text-secondary)" }}
           >
+            <LayoutTemplate size={16} />
+            <span>템플릿</span>
+          </button>
+
+          {/* Projects */}
+          <button
+            onClick={() => router.push(`/${workspaceId}/projects`)}
+            className={cn(
+              "flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto",
+              pathname?.includes("/projects") && "bg-notion-bg-hover font-medium"
+            )}
+            style={{ fontSize: "14px", color: pathname?.includes("/projects") ? "var(--text-primary)" : "var(--text-secondary)" }}
+          >
             <BarChart3 size={16} />
-            <span>Projects</span>
+            <span>프로젝트</span>
+          </button>
+
+          {/* Workflows */}
+          <button
+            onClick={() => router.push(`/${workspaceId}/workflows`)}
+            className={cn(
+              "flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto",
+              pathname?.includes("/workflows") && "bg-notion-bg-hover font-medium"
+            )}
+            style={{ fontSize: "14px", color: pathname?.includes("/workflows") ? "var(--text-primary)" : "var(--text-secondary)" }}
+          >
+            <Workflow size={16} />
+            <span>워크플로우</span>
           </button>
 
           {/* Automations */}
           <button
             onClick={() => router.push(`/${workspaceId}/automations`)}
-            className="flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto"
-            style={{ fontSize: "14px", color: "var(--text-secondary)" }}
+            className={cn(
+              "flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto",
+              pathname?.includes("/automations") && "bg-notion-bg-hover font-medium"
+            )}
+            style={{ fontSize: "14px", color: pathname?.includes("/automations") ? "var(--text-primary)" : "var(--text-secondary)" }}
           >
             <Zap size={16} />
-            <span>Automations</span>
+            <span>자동화</span>
+          </button>
+
+          {/* Graph View */}
+          <button
+            onClick={() => router.push(`/${workspaceId}/graph`)}
+            className={cn(
+              "flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto",
+              pathname?.includes("/graph") && "bg-notion-bg-hover font-medium"
+            )}
+            style={{ fontSize: "14px", color: pathname?.includes("/graph") ? "var(--text-primary)" : "var(--text-secondary)" }}
+          >
+            <Network size={16} />
+            <span>그래프 뷰</span>
           </button>
 
           {/* Settings */}
           <button
             onClick={() => router.push(`/${workspaceId}/settings`)}
-            className="flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto"
-            style={{ fontSize: "14px", color: "var(--text-secondary)" }}
+            className={cn(
+              "flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto",
+              pathname?.includes("/settings") && "bg-notion-bg-hover font-medium"
+            )}
+            style={{ fontSize: "14px", color: pathname?.includes("/settings") ? "var(--text-primary)" : "var(--text-secondary)" }}
           >
             <Settings size={16} />
             <span>{t("settings")}</span>
