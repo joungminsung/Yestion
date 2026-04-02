@@ -80,53 +80,76 @@ export function BlockMenu({ editor, pos, coords, onClose, onTurnIntoPage }: Bloc
         </button>
       ))}
       {showColors && (
-        <div className="border-t px-2 py-2" style={{ borderColor: "var(--border-divider)" }}>
-          <div className="text-[11px] mb-1.5" style={{ color: "var(--text-tertiary)", fontWeight: 500 }}>
-            텍스트 색상
+        <div className="border-t pt-2 mt-1 px-2" style={{ borderColor: "var(--border-default)" }}>
+          <div className="mb-1" style={{ fontSize: "11px", color: "var(--text-tertiary)", fontWeight: 500 }}>
+            블록 배경 색상
           </div>
           <div className="flex flex-wrap gap-1 mb-2">
             {[
-              { name: "기본", css: "var(--text-primary)", value: "default" },
-              { name: "회색", css: "var(--color-gray)", value: "gray" },
-              { name: "갈색", css: "var(--color-brown)", value: "brown" },
-              { name: "주황", css: "var(--color-orange)", value: "orange" },
-              { name: "파랑", css: "var(--color-blue)", value: "blue" },
-              { name: "빨강", css: "var(--color-red)", value: "red" },
+              { name: "기본", css: "transparent" },
+              { name: "회색", css: "var(--color-gray-bg)" },
+              { name: "갈색", css: "var(--color-brown-bg)" },
+              { name: "주황", css: "var(--color-orange-bg)" },
+              { name: "노랑", css: "var(--color-yellow-bg)" },
+              { name: "초록", css: "var(--color-green-bg)" },
+              { name: "파랑", css: "var(--color-blue-bg)" },
+              { name: "보라", css: "var(--color-purple-bg)" },
+              { name: "분홍", css: "var(--color-pink-bg)" },
+              { name: "빨강", css: "var(--color-red-bg)" },
             ].map((c) => (
-              <button key={c.value} className="w-5 h-5 rounded flex items-center justify-center text-xs hover:ring-2 ring-[#2383e2]"
-                style={{ color: c.css }} title={c.name}
-                onClick={() => {
-                  const node = editor.state.doc.nodeAt(pos);
-                  if (!node) return;
-                  editor.chain().focus().setTextSelection({ from: pos + 1, to: pos + node.nodeSize - 1 })
-                    [c.value === "default" ? "unsetColor" : "setColor"](c.value === "default" ? undefined as any : c.css).run();
-                  onClose();
+              <button
+                key={c.name}
+                className="w-6 h-6 rounded border hover:ring-2 ring-[#2383e2]"
+                style={{
+                  backgroundColor: c.css,
+                  borderColor: "var(--border-default)",
                 }}
-              >A</button>
-            ))}
-          </div>
-          <div className="text-[11px] mb-1.5" style={{ color: "var(--text-tertiary)", fontWeight: 500 }}>
-            배경 색상
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {[
-              { name: "기본", css: "transparent", value: "default" },
-              { name: "회색", css: "var(--color-gray-bg)", value: "gray" },
-              { name: "노랑", css: "var(--color-yellow-bg)", value: "yellow" },
-              { name: "초록", css: "var(--color-green-bg)", value: "green" },
-              { name: "파랑", css: "var(--color-blue-bg)", value: "blue" },
-              { name: "빨강", css: "var(--color-red-bg)", value: "red" },
-            ].map((c) => (
-              <button key={c.value} className="w-5 h-5 rounded border hover:ring-2 ring-[#2383e2]"
-                style={{ backgroundColor: c.css, borderColor: "var(--border-default)" }} title={c.name}
+                title={c.name}
                 onClick={() => {
                   const node = editor.state.doc.nodeAt(pos);
-                  if (!node) return;
-                  editor.chain().focus().setTextSelection({ from: pos + 1, to: pos + node.nodeSize - 1 })
-                    [c.value === "default" ? "unsetHighlight" : "setHighlight"](c.value === "default" ? undefined as any : { color: c.css }).run();
+                  if (node) {
+                    const tr = editor.state.tr;
+                    tr.setNodeMarkup(pos, undefined, {
+                      ...node.attrs,
+                      backgroundColor: c.css === "transparent" ? null : c.css,
+                    });
+                    editor.view.dispatch(tr);
+                  }
                   onClose();
                 }}
               />
+            ))}
+          </div>
+          <div className="mb-1" style={{ fontSize: "11px", color: "var(--text-tertiary)", fontWeight: 500 }}>
+            텍스트 색상
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {[
+              { name: "기본", css: "var(--text-primary)" },
+              { name: "회색", css: "var(--color-gray)" },
+              { name: "갈색", css: "var(--color-brown)" },
+              { name: "주황", css: "var(--color-orange)" },
+              { name: "노랑", css: "var(--color-yellow)" },
+              { name: "초록", css: "var(--color-green)" },
+              { name: "파랑", css: "var(--color-blue)" },
+              { name: "보라", css: "var(--color-purple)" },
+              { name: "분홍", css: "var(--color-pink)" },
+              { name: "빨강", css: "var(--color-red)" },
+            ].map((c) => (
+              <button
+                key={c.name}
+                className="w-6 h-6 rounded flex items-center justify-center text-sm hover:ring-2 ring-[#2383e2]"
+                style={{ color: c.css }}
+                title={c.name}
+                onClick={() => {
+                  const node = editor.state.doc.nodeAt(pos);
+                  if (!node) return;
+                  editor.chain().focus().setTextSelection({ from: pos + 1, to: pos + node.nodeSize - 1 }).setColor(c.css).run();
+                  onClose();
+                }}
+              >
+                A
+              </button>
             ))}
           </div>
         </div>
