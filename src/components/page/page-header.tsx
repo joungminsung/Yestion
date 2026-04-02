@@ -120,13 +120,16 @@ export function PageHeader({ page }: PageHeaderProps) {
           </div>
         )}
 
-        {/* Hover buttons (when icon or cover is missing) */}
-        {isHovered && (!page.icon || !page.cover) && (
+        {/* Hover buttons — always take up space, only show on hover (no layout shift) */}
+        {(!page.icon || !page.cover) && (
           <div
-            className="flex gap-1"
+            className="flex gap-1 transition-opacity duration-150"
             style={{
               marginTop: page.icon ? undefined : page.cover ? "12px" : "72px",
               marginBottom: "4px",
+              opacity: isHovered ? 1 : 0,
+              pointerEvents: isHovered ? "auto" : "none",
+              height: "28px", // Fixed height to prevent layout shift
             }}
           >
             {!page.icon && (
@@ -162,7 +165,7 @@ export function PageHeader({ page }: PageHeaderProps) {
         )}
 
         {/* Title */}
-        <div style={{ marginTop: !page.icon && !isHovered && !page.cover ? "72px" : undefined }}>
+        <div style={{ marginTop: !page.icon && !page.cover && !(!page.icon || !page.cover) ? "72px" : undefined }}>
           <PageTitle pageId={page.id} initialTitle={page.title || "제목 없음"} />
         </div>
       </div>
