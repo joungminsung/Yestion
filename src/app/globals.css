@@ -247,10 +247,24 @@ html[data-transitioning] canvas {
 
 /* Mobile responsive editor */
 @media (max-width: 767px) {
-  /* Reduce editor padding */
+  /* Reduce editor padding and adjust font size */
   .ProseMirror {
     padding-left: var(--page-padding-x-mobile) !important;
     padding-right: var(--page-padding-x-mobile) !important;
+    font-size: 15px;
+  }
+
+  /* Mobile heading sizes */
+  .ProseMirror h1 {
+    font-size: 1.625em;
+  }
+
+  .ProseMirror h2 {
+    font-size: 1.375em;
+  }
+
+  .ProseMirror h3 {
+    font-size: 1.125em;
   }
 
   /* Increase block spacing for touch targets */
@@ -273,6 +287,15 @@ html[data-transitioning] canvas {
   .ProseMirror img {
     max-width: 100%;
     height: auto;
+  }
+
+  /* Full width blocks on mobile */
+  .ProseMirror .notion-synced-block,
+  .ProseMirror .notion-callout,
+  .ProseMirror table {
+    margin-left: -0.5rem;
+    margin-right: -0.5rem;
+    border-radius: 0;
   }
 
   /* Horizontal scroll for tables */
@@ -304,6 +327,11 @@ html[data-transitioning] canvas {
   .page-header-wrapper {
     padding-left: var(--page-padding-x-mobile) !important;
     padding-right: var(--page-padding-x-mobile) !important;
+  }
+
+  /* Add bottom padding for mobile toolbar */
+  .ProseMirror {
+    padding-bottom: 80px !important;
   }
 }
 
