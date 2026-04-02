@@ -202,25 +202,23 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
 
       if (blocks.length === 0) return null;
 
-      // Above the first block → snap to between first and second (no drop above doc start)
+      // Above the first block → insert at position 0 (top of document)
       if (clientY <= blocks[0].top) {
-        if (blocks.length > 1) {
-          return { top: blocks[0].bottom, blockPos: blocks[0].offset + blocks[0].nodeSize };
-        }
-        return null; // Only one block, nowhere to drop
+        return { top: blocks[0].top, blockPos: blocks[0].offset };
       }
 
       // Check each gap between blocks using midpoints
       for (let i = 0; i < blocks.length; i++) {
         const block = blocks[i];
+        const midY = (block.top + block.bottom) / 2;
 
-        // For blocks after the first: top half → insert before
-        if (i > 0 && clientY >= block.top && clientY < (block.top + block.bottom) / 2) {
+        // Top half → insert before this block
+        if (clientY >= block.top && clientY < midY) {
           return { top: block.top, blockPos: block.offset };
         }
 
-        // Bottom half → insert after
-        if (clientY >= (block.top + block.bottom) / 2 && clientY <= block.bottom) {
+        // Bottom half → insert after this block
+        if (clientY >= midY && clientY <= block.bottom) {
           return { top: block.bottom, blockPos: block.offset + block.nodeSize };
         }
 
@@ -341,6 +339,8 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
           if (dropPos === currentBlockPos || dropPos === currentBlockPos + node.nodeSize) return;
           // Don't move inside itself
           if (dropPos > currentBlockPos && dropPos < currentBlockPos + node.nodeSize) return;
+          // Already at the top of the document — can't go higher
+          if (currentBlockPos === 0 && dropPos === 0) return;
 
           let tr = editor.state.tr;
           const nodeSize = node.nodeSize;
