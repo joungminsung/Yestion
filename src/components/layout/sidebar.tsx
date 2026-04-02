@@ -18,6 +18,7 @@ import { useSidebarKeyboardNav } from "./sidebar-keyboard-nav";
 import { PageTemplatePicker } from "@/components/page/page-template-picker";
 import { useTranslations } from "next-intl";
 import { useDevice } from "@/components/providers/responsive-provider";
+import { useTouchGestures } from "@/hooks/use-touch-gestures";
 
 const MOBILE_SIDEBAR_WIDTH = "min(85vw, 320px)";
 
@@ -29,6 +30,19 @@ export function Sidebar() {
   const workspaceId = params.workspaceId as string;
   const { isOpen, width, isResizing, isHoverExpanded } = useSidebarStore();
   const { isMobile } = useDevice();
+
+  // Swipe to open/close sidebar on mobile
+  useTouchGestures({
+    onSwipe: (direction) => {
+      if (direction === "right" && !isOpen && isMobile) {
+        useSidebarStore.getState().setOpen(true);
+      }
+      if (direction === "left" && isOpen && isMobile) {
+        useSidebarStore.getState().setOpen(false);
+      }
+    },
+    swipeThreshold: 60,
+  });
 
   // Close sidebar on navigation change or when entering mobile mode.
   useEffect(() => {
