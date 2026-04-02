@@ -65,12 +65,28 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
     []
   );
 
+  // Delay hide so mouse has time to travel from editor to handle
+  const hideDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleHide = useCallback(() => {
+    if (hideDelayRef.current) clearTimeout(hideDelayRef.current);
+    hideDelayRef.current = setTimeout(() => {
+      hide();
+    }, 200);
+  }, [hide]);
+
+  const cancelHide = useCallback(() => {
+    if (hideDelayRef.current) {
+      clearTimeout(hideDelayRef.current);
+      hideDelayRef.current = null;
+    }
+  }, []);
+
   const handleMouseMove = useCallback(
     (event: MouseEvent) => {
-      // Mouse is over editor — cancel any pending hide from mouseleave
       cancelHide();
 
-      if (rafRef.current) return; // already scheduled
+      if (rafRef.current) return;
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
         if (!editor.view) return;
@@ -80,7 +96,6 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
 
         try {
           const blockPos = resolveBlockPos(view.state.doc, posResult.pos);
-          // Skip if same block
           if (blockPos === lastBlockPosRef.current) return;
           lastBlockPosRef.current = blockPos;
 
@@ -91,25 +106,8 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
         } catch { scheduleHide(); }
       });
     },
-    [editor, show, hide, scheduleHide, cancelHide, computeHandlePosition]
+    [editor, show, scheduleHide, cancelHide, computeHandlePosition]
   );
-
-  // Delay hide so mouse has time to travel from editor to handle
-  const hideDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const scheduleHide = useCallback(() => {
-    if (hideDelayRef.current) clearTimeout(hideDelayRef.current);
-    hideDelayRef.current = setTimeout(() => {
-      hide();
-    }, 200); // 200ms grace period to reach the handle
-  }, [hide]);
-
-  const cancelHide = useCallback(() => {
-    if (hideDelayRef.current) {
-      clearTimeout(hideDelayRef.current);
-      hideDelayRef.current = null;
-    }
-  }, []);
 
   const handleMouseLeave = useCallback(() => { scheduleHide(); }, [scheduleHide]);
 
