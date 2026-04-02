@@ -1,0 +1,1880 @@
+# Template Expansion Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Expand the template system from 10 built-in templates to 80+ across 8 categories, with Korean/English support, full CRUD, "Save as template" from pages, and a redesigned gallery with previews.
+**Architecture:** The Template Prisma model gets bilingual fields and a cover image. A seed script populates 80 templates with actual TipTap JSON content. The tRPC router gains full CRUD + duplicate. The gallery UI is rewritten with cover cards, preview modal, and category filtering. "Save as template" is added to the page options menu.
+**Tech Stack:** Prisma, tRPC, React 18, TipTap JSON, Tailwind CSS
+
+---
+
+### Task 1: Update Prisma Schema for Template Enhancements
+
+**Files:**
+- Modify: `prisma/schema.prisma`
+
+- [ ] **Step 1: Add bilingual and cover fields to Template model**
+
+In `prisma/schema.prisma`, replace the Template model:
+```prisma
+model Template {
+  id          String   @id @default(cuid())
+  workspaceId String?
+  creatorId   String?
+  name        String
+  nameKo      String?
+  description String?
+  descriptionKo String?
+  icon        String?
+  coverImage  String?
+  category    String   @default("custom")
+  locale      String   @default("ko")
+  blocks      Json     @default("[]")
+  isPublic    Boolean  @default(false)
+  isDefault   Boolean  @default(false)
+  usageCount  Int      @default(0)
+  tags        String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([category])
+  @@index([isDefault])
+  @@index([usageCount])
+}
+```
+
+Run: `npx prisma db push`
+
+- [ ] **Step 2: Commit**
+```
+git add prisma/schema.prisma
+git commit -m "feat: add nameKo, descriptionKo, coverImage, locale to Template model"
+```
+
+---
+
+### Task 2: Expand tRPC Template Router with Full CRUD
+
+**Files:**
+- Modify: `src/server/routers/template.ts`
+
+- [ ] **Step 1: Add update, duplicate, and enhanced list procedures**
+
+Replace `src/server/routers/template.ts` entirely:
+```ts
+// src/server/routers/template.ts
+import { z } from "zod";
+import { TRPCError } from "@trpc/server";
+import { router, protectedProcedure } from "@/server/trpc/init";
+
+const TEMPLATE_CATEGORIES = [
+  "documents",
+  "personal",
+  "team",
+  "project",
+  "engineering",
+  "education",
+  "marketing",
+  "custom",
+] as const;
+
+export const templateRouter = router({
+  list: protectedProcedure
+    .input(
+      z.object({
+        workspaceId: z.string(),
+        category: z.string().optional(),
+        search: z.string().optional(),
+        limit: z.number().min(1).max(100).default(50),
+        cursor: z.string().optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const where: Record<string, unknown> = {
+        OR: [
+          { isDefault: true },
+          { workspaceId: input.workspaceId },
+          { isPublic: true },
+        ],
+      };
+      if (input.category && input.category !== "all") {
+        where.category = input.category;
+      }
+      if (input.search?.trim()) {
+        const q = input.search.trim();
+        where.AND = [
+          where.OR ? { OR: where.OR } : {},
+          {
+            OR: [
+              { name: { contains: q, mode: "insensitive" } },
+              { nameKo: { contains: q, mode: "insensitive" } },
+              { description: { contains: q, mode: "insensitive" } },
+              { descriptionKo: { contains: q, mode: "insensitive" } },
+              { tags: { has: q.toLowerCase() } },
+            ],
+          },
+        ];
+        delete where.OR;
+      }
+      const templates = await ctx.db.template.findMany({
+        where,
+        orderBy: [{ isDefault: "desc" }, { usageCount: "desc" }, { name: "asc" }],
+        take: input.limit + 1,
+        ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+      });
+
+      let nextCursor: string | undefined;
+      if (templates.length > input.limit) {
+        const next = templates.pop();
+        nextCursor = next?.id;
+      }
+
+      return { templates, nextCursor };
+    }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const template = await ctx.db.template.findUnique({
+        where: { id: input.id },
+      });
+      if (!template) throw new TRPCError({ code: "NOT_FOUND" });
+      return template;
+    }),
+
+  create: protectedProcedure
+    .input(
+      z.object({
+        workspaceId: z.string(),
+        name: z.string().min(1).max(100),
+        nameKo: z.string().optional(),
+        description: z.string().max(500).optional(),
+        descriptionKo: z.string().max(500).optional(),
+        icon: z.string().optional(),
+        coverImage: z.string().url().optional(),
+        category: z.enum(TEMPLATE_CATEGORIES).default("custom"),
+        blocks: z.array(z.record(z.string(), z.unknown())).default([]),
+        tags: z.array(z.string()).default([]),
+        isPublic: z.boolean().default(false),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      return ctx.db.template.create({
+        data: {
+          ...input,
+          creatorId: ctx.session.user.id,
+        },
+      });
+    }),
+
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string().min(1).max(100).optional(),
+        nameKo: z.string().optional(),
+        description: z.string().max(500).optional(),
+        descriptionKo: z.string().max(500).optional(),
+        icon: z.string().optional(),
+        coverImage: z.string().url().nullable().optional(),
+        category: z.enum(TEMPLATE_CATEGORIES).optional(),
+        blocks: z.array(z.record(z.string(), z.unknown())).optional(),
+        tags: z.array(z.string()).optional(),
+        isPublic: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const template = await ctx.db.template.findUnique({
+        where: { id: input.id },
+      });
+      if (!template) throw new TRPCError({ code: "NOT_FOUND" });
+      if (template.isDefault) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Cannot edit system templates",
+        });
+      }
+      if (template.creatorId && template.creatorId !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Not authorized",
+        });
+      }
+      const { id, ...data } = input;
+      return ctx.db.template.update({ where: { id }, data });
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const template = await ctx.db.template.findUnique({
+        where: { id: input.id },
+      });
+      if (!template) throw new TRPCError({ code: "NOT_FOUND" });
+      if (template.isDefault) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Cannot delete system templates",
+        });
+      }
+      if (template.creatorId && template.creatorId !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Not authorized",
+        });
+      }
+      return ctx.db.template.delete({ where: { id: input.id } });
+    }),
+
+  duplicate: protectedProcedure
+    .input(z.object({ id: z.string(), workspaceId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const source = await ctx.db.template.findUnique({
+        where: { id: input.id },
+      });
+      if (!source) throw new TRPCError({ code: "NOT_FOUND" });
+
+      return ctx.db.template.create({
+        data: {
+          workspaceId: input.workspaceId,
+          creatorId: ctx.session.user.id,
+          name: `${source.name} (복사)`,
+          nameKo: source.nameKo ? `${source.nameKo} (복사)` : null,
+          description: source.description,
+          descriptionKo: source.descriptionKo,
+          icon: source.icon,
+          coverImage: source.coverImage,
+          category: "custom",
+          blocks: source.blocks as object[],
+          tags: source.tags,
+          isPublic: false,
+          isDefault: false,
+        },
+      });
+    }),
+
+  incrementUsage: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.db.template.update({
+        where: { id: input.id },
+        data: { usageCount: { increment: 1 } },
+      });
+    }),
+
+  seed: protectedProcedure.mutation(async ({ ctx }) => {
+    const existing = await ctx.db.template.count({
+      where: { isDefault: true },
+    });
+    if (existing > 0) return { seeded: false, count: existing };
+
+    // Import seed data
+    const { SEED_TEMPLATES } = await import("@/../prisma/seed-templates");
+    const created = await ctx.db.template.createMany({
+      data: SEED_TEMPLATES.map((t) => ({
+        ...t,
+        isDefault: true,
+        isPublic: true,
+      })),
+      skipDuplicates: true,
+    });
+    return { seeded: true, count: created.count };
+  }),
+});
+```
+
+- [ ] **Step 2: Commit**
+```
+git add src/server/routers/template.ts
+git commit -m "feat: template CRUD router with update, duplicate, search, pagination"
+```
+
+---
+
+### Task 3: Create Seed Templates (80 templates, 8 categories)
+
+**Files:**
+- Create: `prisma/seed-templates.ts`
+
+- [ ] **Step 1: Create seed-templates.ts with all templates**
+
+This file exports `SEED_TEMPLATES` -- an array of 80 template objects. Below is the structure with representative templates per category (10 per category). Each has actual TipTap JSON in `blocks`.
+
+```ts
+// prisma/seed-templates.ts
+
+type SeedTemplate = {
+  name: string;
+  nameKo: string;
+  description: string;
+  descriptionKo: string;
+  icon: string;
+  category: string;
+  tags: string[];
+  blocks: object[];
+};
+
+// Helper to create heading block
+const h2 = (text: string) => ({
+  type: "heading",
+  attrs: { level: 2 },
+  content: [{ type: "text", text }],
+});
+
+const h3 = (text: string) => ({
+  type: "heading",
+  attrs: { level: 3 },
+  content: [{ type: "text", text }],
+});
+
+const p = (text = "") =>
+  text
+    ? { type: "paragraph", content: [{ type: "text", text }] }
+    : { type: "paragraph" };
+
+const bullet = (...items: string[]) => ({
+  type: "bulletList",
+  content: items.map((t) => ({
+    type: "listItem",
+    content: [t ? { type: "paragraph", content: [{ type: "text", text: t }] } : { type: "paragraph" }],
+  })),
+});
+
+const tasks = (...items: string[]) => ({
+  type: "taskList",
+  content: items.map((t) => ({
+    type: "taskItem",
+    attrs: { checked: false },
+    content: [t ? { type: "paragraph", content: [{ type: "text", text: t }] } : { type: "paragraph" }],
+  })),
+});
+
+const numbered = (...items: string[]) => ({
+  type: "orderedList",
+  content: items.map((t) => ({
+    type: "listItem",
+    content: [{ type: "paragraph", content: [{ type: "text", text: t }] }],
+  })),
+});
+
+const quote = (text: string) => ({
+  type: "blockquote",
+  content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+});
+
+const hr = () => ({ type: "horizontalRule" });
+
+const callout = (text: string, icon = "💡") => ({
+  type: "callout",
+  attrs: { icon, color: "default" },
+  content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+});
+
+export const SEED_TEMPLATES: SeedTemplate[] = [
+  // ──────────────── DOCUMENTS (10) ────────────────
+  {
+    name: "Meeting Notes",
+    nameKo: "회의록",
+    description: "Agenda, discussion points, and action items",
+    descriptionKo: "안건, 토론 사항, 액션 아이템",
+    icon: "📝",
+    category: "documents",
+    tags: ["meeting", "notes", "agenda", "회의"],
+    blocks: [h2("Agenda / 안건"), bullet(""), h2("Discussion / 토론"), bullet(""), h2("Action Items / 액션 아이템"), tasks("", "")],
+  },
+  {
+    name: "Design Document",
+    nameKo: "설계 문서",
+    description: "Technical design with context, goals, and solution",
+    descriptionKo: "기술 설계 문서 - 맥락, 목표, 제안 솔루션",
+    icon: "📐",
+    category: "documents",
+    tags: ["design", "technical", "rfc", "설계"],
+    blocks: [h2("Context / 맥락"), p(), h2("Goals / 목표"), bullet(""), h2("Proposed Solution / 제안 솔루션"), p(), h2("Alternatives / 대안"), p(), h2("Open Questions / 미해결 질문"), tasks("")],
+  },
+  {
+    name: "Product Requirements (PRD)",
+    nameKo: "제품 요구사항 (PRD)",
+    description: "Product requirements document template",
+    descriptionKo: "제품 요구사항 문서 템플릿",
+    icon: "📋",
+    category: "documents",
+    tags: ["prd", "product", "requirements", "요구사항"],
+    blocks: [h2("Overview / 개요"), p(), h2("Problem Statement / 문제 정의"), p(), h2("Goals / 목표"), bullet(""), h2("User Stories / 사용자 스토리"), numbered("As a [user], I want [feature] so that [benefit]"), h2("Requirements / 요구사항"), h3("Must Have"), tasks(""), h3("Nice to Have"), tasks(""), h2("Success Metrics / 성공 지표"), bullet(""), h2("Timeline / 일정"), p()],
+  },
+  {
+    name: "Technical Spec",
+    nameKo: "기술 스펙",
+    description: "API and system technical specification",
+    descriptionKo: "API 및 시스템 기술 명세",
+    icon: "🔧",
+    category: "documents",
+    tags: ["spec", "api", "technical", "기술"],
+    blocks: [h2("System Overview / 시스템 개요"), p(), h2("Architecture / 아키텍처"), p(), h2("API Endpoints"), bullet("GET /api/...", "POST /api/..."), h2("Data Models / 데이터 모델"), p(), h2("Error Handling / 에러 처리"), bullet(""), h2("Security Considerations / 보안"), bullet("")],
+  },
+  {
+    name: "Decision Record (ADR)",
+    nameKo: "의사결정 기록 (ADR)",
+    description: "Architecture decision record",
+    descriptionKo: "아키텍처 의사결정 기록",
+    icon: "⚖️",
+    category: "documents",
+    tags: ["adr", "decision", "architecture", "의사결정"],
+    blocks: [h2("Status / 상태"), p("Proposed"), h2("Context / 맥락"), p(), h2("Decision / 결정"), p(), h2("Consequences / 결과"), bullet("Positive:", "Negative:"), h2("Alternatives Considered / 대안"), bullet("")],
+  },
+  {
+    name: "Runbook",
+    nameKo: "런북",
+    description: "Operational runbook for incident response",
+    descriptionKo: "장애 대응 운영 런북",
+    icon: "🚨",
+    category: "documents",
+    tags: ["runbook", "ops", "incident", "런북"],
+    blocks: [callout("Follow these steps in order during an incident.", "🚨"), h2("Symptoms / 증상"), bullet(""), h2("Diagnosis Steps / 진단"), numbered("Check service health", "Review logs", "Check dependencies"), h2("Resolution / 해결"), numbered("Step 1", "Step 2"), h2("Post-Incident / 사후 조치"), tasks("Update status page", "Write postmortem")],
+  },
+  {
+    name: "Release Notes",
+    nameKo: "릴리스 노트",
+    description: "Changelog and release notes template",
+    descriptionKo: "변경 로그 및 릴리스 노트",
+    icon: "🚀",
+    category: "documents",
+    tags: ["release", "changelog", "릴리스"],
+    blocks: [h2("Version X.Y.Z"), p("Release date: YYYY-MM-DD"), h2("New Features / 새 기능"), bullet(""), h2("Improvements / 개선"), bullet(""), h2("Bug Fixes / 버그 수정"), bullet(""), h2("Breaking Changes / 호환성"), callout("None in this release", "⚠️")],
+  },
+  {
+    name: "Research Notes",
+    nameKo: "리서치 노트",
+    description: "User research and findings documentation",
+    descriptionKo: "사용자 리서치 및 분석 문서",
+    icon: "🔍",
+    category: "documents",
+    tags: ["research", "ux", "리서치"],
+    blocks: [h2("Research Question / 연구 질문"), p(), h2("Methodology / 방법론"), p(), h2("Participants / 참여자"), bullet(""), h2("Key Findings / 주요 발견"), numbered(""), h2("Recommendations / 권장사항"), tasks("")],
+  },
+  {
+    name: "Standard Operating Procedure",
+    nameKo: "표준 운영 절차 (SOP)",
+    description: "Step-by-step process documentation",
+    descriptionKo: "단계별 프로세스 문서",
+    icon: "📖",
+    category: "documents",
+    tags: ["sop", "process", "절차"],
+    blocks: [h2("Purpose / 목적"), p(), h2("Scope / 범위"), p(), h2("Prerequisites / 사전 조건"), tasks(""), h2("Procedure / 절차"), numbered("Step 1", "Step 2", "Step 3"), h2("Troubleshooting / 문제 해결"), bullet("")],
+  },
+  {
+    name: "Postmortem",
+    nameKo: "포스트모템",
+    description: "Incident postmortem with timeline and actions",
+    descriptionKo: "장애 포스트모템 - 타임라인 및 조치",
+    icon: "🔥",
+    category: "documents",
+    tags: ["postmortem", "incident", "포스트모템"],
+    blocks: [h2("Summary / 요약"), p(), h2("Impact / 영향"), bullet("Duration:", "Users affected:", "Revenue impact:"), h2("Timeline / 타임라인"), bullet("HH:MM - Event 1", "HH:MM - Event 2"), h2("Root Cause / 근본 원인"), p(), h2("Action Items / 조치 항목"), tasks("", ""), h2("Lessons Learned / 교훈"), bullet("")],
+  },
+
+  // ──────────────── PERSONAL (10) ────────────────
+  {
+    name: "Todo List",
+    nameKo: "할 일 목록",
+    description: "Simple task tracker with sections",
+    descriptionKo: "섹션별 간단한 작업 추적",
+    icon: "☑️",
+    category: "personal",
+    tags: ["todo", "tasks", "할일"],
+    blocks: [h2("Today / 오늘"), tasks("", "", ""), h2("This Week / 이번 주"), tasks(""), h2("Later / 나중에"), tasks("")],
+  },
+  {
+    name: "Weekly Plan",
+    nameKo: "주간 계획",
+    description: "Weekly goals and daily breakdown",
+    descriptionKo: "주간 목표 및 일별 계획",
+    icon: "📅",
+    category: "personal",
+    tags: ["weekly", "plan", "주간"],
+    blocks: [h2("Goals / 목표"), tasks(""), h2("Monday / 월요일"), p(), h2("Tuesday / 화요일"), p(), h2("Wednesday / 수요일"), p(), h2("Thursday / 목요일"), p(), h2("Friday / 금요일"), p()],
+  },
+  {
+    name: "Daily Journal",
+    nameKo: "일일 저널",
+    description: "Morning check-in and evening reflection",
+    descriptionKo: "아침 체크인과 저녁 회고",
+    icon: "📓",
+    category: "personal",
+    tags: ["journal", "daily", "저널"],
+    blocks: [h2("Gratitude / 감사"), bullet("", "", ""), h2("Today's Focus / 오늘의 집중"), tasks(""), h2("Reflection / 회고"), p()],
+  },
+  {
+    name: "Reading Notes",
+    nameKo: "독서 노트",
+    description: "Book notes with key ideas and quotes",
+    descriptionKo: "핵심 아이디어와 인용구 독서 노트",
+    icon: "📚",
+    category: "personal",
+    tags: ["reading", "book", "독서"],
+    blocks: [h2("Summary / 요약"), p(), h2("Key Ideas / 핵심 아이디어"), bullet(""), h2("Favorite Quotes / 인용구"), quote(""), h2("Action Items / 실천사항"), tasks("")],
+  },
+  {
+    name: "Habit Tracker",
+    nameKo: "습관 추적기",
+    description: "Daily habit tracking checklist",
+    descriptionKo: "일별 습관 체크리스트",
+    icon: "🎯",
+    category: "personal",
+    tags: ["habit", "tracker", "습관"],
+    blocks: [h2("Daily Habits / 일일 습관"), tasks("Exercise 30min / 운동 30분", "Read 20 pages / 독서 20페이지", "Meditate 10min / 명상 10분", "Drink 2L water / 물 2L", "Sleep by 11pm / 11시 취침"), hr(), h2("Weekly Review / 주간 리뷰"), p()],
+  },
+  {
+    name: "Goal Setting",
+    nameKo: "목표 설정",
+    description: "Quarterly goals with OKR framework",
+    descriptionKo: "OKR 프레임워크 분기 목표",
+    icon: "🏆",
+    category: "personal",
+    tags: ["goals", "okr", "목표"],
+    blocks: [h2("Vision / 비전"), p(), h2("Objective 1 / 목표 1"), p(), h3("Key Results / 핵심 결과"), tasks("KR1:", "KR2:", "KR3:"), h2("Objective 2 / 목표 2"), p(), h3("Key Results / 핵심 결과"), tasks("KR1:", "KR2:", "KR3:")],
+  },
+  {
+    name: "Travel Planner",
+    nameKo: "여행 계획",
+    description: "Trip planning with itinerary and packing",
+    descriptionKo: "일정 및 짐 목록 여행 계획",
+    icon: "✈️",
+    category: "personal",
+    tags: ["travel", "trip", "여행"],
+    blocks: [h2("Destination / 목적지"), p(), h2("Dates / 일정"), p(), h2("Accommodation / 숙소"), bullet(""), h2("Itinerary / 여행 일정"), h3("Day 1"), bullet(""), h3("Day 2"), bullet(""), h2("Packing List / 짐 목록"), tasks("Passport / 여권", "Charger / 충전기", "Clothes / 옷")],
+  },
+  {
+    name: "Recipe",
+    nameKo: "레시피",
+    description: "Cooking recipe with ingredients and steps",
+    descriptionKo: "재료 및 조리법 레시피",
+    icon: "🍳",
+    category: "personal",
+    tags: ["recipe", "cooking", "레시피"],
+    blocks: [h2("Ingredients / 재료"), bullet(""), h2("Instructions / 조리법"), numbered("Step 1", "Step 2", "Step 3"), h2("Notes / 메모"), p()],
+  },
+  {
+    name: "Budget Planner",
+    nameKo: "예산 계획",
+    description: "Monthly budget tracking",
+    descriptionKo: "월별 예산 관리",
+    icon: "💰",
+    category: "personal",
+    tags: ["budget", "finance", "예산"],
+    blocks: [h2("Income / 수입"), bullet("Salary / 급여:", "Other / 기타:"), h2("Fixed Expenses / 고정 지출"), bullet("Rent / 월세:", "Insurance / 보험:", "Subscriptions / 구독:"), h2("Variable Expenses / 변동 지출"), bullet("Food / 식비:", "Transport / 교통:", "Entertainment / 여가:"), h2("Savings Goal / 저축 목표"), p()],
+  },
+  {
+    name: "Morning Routine",
+    nameKo: "아침 루틴",
+    description: "Daily morning routine checklist",
+    descriptionKo: "매일 아침 루틴 체크리스트",
+    icon: "🌅",
+    category: "personal",
+    tags: ["routine", "morning", "루틴"],
+    blocks: [h2("Morning Routine / 아침 루틴"), tasks("Wake up at 6:00 / 6시 기상", "Stretch / 스트레칭", "Meditate 10min / 명상 10분", "Journal / 저널 쓰기", "Healthy breakfast / 건강한 아침"), callout("Consistency is key! / 꾸준함이 핵심!", "💪")],
+  },
+
+  // ──────────────── TEAM (10) ────────────────
+  {
+    name: "1:1 Meeting",
+    nameKo: "1:1 미팅",
+    description: "Recurring meeting notes with action items",
+    descriptionKo: "정기 미팅 노트 및 액션 아이템",
+    icon: "🤝",
+    category: "team",
+    tags: ["meeting", "1on1", "미팅"],
+    blocks: [h2("Updates / 업데이트"), bullet(""), h2("Discussion / 토론"), bullet(""), h2("Action Items / 액션 아이템"), tasks("", "")],
+  },
+  {
+    name: "Sprint Retrospective",
+    nameKo: "스프린트 회고",
+    description: "What went well, what to improve",
+    descriptionKo: "잘한 점, 개선할 점",
+    icon: "🔄",
+    category: "team",
+    tags: ["sprint", "retro", "회고"],
+    blocks: [h2("What went well / 잘한 점"), bullet(""), h2("What could improve / 개선할 점"), bullet(""), h2("Action Items / 액션 아이템"), tasks("")],
+  },
+  {
+    name: "Sprint Planning",
+    nameKo: "스프린트 계획",
+    description: "Sprint goals and task breakdown",
+    descriptionKo: "스프린트 목표 및 작업 분배",
+    icon: "🏃",
+    category: "team",
+    tags: ["sprint", "planning", "계획"],
+    blocks: [h2("Sprint Goal / 스프린트 목표"), p(), h2("Capacity / 가용 인력"), bullet(""), h2("Backlog Items / 백로그"), tasks("", "", "", ""), h2("Risks / 리스크"), bullet("")],
+  },
+  {
+    name: "Team Standup",
+    nameKo: "팀 스탠드업",
+    description: "Daily standup notes",
+    descriptionKo: "일일 스탠드업 미팅 노트",
+    icon: "🧑‍💻",
+    category: "team",
+    tags: ["standup", "daily", "스탠드업"],
+    blocks: [h2("Yesterday / 어제"), bullet(""), h2("Today / 오늘"), bullet(""), h2("Blockers / 차단 요소"), bullet("")],
+  },
+  {
+    name: "Team Wiki",
+    nameKo: "팀 위키",
+    description: "Team knowledge base home page",
+    descriptionKo: "팀 지식 베이스 홈페이지",
+    icon: "📖",
+    category: "team",
+    tags: ["wiki", "knowledge", "위키"],
+    blocks: [h2("Welcome / 환영합니다"), p("This is the team wiki. Add important links and docs below."), h2("Quick Links / 빠른 링크"), bullet("Getting Started", "Code Standards", "Design System"), h2("Team Members / 팀원"), bullet(""), h2("Processes / 프로세스"), bullet("")],
+  },
+  {
+    name: "Onboarding Checklist",
+    nameKo: "온보딩 체크리스트",
+    description: "New team member onboarding",
+    descriptionKo: "신규 팀원 온보딩",
+    icon: "👋",
+    category: "team",
+    tags: ["onboarding", "checklist", "온보딩"],
+    blocks: [h2("Day 1"), tasks("Set up accounts", "Meet the team", "Read team wiki"), h2("Week 1"), tasks("Complete dev environment setup", "Read codebase overview", "First PR"), h2("Month 1"), tasks("Complete first feature", "Participate in code review", "Present in team meeting")],
+  },
+  {
+    name: "Team OKRs",
+    nameKo: "팀 OKR",
+    description: "Team quarterly objectives and key results",
+    descriptionKo: "팀 분기 목표 및 핵심 결과",
+    icon: "🎯",
+    category: "team",
+    tags: ["okr", "objectives", "OKR"],
+    blocks: [h2("Q1 Objectives / Q1 목표"), h3("Objective 1"), tasks("KR1:", "KR2:", "KR3:"), h3("Objective 2"), tasks("KR1:", "KR2:"), hr(), h2("Status / 진행 상황"), p("Last updated: ")],
+  },
+  {
+    name: "Interview Scorecard",
+    nameKo: "면접 평가표",
+    description: "Structured interview evaluation form",
+    descriptionKo: "구조화된 면접 평가 양식",
+    icon: "📊",
+    category: "team",
+    tags: ["interview", "hiring", "면접"],
+    blocks: [h2("Candidate / 후보자"), p("Name:"), p("Position:"), p("Date:"), h2("Technical Skills / 기술 역량"), bullet("Problem solving: /5", "System design: /5", "Coding: /5"), h2("Culture Fit / 문화 적합"), bullet("Communication: /5", "Teamwork: /5"), h2("Overall / 종합"), p("Strong hire / Hire / No hire"), h2("Notes / 메모"), p()],
+  },
+  {
+    name: "Decision Matrix",
+    nameKo: "의사결정 매트릭스",
+    description: "Compare options with weighted criteria",
+    descriptionKo: "가중치 기준으로 옵션 비교",
+    icon: "🧮",
+    category: "team",
+    tags: ["decision", "matrix", "의사결정"],
+    blocks: [h2("Decision / 결정 사항"), p(), h2("Options / 옵션"), bullet("Option A:", "Option B:", "Option C:"), h2("Criteria / 기준"), bullet("Cost (weight: 3)", "Speed (weight: 2)", "Quality (weight: 3)"), h2("Recommendation / 권장"), p()],
+  },
+  {
+    name: "All-Hands Meeting",
+    nameKo: "전체 회의",
+    description: "Company all-hands meeting agenda",
+    descriptionKo: "전사 회의 안건",
+    icon: "🏢",
+    category: "team",
+    tags: ["all-hands", "company", "전체회의"],
+    blocks: [h2("Company Updates / 회사 소식"), bullet(""), h2("Team Highlights / 팀 하이라이트"), bullet(""), h2("Q&A / 질의응답"), bullet(""), h2("Action Items / 액션 아이템"), tasks("")],
+  },
+
+  // ──────────────── PROJECT (10) ────────────────
+  {
+    name: "Project Brief",
+    nameKo: "프로젝트 브리프",
+    description: "Project overview with goals, scope, timeline",
+    descriptionKo: "프로젝트 개요 - 목표, 범위, 일정",
+    icon: "🎯",
+    category: "project",
+    tags: ["project", "brief", "프로젝트"],
+    blocks: [h2("Overview / 개요"), p(), h2("Goals / 목표"), bullet(""), h2("Scope / 범위"), p(), h2("Timeline / 일정"), p(), h2("Team / 팀"), bullet("")],
+  },
+  {
+    name: "Project Status Update",
+    nameKo: "프로젝트 상태 업데이트",
+    description: "Weekly project progress report",
+    descriptionKo: "주간 프로젝트 진행 보고",
+    icon: "📊",
+    category: "project",
+    tags: ["status", "report", "보고"],
+    blocks: [callout("Status: On Track / 상태: 정상", "🟢"), h2("Progress / 진행 상황"), bullet(""), h2("Completed This Week / 이번 주 완료"), tasks(""), h2("Next Week / 다음 주 계획"), tasks(""), h2("Risks & Blockers / 리스크"), bullet("")],
+  },
+  {
+    name: "Project Kickoff",
+    nameKo: "프로젝트 킥오프",
+    description: "Project kickoff meeting template",
+    descriptionKo: "프로젝트 킥오프 미팅 템플릿",
+    icon: "🚀",
+    category: "project",
+    tags: ["kickoff", "project", "킥오프"],
+    blocks: [h2("Project Vision / 비전"), p(), h2("Team & Roles / 팀 & 역할"), bullet("PM:", "Design:", "Engineering:", "QA:"), h2("Milestones / 마일스톤"), numbered("Phase 1:", "Phase 2:", "Phase 3:"), h2("Communication Plan / 소통 계획"), bullet("Standup: Daily", "Review: Weekly"), h2("Questions / 질문"), bullet("")],
+  },
+  {
+    name: "Feature Spec",
+    nameKo: "기능 스펙",
+    description: "Feature specification with user stories",
+    descriptionKo: "사용자 스토리 기반 기능 명세",
+    icon: "💡",
+    category: "project",
+    tags: ["feature", "spec", "기능"],
+    blocks: [h2("Feature / 기능"), p(), h2("Problem / 문제"), p(), h2("User Stories / 사용자 스토리"), bullet("As a [user], I want [feature] so that [benefit]"), h2("Design / 디자인"), p(), h2("Acceptance Criteria / 인수 조건"), tasks("", ""), h2("Edge Cases / 엣지 케이스"), bullet("")],
+  },
+  {
+    name: "Roadmap",
+    nameKo: "로드맵",
+    description: "Quarterly product roadmap",
+    descriptionKo: "분기별 제품 로드맵",
+    icon: "🗺️",
+    category: "project",
+    tags: ["roadmap", "planning", "로드맵"],
+    blocks: [h2("Q1"), h3("Theme / 테마"), p(), tasks("Feature 1", "Feature 2"), h2("Q2"), h3("Theme / 테마"), p(), tasks("Feature 3", "Feature 4"), h2("Q3"), h3("Theme / 테마"), p(), tasks("Feature 5"), h2("Q4"), h3("Theme / 테마"), p(), tasks("Feature 6")],
+  },
+  {
+    name: "Risk Assessment",
+    nameKo: "리스크 평가",
+    description: "Project risk identification and mitigation",
+    descriptionKo: "프로젝트 리스크 식별 및 완화",
+    icon: "⚠️",
+    category: "project",
+    tags: ["risk", "assessment", "리스크"],
+    blocks: [h2("High Risk / 높은 리스크"), bullet("Risk: | Impact: High | Likelihood: High | Mitigation:"), h2("Medium Risk / 중간 리스크"), bullet("Risk: | Impact: Medium | Likelihood: Medium | Mitigation:"), h2("Low Risk / 낮은 리스크"), bullet(""), h2("Contingency Plans / 비상 계획"), bullet("")],
+  },
+  {
+    name: "Launch Checklist",
+    nameKo: "출시 체크리스트",
+    description: "Product/feature launch readiness checklist",
+    descriptionKo: "제품/기능 출시 준비 체크리스트",
+    icon: "🎉",
+    category: "project",
+    tags: ["launch", "checklist", "출시"],
+    blocks: [h2("Pre-Launch / 출시 전"), tasks("QA complete", "Docs updated", "Monitoring set up", "Rollback plan ready"), h2("Launch Day / 출시일"), tasks("Deploy to production", "Verify in production", "Update status page", "Announce to team"), h2("Post-Launch / 출시 후"), tasks("Monitor metrics", "Collect feedback", "Address critical bugs")],
+  },
+  {
+    name: "Competitive Analysis",
+    nameKo: "경쟁사 분석",
+    description: "Competitor comparison and analysis",
+    descriptionKo: "경쟁사 비교 및 분석",
+    icon: "🏁",
+    category: "project",
+    tags: ["competitive", "analysis", "경쟁사"],
+    blocks: [h2("Overview / 개요"), p(), h2("Competitor A"), bullet("Strengths:", "Weaknesses:", "Pricing:"), h2("Competitor B"), bullet("Strengths:", "Weaknesses:", "Pricing:"), h2("Our Advantages / 우리의 장점"), bullet(""), h2("Opportunities / 기회"), bullet("")],
+  },
+  {
+    name: "Stakeholder Map",
+    nameKo: "이해관계자 맵",
+    description: "Stakeholder identification and management",
+    descriptionKo: "이해관계자 식별 및 관리",
+    icon: "🗂️",
+    category: "project",
+    tags: ["stakeholder", "management", "이해관계자"],
+    blocks: [h2("Key Stakeholders / 주요 이해관계자"), bullet("Name: | Role: | Interest: | Influence:"), h2("Communication Plan / 소통 계획"), bullet("Weekly update to:", "Monthly review with:"), h2("Approvals Needed / 필요 승인"), tasks("")],
+  },
+  {
+    name: "Lessons Learned",
+    nameKo: "프로젝트 교훈",
+    description: "Project retrospective and lessons learned",
+    descriptionKo: "프로젝트 회고 및 교훈",
+    icon: "🎓",
+    category: "project",
+    tags: ["lessons", "retrospective", "교훈"],
+    blocks: [h2("Project Summary / 요약"), p(), h2("What Went Well / 잘한 점"), bullet(""), h2("What Didn't / 아쉬운 점"), bullet(""), h2("Key Learnings / 핵심 교훈"), numbered(""), h2("Recommendations / 권장사항"), bullet("")],
+  },
+
+  // ──────────────── ENGINEERING (10) ────────────────
+  {
+    name: "Bug Report",
+    nameKo: "버그 리포트",
+    description: "Bug tracking with steps to reproduce",
+    descriptionKo: "재현 방법 포함 버그 리포트",
+    icon: "🐛",
+    category: "engineering",
+    tags: ["bug", "report", "버그"],
+    blocks: [h2("Description / 설명"), p(), h2("Steps to Reproduce / 재현 방법"), numbered("", ""), h2("Expected / 기대 동작"), p(), h2("Actual / 실제 동작"), p(), h2("Environment / 환경"), bullet("OS:", "Browser:", "Version:")],
+  },
+  {
+    name: "Code Review Checklist",
+    nameKo: "코드 리뷰 체크리스트",
+    description: "Structured code review checklist",
+    descriptionKo: "구조화된 코드 리뷰 체크리스트",
+    icon: "✅",
+    category: "engineering",
+    tags: ["code review", "checklist", "리뷰"],
+    blocks: [h2("PR Overview"), p("PR #:"), p("Author:"), h2("Checklist"), tasks("Code compiles without errors", "Tests pass", "No hardcoded secrets", "Error handling present", "Follows coding standards", "Documentation updated", "No unnecessary console.log"), h2("Comments / 코멘트"), bullet("")],
+  },
+  {
+    name: "Database Migration Plan",
+    nameKo: "DB 마이그레이션 계획",
+    description: "Database schema migration planning",
+    descriptionKo: "데이터베이스 스키마 마이그레이션 계획",
+    icon: "🗄️",
+    category: "engineering",
+    tags: ["database", "migration", "마이그레이션"],
+    blocks: [h2("Changes / 변경 사항"), bullet(""), h2("Migration Script"), p(), h2("Rollback Plan / 롤백 계획"), p(), h2("Testing / 테스트"), tasks("Test on staging", "Verify data integrity", "Performance check"), h2("Deployment Steps / 배포 절차"), numbered("Backup database", "Run migration", "Verify", "Update application")],
+  },
+  {
+    name: "Architecture Overview",
+    nameKo: "아키텍처 개요",
+    description: "System architecture documentation",
+    descriptionKo: "시스템 아키텍처 문서",
+    icon: "🏗️",
+    category: "engineering",
+    tags: ["architecture", "system", "아키텍처"],
+    blocks: [h2("System Diagram / 시스템 다이어그램"), p(), h2("Components / 컴포넌트"), bullet("Frontend:", "Backend:", "Database:", "Cache:"), h2("Data Flow / 데이터 흐름"), numbered(""), h2("Infrastructure / 인프라"), bullet(""), h2("Monitoring / 모니터링"), bullet("")],
+  },
+  {
+    name: "API Documentation",
+    nameKo: "API 문서",
+    description: "REST API endpoint documentation",
+    descriptionKo: "REST API 엔드포인트 문서",
+    icon: "🔌",
+    category: "engineering",
+    tags: ["api", "docs", "API"],
+    blocks: [h2("Base URL"), p("`https://api.example.com/v1`"), h2("Authentication / 인증"), p("Bearer token in Authorization header"), h2("Endpoints"), h3("GET /resource"), p("Description:"), p("Response:"), h3("POST /resource"), p("Description:"), p("Request body:"), p("Response:"), h2("Error Codes / 에러 코드"), bullet("400: Bad Request", "401: Unauthorized", "404: Not Found")],
+  },
+  {
+    name: "On-Call Handoff",
+    nameKo: "온콜 인수인계",
+    description: "On-call rotation handoff notes",
+    descriptionKo: "온콜 교대 인수인계 노트",
+    icon: "📟",
+    category: "engineering",
+    tags: ["oncall", "handoff", "온콜"],
+    blocks: [h2("Active Issues / 진행 중 이슈"), bullet(""), h2("Resolved This Rotation / 해결된 이슈"), bullet(""), h2("Known Risks / 알려진 리스크"), bullet(""), h2("Upcoming / 예정"), bullet(""), h2("Useful Commands / 유용한 명령어"), p()],
+  },
+  {
+    name: "Performance Review",
+    nameKo: "성능 분석",
+    description: "App performance audit checklist",
+    descriptionKo: "앱 성능 감사 체크리스트",
+    icon: "⚡",
+    category: "engineering",
+    tags: ["performance", "audit", "성능"],
+    blocks: [h2("Metrics / 지표"), bullet("LCP:", "FID:", "CLS:", "TTFB:"), h2("Issues Found / 발견된 이슈"), bullet(""), h2("Optimizations / 최적화"), tasks("Optimize images", "Code splitting", "Cache headers", "Database queries"), h2("Results / 결과"), p()],
+  },
+  {
+    name: "Security Audit",
+    nameKo: "보안 감사",
+    description: "Security review checklist",
+    descriptionKo: "보안 검토 체크리스트",
+    icon: "🔒",
+    category: "engineering",
+    tags: ["security", "audit", "보안"],
+    blocks: [h2("Authentication / 인증"), tasks("Rate limiting", "Password policy", "Session management", "MFA support"), h2("Authorization / 인가"), tasks("Role-based access", "Resource ownership checks"), h2("Data Protection / 데이터 보호"), tasks("Encryption at rest", "Encryption in transit", "PII handling"), h2("Findings / 발견사항"), bullet("")],
+  },
+  {
+    name: "Dependency Update",
+    nameKo: "의존성 업데이트",
+    description: "Track and plan dependency updates",
+    descriptionKo: "의존성 업데이트 추적 및 계획",
+    icon: "📦",
+    category: "engineering",
+    tags: ["dependencies", "update", "의존성"],
+    blocks: [h2("Critical Updates / 긴급"), tasks(""), h2("Major Updates / 메이저"), tasks(""), h2("Minor/Patch / 마이너"), tasks(""), h2("Breaking Changes / 호환성"), bullet(""), h2("Test Plan / 테스트"), tasks("Run full test suite", "Smoke test production")],
+  },
+  {
+    name: "Deployment Checklist",
+    nameKo: "배포 체크리스트",
+    description: "Production deployment checklist",
+    descriptionKo: "프로덕션 배포 체크리스트",
+    icon: "🚢",
+    category: "engineering",
+    tags: ["deploy", "checklist", "배포"],
+    blocks: [h2("Pre-Deploy / 배포 전"), tasks("All tests pass", "Code reviewed and approved", "Staging verified", "Database migrations ready", "Feature flags configured"), h2("Deploy / 배포"), tasks("Deploy to production", "Run smoke tests", "Monitor error rates"), h2("Post-Deploy / 배포 후"), tasks("Verify in production", "Update changelog", "Notify stakeholders")],
+  },
+
+  // ──────────────── EDUCATION (10) ────────────────
+  {
+    name: "Lecture Notes",
+    nameKo: "강의 노트",
+    description: "Class lecture notes with key concepts",
+    descriptionKo: "수업 강의 노트 - 핵심 개념",
+    icon: "🎒",
+    category: "education",
+    tags: ["lecture", "notes", "강의"],
+    blocks: [h2("Topic / 주제"), p(), h2("Key Concepts / 핵심 개념"), bullet(""), h2("Examples / 예시"), p(), h2("Questions / 질문"), bullet(""), h2("Summary / 요약"), p()],
+  },
+  {
+    name: "Study Plan",
+    nameKo: "학습 계획",
+    description: "Exam preparation study plan",
+    descriptionKo: "시험 대비 학습 계획",
+    icon: "📖",
+    category: "education",
+    tags: ["study", "plan", "학습"],
+    blocks: [h2("Exam Date / 시험 일자"), p(), h2("Topics to Cover / 학습 범위"), tasks("", "", ""), h2("Study Schedule / 학습 일정"), h3("Week 1"), tasks(""), h3("Week 2"), tasks(""), h2("Resources / 참고 자료"), bullet("")],
+  },
+  {
+    name: "Cornell Notes",
+    nameKo: "코넬 노트",
+    description: "Cornell note-taking method template",
+    descriptionKo: "코넬 노트 필기법 템플릿",
+    icon: "📝",
+    category: "education",
+    tags: ["cornell", "notes", "코넬"],
+    blocks: [h2("Cue Column / 키워드"), bullet(""), h2("Notes / 노트"), p(), hr(), h2("Summary / 요약"), p()],
+  },
+  {
+    name: "Flashcard Set",
+    nameKo: "플래시카드 세트",
+    description: "Study flashcards with Q&A pairs",
+    descriptionKo: "Q&A 형식 학습 플래시카드",
+    icon: "🃏",
+    category: "education",
+    tags: ["flashcard", "study", "플래시카드"],
+    blocks: [h2("Card 1"), h3("Q:"), p(), h3("A:"), p(), hr(), h2("Card 2"), h3("Q:"), p(), h3("A:"), p(), hr(), h2("Card 3"), h3("Q:"), p(), h3("A:"), p()],
+  },
+  {
+    name: "Essay Outline",
+    nameKo: "에세이 개요",
+    description: "Essay writing outline structure",
+    descriptionKo: "에세이 작성 개요 구조",
+    icon: "✍️",
+    category: "education",
+    tags: ["essay", "writing", "에세이"],
+    blocks: [h2("Thesis / 논제"), p(), h2("Introduction / 서론"), p(), h2("Body Paragraph 1 / 본론 1"), p("Topic sentence:"), bullet("Evidence:", "Analysis:"), h2("Body Paragraph 2 / 본론 2"), p("Topic sentence:"), bullet("Evidence:", "Analysis:"), h2("Body Paragraph 3 / 본론 3"), p("Topic sentence:"), bullet("Evidence:", "Analysis:"), h2("Conclusion / 결론"), p()],
+  },
+  {
+    name: "Lab Report",
+    nameKo: "실험 보고서",
+    description: "Science lab report template",
+    descriptionKo: "과학 실험 보고서 템플릿",
+    icon: "🔬",
+    category: "education",
+    tags: ["lab", "science", "실험"],
+    blocks: [h2("Title / 제목"), p(), h2("Hypothesis / 가설"), p(), h2("Materials / 재료"), bullet(""), h2("Procedure / 실험 방법"), numbered("", ""), h2("Results / 결과"), p(), h2("Conclusion / 결론"), p()],
+  },
+  {
+    name: "Book Report",
+    nameKo: "독후감",
+    description: "Book review and analysis",
+    descriptionKo: "독서 감상 및 분석",
+    icon: "📕",
+    category: "education",
+    tags: ["book", "report", "독후감"],
+    blocks: [h2("Book Info / 도서 정보"), bullet("Title:", "Author:", "Genre:", "Pages:"), h2("Summary / 줄거리"), p(), h2("Characters / 등장인물"), bullet(""), h2("Themes / 주제"), bullet(""), h2("My Opinion / 내 생각"), p(), h2("Rating / 평점"), p("★★★★☆")],
+  },
+  {
+    name: "Research Paper Outline",
+    nameKo: "연구 논문 개요",
+    description: "Academic research paper structure",
+    descriptionKo: "학술 연구 논문 구조",
+    icon: "🎓",
+    category: "education",
+    tags: ["research", "paper", "논문"],
+    blocks: [h2("Abstract / 초록"), p(), h2("Introduction / 서론"), p(), h2("Literature Review / 문헌 검토"), p(), h2("Methodology / 연구 방법"), p(), h2("Results / 결과"), p(), h2("Discussion / 토론"), p(), h2("Conclusion / 결론"), p(), h2("References / 참고문헌"), bullet("")],
+  },
+  {
+    name: "Presentation Outline",
+    nameKo: "발표 개요",
+    description: "Presentation slide planning",
+    descriptionKo: "발표 슬라이드 계획",
+    icon: "🎤",
+    category: "education",
+    tags: ["presentation", "slides", "발표"],
+    blocks: [h2("Title Slide / 표지"), p("Topic:"), p("Presenter:"), h2("Introduction / 서론"), bullet("Hook:", "Overview:"), h2("Main Points / 핵심 내용"), h3("Point 1"), bullet(""), h3("Point 2"), bullet(""), h3("Point 3"), bullet(""), h2("Conclusion / 결론"), bullet(""), h2("Q&A")],
+  },
+  {
+    name: "Course Syllabus",
+    nameKo: "강의 계획서",
+    description: "Course syllabus and schedule",
+    descriptionKo: "강의 계획서 및 일정",
+    icon: "📚",
+    category: "education",
+    tags: ["course", "syllabus", "강의계획"],
+    blocks: [h2("Course Info / 강좌 정보"), bullet("Course:", "Instructor:", "Schedule:", "Office hours:"), h2("Description / 설명"), p(), h2("Objectives / 학습 목표"), numbered(""), h2("Schedule / 일정"), h3("Week 1"), p(), h3("Week 2"), p(), h2("Grading / 평가"), bullet("Assignments: 40%", "Midterm: 25%", "Final: 35%")],
+  },
+
+  // ──────────────── MARKETING (10) ────────────────
+  {
+    name: "Content Calendar",
+    nameKo: "콘텐츠 캘린더",
+    description: "Monthly content planning calendar",
+    descriptionKo: "월간 콘텐츠 계획 캘린더",
+    icon: "📆",
+    category: "marketing",
+    tags: ["content", "calendar", "콘텐츠"],
+    blocks: [h2("Month / 월"), p(), h2("Week 1"), bullet("Blog:", "Social:", "Email:"), h2("Week 2"), bullet("Blog:", "Social:", "Email:"), h2("Week 3"), bullet("Blog:", "Social:", "Email:"), h2("Week 4"), bullet("Blog:", "Social:", "Email:")],
+  },
+  {
+    name: "Blog Post Template",
+    nameKo: "블로그 포스트",
+    description: "Blog post writing template with SEO",
+    descriptionKo: "SEO 포함 블로그 포스트 작성 템플릿",
+    icon: "✏️",
+    category: "marketing",
+    tags: ["blog", "post", "블로그"],
+    blocks: [h2("Title / 제목"), p(), h2("Meta Description / 메타 설명"), p("(150 characters max)"), h2("Keywords / 키워드"), bullet(""), h2("Introduction / 서론"), p(), h2("Main Content / 본문"), h3("Section 1"), p(), h3("Section 2"), p(), h2("Conclusion / 결론"), p(), h2("CTA / 행동 유도"), p()],
+  },
+  {
+    name: "Social Media Plan",
+    nameKo: "소셜 미디어 계획",
+    description: "Social media content strategy",
+    descriptionKo: "소셜 미디어 콘텐츠 전략",
+    icon: "📱",
+    category: "marketing",
+    tags: ["social", "media", "소셜"],
+    blocks: [h2("Platform Strategy / 플랫폼 전략"), h3("Instagram"), bullet("Frequency:", "Content type:", "Hashtags:"), h3("Twitter"), bullet("Frequency:", "Content type:"), h3("LinkedIn"), bullet("Frequency:", "Content type:"), h2("Monthly Themes / 월간 테마"), bullet(""), h2("Metrics / 지표"), bullet("Followers:", "Engagement:", "Clicks:")],
+  },
+  {
+    name: "Campaign Brief",
+    nameKo: "캠페인 브리프",
+    description: "Marketing campaign planning brief",
+    descriptionKo: "마케팅 캠페인 계획 브리프",
+    icon: "📣",
+    category: "marketing",
+    tags: ["campaign", "brief", "캠페인"],
+    blocks: [h2("Campaign Name / 캠페인명"), p(), h2("Objective / 목표"), p(), h2("Target Audience / 타겟"), bullet("Demographics:", "Interests:", "Pain points:"), h2("Key Message / 핵심 메시지"), p(), h2("Channels / 채널"), bullet(""), h2("Budget / 예산"), p(), h2("Timeline / 일정"), p(), h2("Success Metrics / 성공 지표"), bullet("")],
+  },
+  {
+    name: "Email Newsletter",
+    nameKo: "이메일 뉴스레터",
+    description: "Email newsletter content template",
+    descriptionKo: "이메일 뉴스레터 콘텐츠 템플릿",
+    icon: "📧",
+    category: "marketing",
+    tags: ["email", "newsletter", "뉴스레터"],
+    blocks: [h2("Subject Line / 제목"), p(), h2("Preview Text / 미리보기"), p(), h2("Header / 헤더"), p(), h2("Main Story / 주요 내용"), p(), h2("Secondary Content / 보조 내용"), bullet(""), h2("CTA / 행동 유도"), p(), h2("Footer Note / 하단 메모"), p()],
+  },
+  {
+    name: "Product Launch Plan",
+    nameKo: "제품 출시 계획",
+    description: "Product launch marketing plan",
+    descriptionKo: "제품 출시 마케팅 계획",
+    icon: "🎪",
+    category: "marketing",
+    tags: ["launch", "product", "출시"],
+    blocks: [h2("Product / 제품"), p(), h2("Launch Date / 출시일"), p(), h2("Pre-Launch / 출시 전"), tasks("Teaser campaign", "Press kit", "Beta access"), h2("Launch Day / 출시일"), tasks("Press release", "Social media blitz", "Email blast", "Product Hunt"), h2("Post-Launch / 출시 후"), tasks("Monitor feedback", "Iterate messaging", "Case studies")],
+  },
+  {
+    name: "Competitor Watch",
+    nameKo: "경쟁사 모니터링",
+    description: "Track competitor moves and updates",
+    descriptionKo: "경쟁사 동향 추적",
+    icon: "👀",
+    category: "marketing",
+    tags: ["competitor", "watch", "경쟁사"],
+    blocks: [h2("Competitor A"), bullet("Latest update:", "New features:", "Pricing changes:", "Marketing activity:"), h2("Competitor B"), bullet("Latest update:", "New features:", "Pricing changes:", "Marketing activity:"), h2("Opportunities / 기회"), bullet(""), h2("Our Response / 대응"), tasks("")],
+  },
+  {
+    name: "Brand Guidelines",
+    nameKo: "브랜드 가이드라인",
+    description: "Brand identity and usage guidelines",
+    descriptionKo: "브랜드 아이덴티티 및 사용 가이드",
+    icon: "🎨",
+    category: "marketing",
+    tags: ["brand", "guidelines", "브랜드"],
+    blocks: [h2("Mission / 미션"), p(), h2("Values / 가치"), bullet(""), h2("Logo Usage / 로고 사용"), p(), h2("Color Palette / 컬러 팔레트"), bullet("Primary:", "Secondary:", "Accent:"), h2("Typography / 타이포그래피"), bullet("Heading:", "Body:", "Mono:"), h2("Voice & Tone / 보이스 & 톤"), p(), h2("Do's and Don'ts / 올바른 사용"), bullet("")],
+  },
+  {
+    name: "Event Planning",
+    nameKo: "이벤트 계획",
+    description: "Event organization and logistics",
+    descriptionKo: "이벤트 조직 및 운영 계획",
+    icon: "🎪",
+    category: "marketing",
+    tags: ["event", "planning", "이벤트"],
+    blocks: [h2("Event Details / 이벤트 정보"), bullet("Name:", "Date:", "Location:", "Expected attendees:"), h2("Budget / 예산"), bullet("Venue:", "Catering:", "Marketing:", "Misc:"), h2("Timeline / 타임라인"), tasks("4 weeks: Venue booked", "3 weeks: Speakers confirmed", "2 weeks: Invitations sent", "1 week: Final rehearsal"), h2("Day-of Checklist / 당일 체크"), tasks("")],
+  },
+  {
+    name: "Customer Persona",
+    nameKo: "고객 페르소나",
+    description: "Target customer persona profile",
+    descriptionKo: "타겟 고객 페르소나 프로필",
+    icon: "👤",
+    category: "marketing",
+    tags: ["persona", "customer", "페르소나"],
+    blocks: [h2("Persona Name / 이름"), p(), h2("Demographics / 인구통계"), bullet("Age:", "Occupation:", "Location:", "Income:"), h2("Goals / 목표"), bullet(""), h2("Pain Points / 고충"), bullet(""), h2("Behavior / 행동 패턴"), bullet(""), h2("Preferred Channels / 선호 채널"), bullet(""), h2("Quote / 대표 발언"), quote("")],
+  },
+
+  // ──────────────── CUSTOM (not seeded -- user creates) ────────────────
+];
+```
+
+- [ ] **Step 2: Commit**
+```
+git add prisma/seed-templates.ts
+git commit -m "feat: 80 seed templates across 8 categories with Korean/English content"
+```
+
+---
+
+### Task 4: Rewrite Template Gallery UI
+
+**Files:**
+- Modify: `src/components/page/template-gallery.tsx`
+
+- [ ] **Step 1: Rewrite template-gallery.tsx with covers, preview, and enhanced UI**
+```tsx
+// src/components/page/template-gallery.tsx
+"use client";
+
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { X, Search, LayoutTemplate, Star, Copy, Trash2 } from "lucide-react";
+import { trpc } from "@/server/trpc/client";
+
+const CATEGORIES = [
+  { id: "all", label: "전체", labelEn: "All" },
+  { id: "documents", label: "문서", labelEn: "Documents" },
+  { id: "personal", label: "개인", labelEn: "Personal" },
+  { id: "team", label: "팀", labelEn: "Team" },
+  { id: "project", label: "프로젝트", labelEn: "Project" },
+  { id: "engineering", label: "엔지니어링", labelEn: "Engineering" },
+  { id: "education", label: "교육", labelEn: "Education" },
+  { id: "marketing", label: "마케팅", labelEn: "Marketing" },
+  { id: "custom", label: "내 템플릿", labelEn: "My Templates" },
+] as const;
+
+type TemplateData = {
+  id: string;
+  name: string;
+  nameKo?: string | null;
+  description?: string | null;
+  descriptionKo?: string | null;
+  icon?: string | null;
+  coverImage?: string | null;
+  category: string;
+  blocks: unknown;
+  tags: string[];
+  usageCount: number;
+  isDefault: boolean;
+  creatorId?: string | null;
+};
+
+type Props = {
+  workspaceId: string;
+  onSelect: (template: { name: string; icon?: string; blocks: unknown[] }) => void;
+  onClose: () => void;
+};
+
+export function TemplateGallery({ workspaceId, onSelect, onClose }: Props) {
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [search, setSearch] = useState("");
+  const [previewTemplate, setPreviewTemplate] = useState<TemplateData | null>(null);
+
+  const { data, isLoading } = trpc.template.list.useQuery(
+    { workspaceId, category: selectedCategory === "all" ? undefined : selectedCategory, search: search || undefined },
+    { enabled: !!workspaceId }
+  );
+
+  const templates = data?.templates ?? [];
+
+  // Seed system templates on first load if none exist
+  const seedMutation = trpc.template.seed.useMutation();
+  const incrementUsage = trpc.template.incrementUsage.useMutation();
+  const deleteMutation = trpc.template.delete.useMutation();
+  const duplicateMutation = trpc.template.duplicate.useMutation();
+  const utils = trpc.useUtils();
+  const [seeded, setSeeded] = useState(false);
+
+  useEffect(() => {
+    if (!seeded && !isLoading && templates.length === 0) {
+      setSeeded(true);
+      seedMutation.mutate(undefined, {
+        onSuccess: () => utils.template.list.invalidate(),
+      });
+    }
+  }, [templates, isLoading, seeded, seedMutation, utils.template.list]);
+
+  const handleSelect = useCallback(
+    (template: TemplateData) => {
+      incrementUsage.mutate({ id: template.id });
+      onSelect({
+        name: template.nameKo || template.name,
+        icon: template.icon || undefined,
+        blocks: (Array.isArray(template.blocks) ? template.blocks : []) as unknown[],
+      });
+    },
+    [incrementUsage, onSelect]
+  );
+
+  const handleDuplicate = useCallback(
+    (template: TemplateData) => {
+      duplicateMutation.mutate(
+        { id: template.id, workspaceId },
+        { onSuccess: () => utils.template.list.invalidate() }
+      );
+    },
+    [duplicateMutation, workspaceId, utils.template.list]
+  );
+
+  const handleDelete = useCallback(
+    (template: TemplateData) => {
+      if (template.isDefault) return;
+      deleteMutation.mutate(
+        { id: template.id },
+        { onSuccess: () => utils.template.list.invalidate() }
+      );
+    },
+    [deleteMutation, utils.template.list]
+  );
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (previewTemplate) setPreviewTemplate(null);
+        else onClose();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose, previewTemplate]);
+
+  return (
+    <div
+      className="fixed inset-0 flex items-center justify-center p-4"
+      style={{ zIndex: "var(--z-modal)" }}
+    >
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+      />
+
+      {/* Gallery */}
+      <div
+        className="relative w-full max-w-4xl max-h-[85vh] rounded-xl border shadow-2xl flex flex-col overflow-hidden"
+        style={{
+          backgroundColor: "var(--bg-primary)",
+          borderColor: "var(--border-default)",
+        }}
+      >
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-6 py-4 border-b shrink-0"
+          style={{ borderColor: "var(--border-default)" }}
+        >
+          <div className="flex items-center gap-2">
+            <LayoutTemplate size={20} style={{ color: "var(--text-secondary)" }} />
+            <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
+              템플릿
+            </h2>
+            <span className="text-sm" style={{ color: "var(--text-tertiary)" }}>
+              {templates.length}개
+            </span>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded hover:bg-notion-bg-hover">
+            <X size={18} style={{ color: "var(--text-tertiary)" }} />
+          </button>
+        </div>
+
+        <div className="flex flex-1 min-h-0">
+          {/* Sidebar categories */}
+          <div
+            className="w-48 shrink-0 border-r py-3 overflow-y-auto"
+            style={{ borderColor: "var(--border-default)" }}
+          >
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className="w-full text-left px-4 py-1.5 text-sm transition-colors"
+                style={{
+                  color: selectedCategory === cat.id ? "#2383e2" : "var(--text-secondary)",
+                  backgroundColor: selectedCategory === cat.id ? "rgba(35, 131, 226, 0.08)" : "transparent",
+                  fontWeight: selectedCategory === cat.id ? 600 : 400,
+                }}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Main content */}
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Search */}
+            <div className="px-4 py-3 border-b shrink-0" style={{ borderColor: "var(--border-divider)" }}>
+              <div className="relative">
+                <Search
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2"
+                  style={{ color: "var(--text-placeholder)" }}
+                />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="템플릿 검색..."
+                  className="w-full pl-9 pr-3 py-2 text-sm border rounded-md outline-none focus:ring-1 focus:ring-[#2383e2]"
+                  style={{
+                    backgroundColor: "var(--bg-primary)",
+                    borderColor: "var(--border-default)",
+                    color: "var(--text-primary)",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Grid */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {isLoading ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="rounded-lg border animate-pulse"
+                      style={{
+                        borderColor: "var(--border-default)",
+                        height: 180,
+                        backgroundColor: "var(--bg-tertiary)",
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : templates.length === 0 ? (
+                <div className="text-center py-12" style={{ color: "var(--text-tertiary)" }}>
+                  {search ? "검색 결과가 없습니다" : "템플릿이 없습니다"}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {templates.map((template) => (
+                    <div
+                      key={template.id}
+                      className="group rounded-lg border cursor-pointer hover:shadow-md transition-shadow overflow-hidden"
+                      style={{ borderColor: "var(--border-default)" }}
+                    >
+                      {/* Cover / Icon area */}
+                      <div
+                        className="h-24 flex items-center justify-center relative"
+                        style={{ backgroundColor: "var(--bg-secondary)" }}
+                        onClick={() => setPreviewTemplate(template as TemplateData)}
+                      >
+                        <span className="text-4xl">{template.icon || "📄"}</span>
+                        {/* Hover actions */}
+                        <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDuplicate(template as TemplateData);
+                            }}
+                            className="p-1 rounded bg-white/80 hover:bg-white shadow-sm"
+                            title="복제"
+                          >
+                            <Copy size={12} />
+                          </button>
+                          {!template.isDefault && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(template as TemplateData);
+                              }}
+                              className="p-1 rounded bg-white/80 hover:bg-white shadow-sm"
+                              title="삭제"
+                              style={{ color: "#e03e3e" }}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Info */}
+                      <div
+                        className="p-3"
+                        onClick={() => handleSelect(template as TemplateData)}
+                      >
+                        <div
+                          className="font-medium text-sm truncate"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          {template.nameKo || template.name}
+                        </div>
+                        <div
+                          className="text-xs mt-0.5 line-clamp-2"
+                          style={{ color: "var(--text-tertiary)" }}
+                        >
+                          {template.descriptionKo || template.description || ""}
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded"
+                            style={{
+                              backgroundColor: "var(--bg-tertiary)",
+                              color: "var(--text-tertiary)",
+                            }}
+                          >
+                            {template.category}
+                          </span>
+                          {template.usageCount > 0 && (
+                            <span
+                              className="text-[10px] flex items-center gap-0.5"
+                              style={{ color: "var(--text-tertiary)" }}
+                            >
+                              <Star size={8} />
+                              {template.usageCount}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Preview Modal */}
+      {previewTemplate && (
+        <div
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ zIndex: "calc(var(--z-modal) + 1)" }}
+        >
+          <div
+            className="absolute inset-0 bg-black/30"
+            onClick={() => setPreviewTemplate(null)}
+          />
+          <div
+            className="relative w-full max-w-2xl max-h-[80vh] rounded-xl border shadow-2xl flex flex-col overflow-hidden"
+            style={{
+              backgroundColor: "var(--bg-primary)",
+              borderColor: "var(--border-default)",
+            }}
+          >
+            <div
+              className="flex items-center justify-between px-6 py-4 border-b shrink-0"
+              style={{ borderColor: "var(--border-default)" }}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{previewTemplate.icon || "📄"}</span>
+                <div>
+                  <h3 className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {previewTemplate.nameKo || previewTemplate.name}
+                  </h3>
+                  <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+                    {previewTemplate.descriptionKo || previewTemplate.description}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPreviewTemplate(null)}
+                className="p-1.5 rounded hover:bg-notion-bg-hover"
+              >
+                <X size={18} style={{ color: "var(--text-tertiary)" }} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {/* Render a simple preview of the blocks */}
+              {(Array.isArray(previewTemplate.blocks)
+                ? previewTemplate.blocks
+                : []
+              ).map((block: Record<string, unknown>, i: number) => (
+                <div key={i} className="mb-2">
+                  {block.type === "heading" && (
+                    <div
+                      className="font-semibold"
+                      style={{
+                        fontSize:
+                          (block.attrs as Record<string, number>)?.level === 1
+                            ? "1.5em"
+                            : (block.attrs as Record<string, number>)?.level === 2
+                              ? "1.25em"
+                              : "1.1em",
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      {(
+                        (block.content as { text?: string }[]) || []
+                      )
+                        .map((c) => c.text || "")
+                        .join("")}
+                    </div>
+                  )}
+                  {block.type === "paragraph" && (
+                    <div className="text-sm" style={{ color: "var(--text-secondary)", minHeight: 20 }}>
+                      {(
+                        (block.content as { text?: string }[]) || []
+                      )
+                        .map((c) => c.text || "")
+                        .join("") || " "}
+                    </div>
+                  )}
+                  {(block.type === "bulletList" || block.type === "taskList" || block.type === "orderedList") && (
+                    <div className="text-sm ml-4" style={{ color: "var(--text-secondary)" }}>
+                      {block.type === "bulletList" && "- (list items)"}
+                      {block.type === "taskList" && "[ ] (task items)"}
+                      {block.type === "orderedList" && "1. (numbered items)"}
+                    </div>
+                  )}
+                  {block.type === "horizontalRule" && (
+                    <hr style={{ borderColor: "var(--border-default)" }} />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div
+              className="flex justify-end gap-2 px-6 py-3 border-t shrink-0"
+              style={{ borderColor: "var(--border-default)" }}
+            >
+              <button
+                onClick={() => setPreviewTemplate(null)}
+                className="px-4 py-2 text-sm rounded-md hover:bg-notion-bg-hover"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                취소
+              </button>
+              <button
+                onClick={() => {
+                  handleSelect(previewTemplate);
+                  setPreviewTemplate(null);
+                }}
+                className="px-4 py-2 text-sm rounded-md text-white"
+                style={{ backgroundColor: "#2383e2" }}
+              >
+                이 템플릿 사용
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+- [ ] **Step 2: Commit**
+```
+git add src/components/page/template-gallery.tsx
+git commit -m "feat: redesigned template gallery with categories, search, preview modal"
+```
+
+---
+
+### Task 5: "Save as Template" Action in Page Menu
+
+**Files:**
+- Modify: `src/components/layout/topbar.tsx`
+
+- [ ] **Step 1: Add "Save as template" action to topbar page menu**
+
+In `src/components/layout/topbar.tsx`, find the page actions dropdown and add a "Save as Template" option:
+
+```tsx
+// Add import:
+import { LayoutTemplate } from "lucide-react"; // likely already imported
+
+// Add mutation in the component:
+const saveAsTemplateMutation = trpc.template.create.useMutation({
+  onSuccess: () => {
+    addToast({ type: "success", message: "템플릿으로 저장되었습니다" });
+  },
+});
+
+// Add the menu item in the page dropdown actions (near existing menu items like Lock, Delete, etc.):
+{
+  label: "템플릿으로 저장",
+  icon: <LayoutTemplate size={14} />,
+  action: async () => {
+    if (!page) return;
+    // Fetch page blocks to save as template
+    const blocks = await utils.block.list.fetch({ pageId: page.id });
+    const blockJson = blocks.map((b: { type: string; content: object }) => ({
+      type: b.type,
+      content: b.content,
+    }));
+    saveAsTemplateMutation.mutate({
+      workspaceId,
+      name: page.title || "Untitled Template",
+      description: `Template from page: ${page.title}`,
+      icon: page.icon || undefined,
+      blocks: blockJson,
+      category: "custom",
+    });
+    closeMenu();
+  },
+}
+```
+
+- [ ] **Step 2: Commit**
+```
+git add src/components/layout/topbar.tsx
+git commit -m "feat: save current page as template from topbar menu"
+```
+
+---
+
+### Task 6: Template CRUD UI (Edit/Delete/Duplicate for Custom Templates)
+
+**Files:**
+- Create: `src/components/page/template-edit-dialog.tsx`
+
+- [ ] **Step 1: Create template edit dialog**
+```tsx
+// src/components/page/template-edit-dialog.tsx
+"use client";
+
+import { useState, useEffect } from "react";
+import { X } from "lucide-react";
+import { trpc } from "@/server/trpc/client";
+
+type Props = {
+  templateId: string;
+  onClose: () => void;
+  onSaved: () => void;
+};
+
+const CATEGORY_OPTIONS = [
+  { value: "documents", label: "문서" },
+  { value: "personal", label: "개인" },
+  { value: "team", label: "팀" },
+  { value: "project", label: "프로젝트" },
+  { value: "engineering", label: "엔지니어링" },
+  { value: "education", label: "교육" },
+  { value: "marketing", label: "마케팅" },
+  { value: "custom", label: "사용자 정의" },
+];
+
+export function TemplateEditDialog({ templateId, onClose, onSaved }: Props) {
+  const { data: template, isLoading } = trpc.template.getById.useQuery(
+    { id: templateId },
+    { enabled: !!templateId }
+  );
+
+  const [name, setName] = useState("");
+  const [nameKo, setNameKo] = useState("");
+  const [description, setDescription] = useState("");
+  const [descriptionKo, setDescriptionKo] = useState("");
+  const [icon, setIcon] = useState("");
+  const [category, setCategory] = useState("custom");
+  const [tags, setTags] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
+
+  useEffect(() => {
+    if (template) {
+      setName(template.name);
+      setNameKo(template.nameKo || "");
+      setDescription(template.description || "");
+      setDescriptionKo(template.descriptionKo || "");
+      setIcon(template.icon || "");
+      setCategory(template.category);
+      setTags(template.tags.join(", "));
+      setIsPublic(template.isPublic);
+    }
+  }, [template]);
+
+  const updateMutation = trpc.template.update.useMutation({
+    onSuccess: () => {
+      onSaved();
+      onClose();
+    },
+  });
+
+  const handleSave = () => {
+    updateMutation.mutate({
+      id: templateId,
+      name,
+      nameKo: nameKo || undefined,
+      description: description || undefined,
+      descriptionKo: descriptionKo || undefined,
+      icon: icon || undefined,
+      category: category as "documents" | "personal" | "team" | "project" | "engineering" | "education" | "marketing" | "custom",
+      tags: tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
+      isPublic,
+    });
+  };
+
+  if (isLoading) return null;
+
+  return (
+    <div
+      className="fixed inset-0 flex items-center justify-center p-4"
+      style={{ zIndex: "var(--z-modal)" }}
+    >
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div
+        className="relative w-full max-w-md rounded-xl border shadow-2xl"
+        style={{
+          backgroundColor: "var(--bg-primary)",
+          borderColor: "var(--border-default)",
+        }}
+      >
+        <div
+          className="flex items-center justify-between px-5 py-4 border-b"
+          style={{ borderColor: "var(--border-default)" }}
+        >
+          <h3 className="font-semibold" style={{ color: "var(--text-primary)" }}>
+            템플릿 편집
+          </h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-notion-bg-hover">
+            <X size={16} style={{ color: "var(--text-tertiary)" }} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+              아이콘
+            </label>
+            <input
+              type="text"
+              value={icon}
+              onChange={(e) => setIcon(e.target.value)}
+              placeholder="📝"
+              className="w-16 px-2 py-1.5 text-lg border rounded outline-none text-center"
+              style={{
+                borderColor: "var(--border-default)",
+                backgroundColor: "var(--bg-primary)",
+              }}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+                Name (EN)
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-2 py-1.5 text-sm border rounded outline-none"
+                style={{
+                  borderColor: "var(--border-default)",
+                  backgroundColor: "var(--bg-primary)",
+                  color: "var(--text-primary)",
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+                이름 (KO)
+              </label>
+              <input
+                type="text"
+                value={nameKo}
+                onChange={(e) => setNameKo(e.target.value)}
+                className="w-full px-2 py-1.5 text-sm border rounded outline-none"
+                style={{
+                  borderColor: "var(--border-default)",
+                  backgroundColor: "var(--bg-primary)",
+                  color: "var(--text-primary)",
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+                Description (EN)
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+                className="w-full px-2 py-1.5 text-sm border rounded outline-none resize-none"
+                style={{
+                  borderColor: "var(--border-default)",
+                  backgroundColor: "var(--bg-primary)",
+                  color: "var(--text-primary)",
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+                설명 (KO)
+              </label>
+              <textarea
+                value={descriptionKo}
+                onChange={(e) => setDescriptionKo(e.target.value)}
+                rows={2}
+                className="w-full px-2 py-1.5 text-sm border rounded outline-none resize-none"
+                style={{
+                  borderColor: "var(--border-default)",
+                  backgroundColor: "var(--bg-primary)",
+                  color: "var(--text-primary)",
+                }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+              카테고리
+            </label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full px-2 py-1.5 text-sm border rounded outline-none"
+              style={{
+                borderColor: "var(--border-default)",
+                backgroundColor: "var(--bg-primary)",
+                color: "var(--text-primary)",
+              }}
+            >
+              {CATEGORY_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+              태그 (쉼표로 구분)
+            </label>
+            <input
+              type="text"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              placeholder="tag1, tag2, tag3"
+              className="w-full px-2 py-1.5 text-sm border rounded outline-none"
+              style={{
+                borderColor: "var(--border-default)",
+                backgroundColor: "var(--bg-primary)",
+                color: "var(--text-primary)",
+              }}
+            />
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isPublic}
+              onChange={(e) => setIsPublic(e.target.checked)}
+              className="rounded"
+            />
+            <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              워크스페이스에 공개
+            </span>
+          </label>
+        </div>
+
+        <div
+          className="flex justify-end gap-2 px-5 py-3 border-t"
+          style={{ borderColor: "var(--border-default)" }}
+        >
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm rounded-md hover:bg-notion-bg-hover"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            취소
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!name.trim() || updateMutation.isPending}
+            className="px-4 py-2 text-sm rounded-md text-white disabled:opacity-50"
+            style={{ backgroundColor: "#2383e2" }}
+          >
+            {updateMutation.isPending ? "저장 중..." : "저장"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 2: Commit**
+```
+git add src/components/page/template-edit-dialog.tsx
+git commit -m "feat: template edit dialog for custom template CRUD"
+```
