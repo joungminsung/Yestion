@@ -138,36 +138,58 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
     scheduleHide();
   }, [unlock, scheduleHide]);
 
+  /** Find the gap between blocks where a drop should occur.
+   *  Each gap is identified by the midpoint between two adjacent blocks.
+   *  Cursor above the midpoint → insert before the block, below → insert after. */
   const findDropTarget = useCallback(
     (clientY: number): { top: number; blockPos: number } | null => {
       if (!editor.view) return null;
       const view = editor.view;
       const doc = view.state.doc;
-      let closestTop = 0;
-      let closestBlockPos = 0;
-      let closestDist = Infinity;
 
+      // Collect all top-level block rects
+      const blocks: { offset: number; nodeSize: number; top: number; bottom: number }[] = [];
       doc.forEach((node, offset) => {
         const dom = view.nodeDOM(offset);
         if (!dom || !(dom instanceof HTMLElement)) return;
         const rect = dom.getBoundingClientRect();
-
-        const topDist = Math.abs(clientY - rect.top);
-        if (topDist < closestDist) {
-          closestTop = rect.top;
-          closestBlockPos = offset;
-          closestDist = topDist;
-        }
-
-        const bottomDist = Math.abs(clientY - rect.bottom);
-        if (bottomDist < closestDist) {
-          closestTop = rect.bottom;
-          closestBlockPos = offset + node.nodeSize;
-          closestDist = bottomDist;
-        }
+        blocks.push({ offset, nodeSize: node.nodeSize, top: rect.top, bottom: rect.bottom });
       });
 
-      return closestDist < Infinity ? { top: closestTop, blockPos: closestBlockPos } : null;
+      if (blocks.length === 0) return null;
+
+      // Above the first block → insert at position 0
+      if (clientY <= blocks[0].top) {
+        return { top: blocks[0].top, blockPos: blocks[0].offset };
+      }
+
+      // Check each block: if cursor is in the top half → insert before, bottom half → insert after
+      for (let i = 0; i < blocks.length; i++) {
+        const block = blocks[i];
+        const midY = (block.top + block.bottom) / 2;
+
+        if (clientY >= block.top && clientY < midY) {
+          // Top half of this block → insert before it
+          return { top: block.top, blockPos: block.offset };
+        }
+        if (clientY >= midY && clientY <= block.bottom) {
+          // Bottom half of this block → insert after it
+          return { top: block.bottom, blockPos: block.offset + block.nodeSize };
+        }
+
+        // In the gap between this block and the next
+        if (i < blocks.length - 1) {
+          const next = blocks[i + 1];
+          if (clientY > block.bottom && clientY < next.top) {
+            // Gap between blocks → insert after current block
+            return { top: block.bottom, blockPos: block.offset + block.nodeSize };
+          }
+        }
+      }
+
+      // Below the last block → insert at end
+      const last = blocks[blocks.length - 1];
+      return { top: last.bottom, blockPos: last.offset + last.nodeSize };
     },
     [editor]
   );
