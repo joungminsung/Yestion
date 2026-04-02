@@ -337,6 +337,22 @@ html[data-transitioning] canvas {
   }
 }
 
+/* Full-width page mode */
+.page-full-width .notion-editor,
+.page-full-width .page-content-wrapper {
+  max-width: 100% !important;
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+
+@media (min-width: 1024px) {
+  .page-full-width .notion-editor,
+  .page-full-width .page-content-wrapper {
+    padding-left: 5rem;
+    padding-right: 5rem;
+  }
+}
+
 /* Global reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,

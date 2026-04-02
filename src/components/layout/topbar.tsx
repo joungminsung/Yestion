@@ -698,6 +698,20 @@ export function Topbar() {
       <div className="flex items-center gap-0.5">
         {!isMobile && <PresenceAvatars users={presenceUsers} />}
 
+        {/* Full-width toggle */}
+        {!isMobile && currentPage && (
+          <button
+            onClick={() => {
+              if (pageId) updatePage.mutate({ id: pageId, isFullWidth: !isFullWidth });
+            }}
+            className="p-1.5 rounded hover:bg-notion-bg-hover transition-colors"
+            style={{ color: isFullWidth ? "#2383e2" : "var(--text-tertiary)" }}
+            title={isFullWidth ? "기본 너비" : "전체 너비"}
+          >
+            <ArrowLeftRight size={16} />
+          </button>
+        )}
+
         {/* Notification bell */}
         {!isMobile && (
           <div className="relative">
