@@ -228,16 +228,18 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
       lock();
 
       let isDragging = false;
-      let dropTargetPos: number | null = null;
+      let lastDropPos: number | null = null;
+      // Track the current position of the dragged block (changes as we reorder live)
+      let currentBlockPos = startPos;
 
       const handleMouseMoveForDrag = (moveEvent: MouseEvent) => {
         isDragging = true;
         const editorRect = editor.view.dom.getBoundingClientRect();
 
+        // Auto-scroll near edges
         clearAutoScroll();
         const topDist = moveEvent.clientY - editorRect.top;
         const bottomDist = editorRect.bottom - moveEvent.clientY;
-
         if (topDist < 80 && topDist > 0) {
           const speed = Math.max(1, Math.round((80 - topDist) / 10));
           autoScrollRef.current = setInterval(() => window.scrollBy(0, -speed), 16);
@@ -246,26 +248,51 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
           autoScrollRef.current = setInterval(() => window.scrollBy(0, speed), 16);
         }
 
+        // Find drop target
         const target = findDropTarget(moveEvent.clientY);
-        if (target) {
-          dropTargetPos = target.blockPos;
-          if (dropIndicatorElRef.current) {
-            dropIndicatorElRef.current.style.display = "block";
-            dropIndicatorElRef.current.style.top = `${target.top}px`;
-            dropIndicatorElRef.current.style.left = `${editorRect.left}px`;
-            dropIndicatorElRef.current.style.width = `${editorRect.width}px`;
-          }
+        if (!target) return;
+
+        // Show thin blue drop indicator line
+        if (dropIndicatorElRef.current) {
+          dropIndicatorElRef.current.style.display = "block";
+          dropIndicatorElRef.current.style.top = `${target.top}px`;
+          dropIndicatorElRef.current.style.left = `${editorRect.left}px`;
+          dropIndicatorElRef.current.style.width = `${editorRect.width}px`;
         }
 
-        const coords = editor.view.posAtCoords({
-          left: moveEvent.clientX,
-          top: moveEvent.clientY,
-        });
-        if (coords) {
-          try {
-            const endBlockPos = resolveBlockPos(editor.state.doc, coords.pos);
-            selectBlockRange(editor, startPos, endBlockPos);
-          } catch {}
+        // Live reorder: move the block in real-time as cursor moves
+        const dropPos = target.blockPos;
+        if (dropPos === lastDropPos) return; // same position, skip
+        lastDropPos = dropPos;
+
+        try {
+          const node = editor.state.doc.nodeAt(currentBlockPos);
+          if (!node) return;
+
+          // Don't move if dropping on itself
+          if (dropPos === currentBlockPos || dropPos === currentBlockPos + node.nodeSize) return;
+          // Don't move inside itself
+          if (dropPos > currentBlockPos && dropPos < currentBlockPos + node.nodeSize) return;
+
+          let tr = editor.state.tr;
+          const nodeSize = node.nodeSize;
+
+          // Delete from current position
+          tr = tr.delete(currentBlockPos, currentBlockPos + nodeSize);
+
+          // Calculate new insert position (adjusted for deletion)
+          let insertAt = dropPos > currentBlockPos ? dropPos - nodeSize : dropPos;
+          insertAt = Math.max(0, Math.min(insertAt, tr.doc.content.size));
+
+          // Insert at new position
+          tr = tr.insert(insertAt, node);
+          tr = tr.setMeta(BLOCK_SELECTION_KEY, { selectedBlocks: [insertAt], anchorBlock: insertAt });
+          editor.view.dispatch(tr);
+
+          // Update tracked position
+          currentBlockPos = insertAt;
+        } catch {
+          // Position math can fail on edge cases — ignore silently
         }
       };
 
@@ -277,49 +304,9 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
           dropIndicatorElRef.current.style.display = "none";
         }
 
-        if (isDragging && dropTargetPos !== null) {
-          try {
-            const blockState = BLOCK_SELECTION_KEY.getState(editor.state);
-            const selectedPositions =
-              blockState && blockState.selectedBlocks.length > 1
-                ? [...blockState.selectedBlocks].sort((a: number, b: number) => a - b)
-                : [startPos];
-
-            const isMoving =
-              !selectedPositions.includes(dropTargetPos) &&
-              !selectedPositions.some((p: number) => {
-                const n = editor.state.doc.nodeAt(p);
-                return n && dropTargetPos! > p && dropTargetPos! <= p + n.nodeSize;
-              });
-
-            if (isMoving) {
-              let tr = editor.state.tr;
-              const nodes = selectedPositions
-                .map((p: number) => ({ pos: p, node: editor.state.doc.nodeAt(p) }))
-                .filter((n: { pos: number; node: ReturnType<typeof editor.state.doc.nodeAt> }) => n.node !== null);
-
-              let sizeBeforeDrop = 0;
-              for (const { pos, node } of nodes) {
-                if (pos < dropTargetPos!) sizeBeforeDrop += node!.nodeSize;
-              }
-
-              for (const { pos, node } of [...nodes].reverse()) {
-                tr = tr.delete(pos, pos + node!.nodeSize);
-              }
-
-              let insertAt = dropTargetPos! - sizeBeforeDrop;
-              insertAt = Math.max(0, Math.min(insertAt, tr.doc.content.size));
-
-              for (const { node } of nodes) {
-                tr = tr.insert(insertAt, node!);
-                insertAt += node!.nodeSize;
-              }
-
-              tr = tr.setMeta(BLOCK_SELECTION_KEY, { selectedBlocks: [], anchorBlock: null });
-              editor.view.dispatch(tr);
-            }
-          } catch {}
-        }
+        // Clear selection after drop
+        const tr = editor.state.tr.setMeta(BLOCK_SELECTION_KEY, { selectedBlocks: [], anchorBlock: null });
+        editor.view.dispatch(tr);
 
         document.removeEventListener("mousemove", handleMouseMoveForDrag);
         document.removeEventListener("mouseup", handleMouseUpForDrag);

@@ -93,22 +93,25 @@ body {
   to { opacity: 1; transform: scaleY(1); }
 }
 
-/* 5.7 Block selection — clean Notion-style look */
+/* 5.7 Block selection — Notion-style: subtle tinted background, no borders */
 .notion-block-selected {
   background-color: var(--selection-bg);
   border-radius: 3px;
-  transition: background-color 120ms ease;
+  transition: background-color 100ms ease;
 }
 
-.notion-block-selected:hover {
-  background-color: var(--selection-bg-hover);
+/* Dragging state — block becomes semi-transparent ghost */
+.notion-block-dragging {
+  opacity: 0.4;
+  transition: opacity 100ms ease;
 }
 
-/* Drag source */
-.notion-block-drag-source {
-  background-color: var(--selection-drag-bg);
-  border-radius: 3px;
-  opacity: 0.6;
+/* Drop target highlight — block above/below gets a subtle top/bottom line */
+.notion-block-drop-before {
+  box-shadow: 0 -2px 0 0 var(--accent-blue);
+}
+.notion-block-drop-after {
+  box-shadow: 0 2px 0 0 var(--accent-blue);
 }
 
 /* Lasso selection rectangle */
