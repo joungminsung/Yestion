@@ -69,6 +69,53 @@ export const workspaceRouter = router({
       });
     }),
 
+  get: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return ctx.db.workspace.findUniqueOrThrow({ where: { id: input.id } });
+    }),
+
+  updateMemberRole: protectedProcedure
+    .input(z.object({ workspaceId: z.string(), memberId: z.string(), role: z.enum(["ADMIN", "MEMBER", "GUEST"]) }))
+    .mutation(async ({ ctx, input }) => {
+      const callerMembership = await ctx.db.workspaceMember.findUnique({
+        where: {
+          userId_workspaceId: {
+            userId: ctx.session.user.id,
+            workspaceId: input.workspaceId,
+          },
+        },
+      });
+
+      if (!callerMembership || !["OWNER", "ADMIN"].includes(callerMembership.role)) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      return ctx.db.workspaceMember.update({
+        where: { id: input.memberId },
+        data: { role: input.role },
+      });
+    }),
+
+  removeMember: protectedProcedure
+    .input(z.object({ workspaceId: z.string(), memberId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const callerMembership = await ctx.db.workspaceMember.findUnique({
+        where: {
+          userId_workspaceId: {
+            userId: ctx.session.user.id,
+            workspaceId: input.workspaceId,
+          },
+        },
+      });
+
+      if (!callerMembership || !["OWNER", "ADMIN"].includes(callerMembership.role)) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      return ctx.db.workspaceMember.delete({ where: { id: input.memberId } });
+    }),
+
   inviteMember: protectedProcedure
     .input(
       z.object({
