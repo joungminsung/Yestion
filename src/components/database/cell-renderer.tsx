@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { RollupCellRenderer } from "./rollup-cell-renderer";
 import type { PropertyType, PropertyConfig, SelectOption } from "@/types/database";
+import { evaluateFormula, formatFormulaResult } from "@/lib/database/formula-engine";
 
 type CellRendererProps = {
   value: unknown;
@@ -172,6 +173,18 @@ function renderByType(
 
     case "rollup":
       return <span style={{ color: "var(--text-tertiary)" }}>Rollup</span>;
+
+    case "formula": {
+      const formulaStr = (config.formula as string) || "";
+      if (!formulaStr) return <span className="text-[var(--text-tertiary)]">&mdash;</span>;
+      const rowValues = (typeof value === "object" && value !== null) ? value as Record<string, unknown> : {};
+      const result = evaluateFormula(formulaStr, (propName: string) => {
+        const props = ((config as Record<string, unknown>).properties || []) as { id: string; name: string }[];
+        const prop = props.find((p) => p.name === propName);
+        return prop ? (rowValues[prop.id] as string | number | boolean | null) ?? null : null;
+      });
+      return <span className="font-mono text-sm">{formatFormulaResult(result)}</span>;
+    }
 
     default:
       return <span className="truncate">{String(value)}</span>;
