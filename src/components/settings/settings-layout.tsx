@@ -8,6 +8,7 @@ import { SessionManagement } from "./session-management";
 import { TwoFactorSettings } from "./two-factor-settings";
 import { BackupSettings } from "./backup-settings";
 import { McpSettings } from "./mcp-settings";
+import { IntegrationSettings } from "./integration-settings";
 
 type Tab = "account" | "workspace" | "sessions" | "2fa" | "backup" | "integrations";
 const tabs: { id: Tab; label: string; section?: string }[] = [
@@ -50,8 +51,8 @@ export function SettingsLayout({ workspaceId }: { workspaceId: string }) {
         {activeTab === "backup" && <BackupSettings workspaceId={workspaceId} />}
         {activeTab === "integrations" && (
           <div>
-            <h2 className="text-xl font-semibold mb-6" style={{ color: "var(--text-primary)" }}>통합</h2>
-            <section className="mb-8">
+            <IntegrationSettings workspaceId={workspaceId} />
+            <section className="mt-8">
               <McpSettings />
             </section>
           </div>
