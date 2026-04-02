@@ -347,6 +347,44 @@ export function Topbar() {
   const isLocked = currentPage?.isLocked ?? false;
   const isFullWidth = currentPage?.isFullWidth ?? false;
 
+  const [lockCountdown, setLockCountdown] = useState<number | null>(null);
+  const lockTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-unlock after 30 minutes of locking
+  useEffect(() => {
+    if (!isLocked || !pageId) {
+      setLockCountdown(null);
+      if (lockTimerRef.current) clearInterval(lockTimerRef.current);
+      return;
+    }
+
+    // Set 30-minute countdown
+    const lockDuration = 30 * 60; // seconds
+    setLockCountdown(lockDuration);
+
+    lockTimerRef.current = setInterval(() => {
+      setLockCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          // Auto-unlock
+          updatePage.mutate({ id: pageId, isLocked: false });
+          if (lockTimerRef.current) clearInterval(lockTimerRef.current);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (lockTimerRef.current) clearInterval(lockTimerRef.current);
+    };
+  }, [isLocked, pageId]);
+
+  const formatCountdown = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
   type MenuItem =
     | { icon: ReactNode; label: string; action: () => void; danger?: boolean; divider?: false }
     | { divider: true; icon?: never; label?: never; action?: never; danger?: never };
@@ -643,6 +681,26 @@ export function Topbar() {
                   })
                 )}
               </div>
+            )}
+          </div>
+        )}
+
+        {/* Lock indicator */}
+        {isLocked && (
+          <div
+            className="flex items-center gap-1 px-2 py-0.5 rounded text-xs flex-shrink-0"
+            style={{
+              backgroundColor: "rgba(235, 87, 87, 0.1)",
+              color: "#eb5757",
+              border: "1px solid rgba(235, 87, 87, 0.2)",
+            }}
+          >
+            <Lock size={12} />
+            <span>Locked</span>
+            {lockCountdown !== null && (
+              <span style={{ color: "var(--text-tertiary)", fontSize: "10px" }}>
+                ({formatCountdown(lockCountdown)})
+              </span>
             )}
           </div>
         )}
