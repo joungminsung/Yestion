@@ -398,6 +398,7 @@ model Project {
 
   members     ProjectMember[]
   tasks       Task[]
+  sprints     Sprint[]
 
   @@index([workspaceId])
   @@index([ownerId])
@@ -439,11 +440,15 @@ model Task {
   parentTask     Task?     @relation("SubTasks", fields: [parentTaskId], references: [id], onDelete: SetNull)
   subtasks       Task[]    @relation("SubTasks")
   activities     TaskActivity[]
+  sprintId       String?
+  sprint         Sprint?     @relation("SprintTasks", fields: [sprintId], references: [id], onDelete: SetNull)
+  timeEntries    TimeEntry[]
 
   @@index([projectId])
   @@index([assigneeId])
   @@index([status])
   @@index([parentTaskId])
+  @@index([sprintId])
 }
 
 model TaskActivity {
@@ -458,6 +463,46 @@ model TaskActivity {
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
+}
+
+model Sprint {
+  id          String    @id @default(cuid())
+  projectId   String
+  name        String
+  goal        String?
+  status      String    @default("planning") // "planning" | "active" | "completed"
+  startDate   DateTime?
+  endDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks       Task[]    @relation("SprintTasks")
+
+  @@index([projectId])
+  @@index([status])
+}
+
+model TimeEntry {
+  id          String    @id @default(cuid())
+  taskId      String
+  userId      String
+  description String?
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  duration    Int?      // seconds — computed on stop, null while running
+  isPaused    Boolean   @default(false)
+  pausedAt    DateTime?
+  pausedTotal Int       @default(0) // accumulated paused seconds
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([userId])
+  @@index([userId, startedAt])
 }
 
 model Automation {
