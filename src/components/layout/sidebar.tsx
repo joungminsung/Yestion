@@ -416,6 +416,7 @@ export function Sidebar() {
                   workspaceId,
                   title: template.name,
                   icon: template.icon,
+                  blocks: template.blocks as Record<string, unknown>[],
                 });
               }}
               onClose={() => setShowTemplateGallery(false)}

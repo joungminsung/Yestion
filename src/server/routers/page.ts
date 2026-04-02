@@ -101,6 +101,7 @@ export const pageRouter = router({
         title: z.string().default(""),
         parentId: z.string().nullish(),
         icon: z.string().nullish(),
+        blocks: z.array(z.record(z.string(), z.unknown())).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -118,6 +119,19 @@ export const pageRouter = router({
           lastEditedBy: ctx.session.user.id,
         },
       });
+
+      // If template blocks provided, create them as page blocks
+      // Template blocks are TipTap nodes — wrap in { tiptapNode } for the editor
+      if (input.blocks && input.blocks.length > 0) {
+        await ctx.db.block.createMany({
+          data: input.blocks.map((block, idx) => ({
+            pageId: page.id,
+            type: (block.type as string) || "paragraph",
+            content: { tiptapNode: block } as Record<string, unknown>,
+            position: idx,
+          })),
+        });
+      }
 
       await ctx.db.activityLog.create({
         data: {
