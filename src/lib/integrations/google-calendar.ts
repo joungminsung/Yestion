@@ -1,5 +1,4 @@
-// Stub - will be implemented in Task 9
-import { registerAdapter, BaseIntegrationAdapter } from "./base-adapter";
+import { BaseIntegrationAdapter, registerAdapter } from "./base-adapter";
 import type {
   IntegrationConfig,
   IntegrationEvent,
@@ -23,26 +22,200 @@ class GoogleCalendarAdapter extends BaseIntegrationAdapter {
     requiresOAuth: true,
   };
 
-  getOAuthUrl(_workspaceId: string, _redirectUri: string): string {
-    return "";
+  private get clientId() {
+    return process.env.GOOGLE_CLIENT_ID ?? "";
   }
-  async exchangeCode(_code: string, _redirectUri: string): Promise<OAuthTokens> {
-    throw new Error("Not implemented");
+  private get clientSecret() {
+    return process.env.GOOGLE_CLIENT_SECRET ?? "";
   }
-  async refreshAccessToken(_refreshToken: string): Promise<OAuthTokens> {
-    throw new Error("Not implemented");
+
+  getOAuthUrl(workspaceId: string, redirectUri: string): string {
+    const state = Buffer.from(JSON.stringify({ workspaceId })).toString("base64");
+    const scopes = [
+      "https://www.googleapis.com/auth/calendar",
+      "https://www.googleapis.com/auth/calendar.events",
+    ].join(" ");
+
+    return (
+      `https://accounts.google.com/o/oauth2/v2/auth` +
+      `?client_id=${this.clientId}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&response_type=code` +
+      `&scope=${encodeURIComponent(scopes)}` +
+      `&access_type=offline` +
+      `&prompt=consent` +
+      `&state=${state}`
+    );
   }
+
+  async exchangeCode(code: string, redirectUri: string): Promise<OAuthTokens> {
+    const response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+        code,
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code",
+      }),
+    });
+
+    const data = await response.json();
+    if (data.error) throw new Error(`Google OAuth error: ${data.error_description}`);
+
+    // Get user info
+    const userResponse = await fetch(
+      "https://www.googleapis.com/oauth2/v2/userinfo",
+      { headers: { Authorization: `Bearer ${data.access_token}` } }
+    );
+    const user = await userResponse.json();
+
+    return {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresAt: new Date(Date.now() + data.expires_in * 1000),
+      externalId: user.id,
+      externalName: user.email,
+    };
+  }
+
+  async refreshAccessToken(refreshToken: string): Promise<OAuthTokens> {
+    const response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
+      }),
+    });
+
+    const data = await response.json();
+    if (data.error) throw new Error(`Google refresh error: ${data.error_description}`);
+
+    return {
+      accessToken: data.access_token,
+      refreshToken, // Google doesn't always return a new refresh token
+      expiresAt: new Date(Date.now() + data.expires_in * 1000),
+    };
+  }
+
   async handleEvent(
-    _event: IntegrationEvent,
+    event: IntegrationEvent,
     _config: IntegrationConfig,
-    _db: any
+    db: any
   ): Promise<EventHandlerResult> {
+    // Handle Google Calendar push notification
+    if (event.type === "calendar.push") {
+      const actions: string[] = [];
+      // In a full implementation, we'd fetch changed events and sync them
+      // For now, create a notification
+      const members = await db.workspaceMember.findMany({
+        where: { workspaceId: event.workspaceId },
+        select: { userId: true },
+        take: 5,
+      });
+
+      for (const member of members) {
+        await db.notification.create({
+          data: {
+            userId: member.userId,
+            type: "calendar_update",
+            title: "Calendar event updated",
+            message: "A linked calendar event has changed",
+          },
+        });
+      }
+      actions.push("notification_sent");
+      return { handled: true, actions };
+    }
+
     return { handled: false };
   }
-  async verifyConnection(_accessToken: string): Promise<boolean> {
-    return false;
+
+  async verifyConnection(accessToken: string): Promise<boolean> {
+    try {
+      const response = await fetch(
+        "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1",
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      return response.ok;
+    } catch {
+      return false;
+    }
   }
-  async disconnect(_accessToken: string, _config: IntegrationConfig): Promise<void> {}
+
+  async disconnect(accessToken: string, _config: IntegrationConfig): Promise<void> {
+    try {
+      await fetch(`https://oauth2.googleapis.com/revoke?token=${accessToken}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      });
+    } catch {
+      // Best effort
+    }
+  }
+}
+
+/** Create a Google Calendar event from a task */
+export async function createCalendarEvent(
+  accessToken: string,
+  calendarId: string,
+  task: { title: string; description?: string; dueDate: Date; startDate?: Date }
+): Promise<string> {
+  const start = task.startDate ?? task.dueDate;
+  const body = {
+    summary: task.title,
+    description: task.description,
+    start: { dateTime: start.toISOString(), timeZone: "UTC" },
+    end: { dateTime: task.dueDate.toISOString(), timeZone: "UTC" },
+  };
+
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    }
+  );
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(`Google Calendar error: ${data.error?.message}`);
+  return data.id;
+}
+
+/** Set up a push notification channel (watch) for a calendar */
+export async function watchCalendar(
+  accessToken: string,
+  calendarId: string,
+  webhookUrl: string,
+  channelId: string
+): Promise<{ resourceId: string; expiration: string }> {
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/watch`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id: channelId,
+        type: "web_hook",
+        address: webhookUrl,
+      }),
+    }
+  );
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(`Google Calendar watch error: ${data.error?.message}`);
+  return { resourceId: data.resourceId, expiration: data.expiration };
 }
 
 const googleCalendarAdapter = new GoogleCalendarAdapter();
