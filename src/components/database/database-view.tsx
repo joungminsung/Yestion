@@ -14,6 +14,9 @@ import { GalleryView } from "./views/gallery-view";
 import { CalendarView } from "./views/calendar-view";
 import { TimelineView } from "./views/timeline-view";
 import { RowPeekPanel } from "./row-peek-panel";
+import { CellRenderer } from "./cell-renderer";
+import { useDevice } from "@/components/providers/responsive-provider";
+import { cn } from "@/lib/utils";
 import type { ViewConfig, FilterGroup, SortRule, DatabaseData, RowData } from "@/types/database";
 
 type DatabaseViewProps = {
@@ -28,6 +31,7 @@ function asViewConfig(config: unknown): ViewConfig {
 
 export function DatabaseView({ databaseId }: DatabaseViewProps) {
   const router = useRouter();
+  const { isMobile } = useDevice();
   const utils = trpc.useUtils();
   const { data, isLoading, error } = trpc.database.get.useQuery(
     { databaseId },
@@ -220,6 +224,48 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
 
   // ── Render the active view component ────────────────────────
 
+  function renderMobileCardList(rowsToRender: RowData[]) {
+    if (!data) return null;
+    const properties = data.properties as DatabaseData["properties"];
+    const titleProp = properties.find((p) => p.type === "title") ?? properties[0];
+    const visibleProps = properties.filter((p) => p.id !== titleProp?.id).slice(0, 3);
+
+    return (
+      <div className="flex flex-col gap-2 px-2 py-2">
+        {rowsToRender.map((row) => (
+          <div
+            key={row.id}
+            className="rounded-lg border p-3 active:bg-[var(--bg-hover)] transition-colors"
+            style={{
+              backgroundColor: "var(--bg-primary)",
+              borderColor: "var(--border-default)",
+            }}
+            onClick={() => handleRowClick(row.pageId)}
+          >
+            <div className="font-medium mb-1" style={{ color: "var(--text-primary)", fontSize: "14px" }}>
+              {titleProp ? String(row.values[titleProp.id] || "Untitled") : "Untitled"}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {visibleProps.map((prop) => (
+                <div key={prop.id} className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                  <span className="font-medium">{prop.name}: </span>
+                  <CellRenderer value={row.values[prop.id]} type={prop.type} config={prop.config} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        <button
+          onClick={() => handleAddRow()}
+          className="rounded-lg border border-dashed p-3 text-sm transition-colors hover:bg-[var(--bg-hover)]"
+          style={{ borderColor: "var(--border-default)", color: "var(--text-tertiary)" }}
+        >
+          + New
+        </button>
+      </div>
+    );
+  }
+
   function renderView(rowsToRender: RowData[]) {
     if (!data || !activeViewConfig) return null;
 
@@ -236,6 +282,8 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
 
     switch (activeView?.type) {
       case "table":
+        // On mobile, show card list instead of wide table
+        if (isMobile) return renderMobileCardList(rowsToRender);
         return (
           <TableView
             {...viewProps}
@@ -244,7 +292,11 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
           />
         );
       case "board":
-        return <BoardView {...viewProps} />;
+        return (
+          <div className={cn(isMobile && "overflow-x-auto snap-x snap-mandatory pb-4 -mx-2 px-2")}>
+            <BoardView {...viewProps} />
+          </div>
+        );
       case "list":
         return <ListView {...viewProps} />;
       case "gallery":
@@ -254,6 +306,7 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
       case "timeline":
         return <TimelineView {...viewProps} />;
       default:
+        if (isMobile) return renderMobileCardList(rowsToRender);
         return (
           <TableView
             {...viewProps}
