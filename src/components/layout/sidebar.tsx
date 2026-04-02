@@ -16,6 +16,7 @@ import { trpc } from "@/server/trpc/client";
 import { Search, Settings, Plus, FileText, LayoutTemplate, BarChart3, Zap, Home, Workflow, Network, Shield } from "lucide-react";
 import { useSidebarKeyboardNav } from "./sidebar-keyboard-nav";
 import { PageTemplatePicker } from "@/components/page/page-template-picker";
+import { TemplateGallery } from "@/components/page/template-gallery";
 import { useTranslations } from "next-intl";
 import { useDevice } from "@/components/providers/responsive-provider";
 import { useTouchGestures } from "@/hooks/use-touch-gestures";
@@ -147,6 +148,7 @@ export function Sidebar() {
 
   const [showNewPageMenu, setShowNewPageMenu] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const newPageMenuRef = useRef<HTMLDivElement>(null);
 
   useSidebarKeyboardNav(pages || [], workspaceId);
@@ -228,9 +230,9 @@ export function Sidebar() {
             <span>홈</span>
           </button>
 
-          {/* Templates */}
+          {/* Templates Gallery */}
           <button
-            onClick={() => setShowTemplatePicker(true)}
+            onClick={() => setShowTemplateGallery(true)}
             className="flex items-center gap-2 mx-2 px-2 py-1 rounded hover:bg-notion-bg-hover cursor-pointer text-left w-auto"
             style={{ fontSize: "14px", color: "var(--text-secondary)" }}
           >
@@ -401,6 +403,22 @@ export function Sidebar() {
                 router.push(`/${workspaceId}/${pageId}`);
               }}
               onClose={() => setShowTemplatePicker(false)}
+            />
+          )}
+
+          {/* Template Gallery Modal (80 templates) */}
+          {showTemplateGallery && (
+            <TemplateGallery
+              workspaceId={workspaceId}
+              onSelect={(template) => {
+                setShowTemplateGallery(false);
+                createPage.mutate({
+                  workspaceId,
+                  title: template.name,
+                  icon: template.icon,
+                });
+              }}
+              onClose={() => setShowTemplateGallery(false)}
             />
           )}
         </div>
