@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Search, Filter, FileText, Calendar, User, X, Loader2 } from "lucide-react";
+import { Search, Filter, FileText, Calendar, User, X, Loader2, History, Sparkles } from "lucide-react";
 import { trpc } from "@/server/trpc/client";
 
 type FilterState = {
@@ -12,15 +12,71 @@ type FilterState = {
   dateTo: string | null;
 };
 
+type SearchResultItem = {
+  id: string;
+  title: string;
+  icon: string | null;
+  parentId: string | null;
+  updatedAt: string | Date;
+  kind?: "page" | "database";
+  matchSource?: "title" | "content";
+  path?: string[];
+  snippet?: string;
+};
+
+const RECENT_SEARCHES_KEY = "notion-web:recent-searches";
+const RECOMMENDED_SEARCHES = [
+  "meeting notes",
+  "design doc",
+  "roadmap",
+  "retrospective",
+  "weekly plan",
+] as const;
+
+function highlightText(text: string, query: string) {
+  const rawTerms = query
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!text || rawTerms.length === 0) {
+    return text;
+  }
+
+  const escapedTerms = Array.from(new Set(rawTerms))
+    .sort((left, right) => right.length - left.length)
+    .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const pattern = new RegExp(`(${escapedTerms.join("|")})`, "gi");
+  const normalizedTerms = new Set(rawTerms.map((term) => term.toLowerCase()));
+
+  return text.split(pattern).map((part, index) =>
+    normalizedTerms.has(part.toLowerCase()) ? (
+      <mark
+        key={`${part}-${index}`}
+        className="rounded px-0.5"
+        style={{ backgroundColor: "rgba(35, 131, 226, 0.12)", color: "inherit" }}
+      >
+        {part}
+      </mark>
+    ) : (
+      <span key={`${part}-${index}`}>{part}</span>
+    )
+  );
+}
+
 export default function SearchPage() {
   const params = useParams();
   const router = useRouter();
   const workspaceId = params.workspaceId as string;
   const inputRef = useRef<HTMLInputElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [cursor, setCursor] = useState(0);
+  const [searchItems, setSearchItems] = useState<SearchResultItem[]>([]);
+  const [recentQueries, setRecentQueries] = useState<string[]>([]);
   const [filters, setFilters] = useState<FilterState>({
     type: "all",
     authorId: null,
@@ -39,12 +95,31 @@ export default function SearchPage() {
     inputRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem(RECENT_SEARCHES_KEY);
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        setRecentQueries(parsed.filter((value): value is string => typeof value === "string"));
+      }
+    } catch {
+      // Ignore malformed local state
+    }
+  }, []);
+
   const { data: members } = trpc.workspace.members.useQuery(
     { workspaceId },
     { enabled: !!workspaceId },
   );
 
-  const { data: searchResults, isLoading } = trpc.search.fullSearch.useQuery(
+  useEffect(() => {
+    setCursor(0);
+    setSearchItems([]);
+  }, [debouncedQuery, workspaceId, filters.type, filters.authorId, filters.dateFrom, filters.dateTo]);
+
+  const { data: searchResults, isLoading, isFetching } = trpc.search.fullSearch.useQuery(
     {
       query: debouncedQuery,
       workspaceId,
@@ -54,6 +129,8 @@ export default function SearchPage() {
         dateFrom: filters.dateFrom,
         dateTo: filters.dateTo,
       },
+      cursor,
+      limit: 20,
     },
     { enabled: debouncedQuery.length > 0 },
   );
@@ -70,7 +147,66 @@ export default function SearchPage() {
     [router, workspaceId],
   );
 
-  const displayResults = debouncedQuery.length > 0 ? searchResults?.items : recentPages;
+  useEffect(() => {
+    if (!searchResults) return;
+
+    setSearchItems((prev) => {
+      if (cursor === 0) {
+        return searchResults.items;
+      }
+
+      const merged = new Map(prev.map((item) => [item.id, item] as const));
+      for (const item of searchResults.items) {
+        if (!merged.has(item.id)) {
+          merged.set(item.id, item);
+        }
+      }
+      return Array.from(merged.values());
+    });
+  }, [searchResults, cursor]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const trimmed = debouncedQuery.trim();
+    if (trimmed.length < 2) return;
+
+    setRecentQueries((prev) => {
+      const next = [trimmed, ...prev.filter((item) => item !== trimmed)].slice(0, 8);
+      window.localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, [debouncedQuery]);
+
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || debouncedQuery.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        if (isFetching) return;
+        if (searchResults?.nextCursor == null) return;
+        setCursor((prev) =>
+          prev === searchResults.nextCursor ? prev : (searchResults.nextCursor ?? prev)
+        );
+      },
+      { rootMargin: "240px" }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [debouncedQuery.length, isFetching, searchResults?.nextCursor]);
+
+  const displayResults: SearchResultItem[] | undefined =
+    debouncedQuery.length > 0
+      ? searchItems
+      : recentPages?.map((page) => ({
+          id: page.id,
+          title: page.title,
+          icon: page.icon,
+          parentId: page.parentId,
+          updatedAt: page.updatedAt,
+        }));
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
@@ -199,12 +335,74 @@ export default function SearchPage() {
       {/* Results */}
       <div>
         {debouncedQuery.length === 0 && (
-          <h3
-            className="text-xs font-semibold uppercase mb-3 px-1"
-            style={{ color: "var(--text-tertiary)" }}
-          >
-            Recent Pages
-          </h3>
+          <div className="space-y-5 mb-5">
+            <div>
+              <h3
+                className="text-xs font-semibold uppercase mb-2 px-1 flex items-center gap-2"
+                style={{ color: "var(--text-tertiary)" }}
+              >
+                <History size={12} />
+                Recent Searches
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {recentQueries.length > 0 ? recentQueries.map((item) => (
+                  <button
+                    key={item}
+                    onClick={() => {
+                      setQuery(item);
+                      setDebouncedQuery(item);
+                    }}
+                    className="px-3 py-1.5 text-sm rounded-full border hover:bg-notion-bg-hover"
+                    style={{
+                      borderColor: "var(--border-default)",
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    {item}
+                  </button>
+                )) : (
+                  <p className="text-sm px-1" style={{ color: "var(--text-tertiary)" }}>
+                    아직 검색 기록이 없습니다.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h3
+                className="text-xs font-semibold uppercase mb-2 px-1 flex items-center gap-2"
+                style={{ color: "var(--text-tertiary)" }}
+              >
+                <Sparkles size={12} />
+                Recommended
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {RECOMMENDED_SEARCHES.map((item) => (
+                  <button
+                    key={item}
+                    onClick={() => {
+                      setQuery(item);
+                      setDebouncedQuery(item);
+                    }}
+                    className="px-3 py-1.5 text-sm rounded-full border hover:bg-notion-bg-hover"
+                    style={{
+                      borderColor: "var(--border-default)",
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <h3
+              className="text-xs font-semibold uppercase px-1"
+              style={{ color: "var(--text-tertiary)" }}
+            >
+              Recent Pages
+            </h3>
+          </div>
         )}
 
         {isLoading && debouncedQuery.length > 0 && (
@@ -233,13 +431,34 @@ export default function SearchPage() {
               {result.icon || <FileText size={16} style={{ color: "var(--text-tertiary)" }} />}
             </span>
             <div className="flex-1 min-w-0">
-              <div
-                className="text-sm font-medium truncate"
-                style={{ color: "var(--text-primary)" }}
-              >
-                {result.title || "Untitled"}
+              <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className="text-sm font-medium truncate"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {highlightText(result.title || "Untitled", debouncedQuery)}
+                </div>
+                {result.kind && (
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 rounded-full shrink-0"
+                    style={{
+                      backgroundColor: "var(--bg-tertiary)",
+                      color: "var(--text-tertiary)",
+                    }}
+                  >
+                    {result.kind === "database" ? "Database" : "Page"}
+                  </span>
+                )}
               </div>
               <div className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+                {result.path && result.path.length > 0 && (
+                  <span className="block truncate mb-0.5">{result.path.join(" / ")}</span>
+                )}
+                {result.snippet && debouncedQuery.length > 0 && (
+                  <span className="block truncate mb-0.5">
+                    {highlightText(result.snippet, debouncedQuery)}
+                  </span>
+                )}
                 {new Date(result.updatedAt).toLocaleDateString()}
                 {"matchSource" in result && result.matchSource === "content" && (
                   <span className="ml-2 px-1.5 py-0.5 rounded text-[10px]" style={{ backgroundColor: "var(--bg-tertiary)" }}>
@@ -252,13 +471,23 @@ export default function SearchPage() {
         ))}
 
         {/* Load more */}
+        {debouncedQuery.length > 0 && (
+          <div ref={loadMoreRef} className="h-2" />
+        )}
+
         {searchResults?.nextCursor !== null && searchResults?.nextCursor !== undefined && (
           <div className="text-center py-4">
             <button
+              onClick={() => {
+                if (searchResults.nextCursor !== null) {
+                  setCursor(searchResults.nextCursor);
+                }
+              }}
               className="text-sm px-4 py-1.5 rounded hover:bg-notion-bg-hover"
               style={{ color: "#2383e2" }}
+              disabled={isFetching}
             >
-              Load more results
+              {isFetching ? "Loading..." : "Load more results"}
             </button>
           </div>
         )}

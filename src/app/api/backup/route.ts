@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "@/server/auth/session";
 import { db } from "@/server/db/client";
+import { hasWorkspacePermission } from "@/lib/permissions";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession();
@@ -15,11 +16,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "workspaceId is required" }, { status: 400 });
   }
 
-  const member = await db.workspaceMember.findUnique({
-    where: { userId_workspaceId: { userId: session.user.id, workspaceId } },
-  });
-  if (!member || !["OWNER", "ADMIN"].includes(member.role)) {
-    return NextResponse.json({ error: "Forbidden: Owner or Admin required" }, { status: 403 });
+  const canManageBackup = await hasWorkspacePermission(db, session.user.id, workspaceId, "backup.manage");
+  if (!canManageBackup) {
+    return NextResponse.json({ error: "Forbidden: backup management permission required" }, { status: 403 });
   }
 
   const workspace = await db.workspace.findUnique({ where: { id: workspaceId } });
@@ -151,11 +150,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "workspaceId is required" }, { status: 400 });
   }
 
-  const member = await db.workspaceMember.findUnique({
-    where: { userId_workspaceId: { userId: session.user.id, workspaceId } },
-  });
-  if (!member || !["OWNER", "ADMIN"].includes(member.role)) {
-    return NextResponse.json({ error: "Forbidden: Owner or Admin required" }, { status: 403 });
+  const canManageBackup = await hasWorkspacePermission(db, session.user.id, workspaceId, "backup.manage");
+  if (!canManageBackup) {
+    return NextResponse.json({ error: "Forbidden: backup management permission required" }, { status: 403 });
   }
 
   const backupData = body.data as {
@@ -223,8 +220,8 @@ export async function POST(req: NextRequest) {
             isLocked: (page.isLocked as boolean) || false,
             isFullWidth: (page.isFullWidth as boolean) || false,
             position: (page.position as number) || 0,
-            createdBy: (page.createdBy as string) || session.user.id,
-            lastEditedBy: (page.lastEditedBy as string) || session.user.id,
+            createdBy: session.user.id,
+            lastEditedBy: session.user.id,
           },
         });
       }
@@ -322,7 +319,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("Backup restore failed:", err);
     return NextResponse.json(
-      { error: "Failed to restore backup", details: err instanceof Error ? err.message : "Unknown error" },
+      { error: "Failed to restore backup" },
       { status: 500 }
     );
   }

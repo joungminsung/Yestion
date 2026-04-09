@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter, usePathname } from "next/navigation";
-import { Lock, Unlock, ArrowLeftRight, Star, Copy, Upload, Download, Clock, BarChart3, Bell, Eye, Trash2, FileText, Menu, LayoutTemplate } from "lucide-react";
+import { Lock, Unlock, ArrowLeftRight, Star, Copy, Upload, Download, Clock, BarChart3, Bell, Eye, Trash2, FileText, Menu, LayoutTemplate, Mic } from "lucide-react";
 import { useSidebarStore } from "@/stores/sidebar";
 import { usePresenceStore, type PresenceUser } from "@/stores/presence";
 import { useNavigationStore } from "@/stores/navigation-history";
@@ -14,15 +14,54 @@ import { NotificationPanel } from "@/components/notifications/notification-panel
 import { ActivityPanel } from "@/components/activity/activity-panel";
 import { HistoryPanel } from "@/components/page/history-panel";
 import { ChatPanel } from "@/components/chat/chat-panel";
+import { MeetingPanel } from "@/components/meeting/meeting-panel";
 import { markdownToBlocks } from "@/lib/markdown-import";
 import { htmlToBlocks } from "@/lib/html-import";
 import { useToastStore } from "@/stores/toast";
+import { useSaveStatusStore } from "@/stores/save-status";
 import { useTranslations } from "next-intl";
 import { useDevice } from "@/components/providers/responsive-provider";
 import { FollowModeBanner } from "@/components/editor/follow-mode-banner";
 
 function getInitials(name: string): string {
   return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+}
+
+function SaveStatusIndicator() {
+  const status = useSaveStatusStore((s) => s.status);
+  const label =
+    status === "saving" ? "저장 중…" :
+    status === "error" ? "저장 실패" :
+    "저장됨";
+  const dotColor =
+    status === "saving" ? "var(--text-tertiary)" :
+    status === "error" ? "#e03e3e" :
+    "#16a34a";
+
+  // Hide "저장됨" after 2s
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    if (status === "saved") {
+      const t = setTimeout(() => setVisible(false), 2000);
+      return () => clearTimeout(t);
+    }
+    setVisible(true);
+  }, [status]);
+
+  if (status === "saved" && !visible) return null;
+
+  return (
+    <div
+      className="flex items-center gap-1.5 px-2 py-1 rounded text-[11px]"
+      style={{ color: "var(--text-tertiary)" }}
+    >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${status === "saving" ? "animate-pulse" : ""}`}
+        style={{ backgroundColor: dotColor }}
+      />
+      {label}
+    </div>
+  );
 }
 
 const MAX_VISIBLE_AVATARS = 5;
@@ -149,7 +188,8 @@ export function Topbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { isOpen, toggle } = useSidebarStore();
-  const { isMobile } = useDevice();
+  const { isMobile, isTablet } = useDevice();
+  const usesOverlaySidebar = isMobile || isTablet;
   const presenceUsers = usePresenceStore((s) => s.users);
   const [shareOpen, setShareOpen] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
@@ -158,6 +198,7 @@ export function Topbar() {
   const [activityOpen, setActivityOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [meetingOpen, setMeetingOpen] = useState(false);
   const addToast = useToastStore((s) => s.addToast);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [showNavHistory, setShowNavHistory] = useState(false);
@@ -208,12 +249,20 @@ export function Topbar() {
     { id: pageId! },
     { enabled: !!pageId },
   );
+  const { data: meetingPageState } = trpc.meeting.getPageState.useQuery(
+    { pageId: pageId! },
+    { enabled: !!pageId, refetchOnWindowFocus: false },
+  );
 
   const crumbs: { id: string; title: string | null; icon: string | null }[] =
     ancestors?.map((a) => ({ id: a.id, title: a.title, icon: a.icon })) ?? [];
 
   /* ── tRPC mutations for More Menu (2.12) ── */
   const utils = trpc.useUtils();
+  const { data: favorites } = trpc.page.listFavorites.useQuery(
+    { workspaceId: workspaceId! },
+    { enabled: !!workspaceId },
+  );
 
   const updatePage = trpc.page.update.useMutation({
     onSuccess: () => utils.page.get.invalidate(),
@@ -350,6 +399,10 @@ export function Topbar() {
   const [lockCountdown, setLockCountdown] = useState<number | null>(null);
   const lockTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Use a ref for the mutation to avoid stale closures in setInterval
+  const updatePageRef = useRef(updatePage);
+  updatePageRef.current = updatePage;
+
   // Auto-unlock after 30 minutes of locking
   useEffect(() => {
     if (!isLocked || !pageId) {
@@ -366,7 +419,7 @@ export function Topbar() {
       setLockCountdown((prev) => {
         if (prev === null || prev <= 1) {
           // Auto-unlock
-          updatePage.mutate({ id: pageId, isLocked: false });
+          updatePageRef.current.mutate({ id: pageId, isLocked: false });
           if (lockTimerRef.current) clearInterval(lockTimerRef.current);
           return null;
         }
@@ -406,22 +459,24 @@ export function Topbar() {
         setShowMoreMenu(false);
       },
     },
-    {
-      icon: <Star size={16} className="shrink-0" />,
-      label: "즐겨찾기 추가",
-      action: () => {
-        if (pageId) addFavorite.mutate({ pageId });
-        setShowMoreMenu(false);
-      },
-    },
-    {
-      icon: <Star size={16} className="shrink-0" />,
-      label: "즐겨찾기 해제",
-      action: () => {
-        if (pageId) removeFavorite.mutate({ pageId });
-        setShowMoreMenu(false);
-      },
-    },
+    ...(favorites?.some((f: { page: { id: string } }) => f.page.id === pageId)
+      ? [{
+          icon: <Star size={16} className="shrink-0" />,
+          label: "즐겨찾기 해제",
+          action: () => {
+            if (pageId) removeFavorite.mutate({ pageId });
+            setShowMoreMenu(false);
+          },
+        }]
+      : [{
+          icon: <Star size={16} className="shrink-0" />,
+          label: "즐겨찾기 추가",
+          action: () => {
+            if (pageId) addFavorite.mutate({ pageId });
+            setShowMoreMenu(false);
+          },
+        }]
+    ),
     {
       icon: <Copy size={16} className="shrink-0" />,
       label: "복제",
@@ -551,7 +606,7 @@ export function Topbar() {
       }}
     >
       <div className="flex items-center gap-1 min-w-0">
-        {isMobile && (
+        {usesOverlaySidebar && (
           <button
             onClick={() => useSidebarStore.getState().toggle()}
             className="flex items-center justify-center w-8 h-8 rounded hover:bg-notion-bg-hover flex-shrink-0"
@@ -561,7 +616,7 @@ export function Topbar() {
             <Menu size={18} />
           </button>
         )}
-        {!isMobile && !isOpen && (
+        {!usesOverlaySidebar && !isOpen && (
           <button
             onClick={toggle}
             className="p-1 rounded hover:bg-notion-bg-hover flex-shrink-0"
@@ -789,6 +844,7 @@ export function Topbar() {
         </div>
       </div>
       <div className="flex items-center gap-0.5">
+        {!isMobile && pageId && <SaveStatusIndicator />}
         {!isMobile && <PresenceAvatars users={presenceUsers} />}
 
         {/* Full-width toggle */}
@@ -859,6 +915,18 @@ export function Topbar() {
               <line x1="5" y1="6" x2="11" y2="6" />
               <line x1="5" y1="8.5" x2="9" y2="8.5" />
             </svg>
+          </button>
+        )}
+
+        {!isMobile && (
+          <button
+            onClick={() => pageId && setMeetingOpen(!meetingOpen)}
+            className="p-1.5 rounded hover:bg-notion-bg-hover"
+            style={{ color: meetingOpen || meetingPageState?.page.meetingEnabled ? "#2383e2" : "var(--text-secondary)" }}
+            disabled={!pageId}
+            title="회의"
+          >
+            <Mic size={16} />
           </button>
         )}
 
@@ -963,6 +1031,15 @@ export function Topbar() {
             currentUserId={user.id}
             onClose={() => setChatOpen(false)}
           />
+        </div>
+      )}
+
+      {meetingOpen && pageId && (
+        <div
+          className="fixed right-0 top-0 bottom-0 w-[420px] z-50 shadow-lg"
+          style={{ backgroundColor: "var(--bg-primary)" }}
+        >
+          <MeetingPanel pageId={pageId} onClose={() => setMeetingOpen(false)} />
         </div>
       )}
     </header>

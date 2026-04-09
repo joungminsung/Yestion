@@ -1,8 +1,7 @@
 import { Server } from "@hocuspocus/server";
 import { Database } from "@hocuspocus/extension-database";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { db as prisma } from "@/server/db/client";
+import { getEffectivePermission } from "@/lib/permissions";
 
 export const hocuspocus = new Server({
   port: Number(process.env.COLLAB_PORT) || 4000,
@@ -14,7 +13,7 @@ export const hocuspocus = new Server({
 
     const session = await prisma.session.findUnique({
       where: { token },
-      include: { user: true },
+      include: { user: { select: { id: true, name: true, email: true } } },
     });
 
     if (!session) {
@@ -46,11 +45,18 @@ export const hocuspocus = new Server({
       throw new Error("No access to this workspace");
     }
 
-    // I6: Return readOnly flag when page is locked
+    // Check page-level permissions for non-admin users
+    const permission = await getEffectivePermission(prisma, session.userId, pageId);
+    if (permission === "none") {
+      throw new Error("No access to this page");
+    }
+
+    // I6: Return readOnly flag when page is locked or user only has view/comment permission
+    const isReadOnly = page.isLocked || permission === "view" || permission === "comment";
     return {
       userId: session.userId,
       userName: session.user.name,
-      readOnly: page.isLocked,
+      readOnly: isReadOnly,
     };
   },
 

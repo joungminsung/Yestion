@@ -5,8 +5,13 @@ import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, protectedProcedure } from "@/server/trpc/init";
 import { generateTotpSecret, generateQrCodeDataUrl, verifyTotp, generateBackupCodes } from "@/lib/totp";
 import { sendVerificationEmail, sendPasswordResetEmail, sendWelcomeEmail } from "@/lib/email";
-
-type TwoFactorData = { totpEnabled?: boolean; totpSecret?: string; backupCodes?: string[] };
+import {
+  parseTwoFactorData,
+  serializeTwoFactorData,
+  hasMatchingBackupCode,
+  consumeBackupCode,
+  type ParsedTwoFactorData,
+} from "@/lib/two-factor-storage";
 
 const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
 
@@ -47,8 +52,12 @@ export const authRouter = router({
       });
 
       // Send verification + welcome emails (non-blocking)
-      sendVerificationEmail(input.email, verifyToken).catch(() => {});
-      sendWelcomeEmail(input.email, input.name).catch(() => {});
+      sendVerificationEmail(input.email, verifyToken).catch((err) => {
+        console.error("[Auth] Failed to send verification email:", err);
+      });
+      sendWelcomeEmail(input.email, input.name).catch((err) => {
+        console.error("[Auth] Failed to send welcome email:", err);
+      });
 
       const workspace = await ctx.db.workspace.create({
         data: {
@@ -87,7 +96,6 @@ export const authRouter = router({
 
       return {
         user: { id: user.id, email: user.email, name: user.name },
-        token,
       };
     }),
 
@@ -125,11 +133,15 @@ export const authRouter = router({
         where: { name: `__2fa_${user.id}` },
       });
       if (twoFactorKey) {
-        let totpData: TwoFactorData;
+        let totpData: ParsedTwoFactorData;
         try {
-          totpData = JSON.parse(twoFactorKey.key) as TwoFactorData;
-        } catch {
-          totpData = {};
+          totpData = parseTwoFactorData(twoFactorKey.key);
+        } catch (error) {
+          console.error("[Auth] Failed to read 2FA configuration:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "2FA configuration is unavailable",
+          });
         }
         if (totpData.totpEnabled && totpData.totpSecret) {
           if (!input.totpCode) {
@@ -139,7 +151,7 @@ export const authRouter = router({
             });
           }
           const isValidTotp = verifyTotp(input.totpCode, totpData.totpSecret);
-          const isValidBackup = totpData.backupCodes?.includes(input.totpCode) ?? false;
+          const isValidBackup = hasMatchingBackupCode(totpData, input.totpCode);
           if (!isValidTotp && !isValidBackup) {
             throw new TRPCError({
               code: "UNAUTHORIZED",
@@ -147,11 +159,20 @@ export const authRouter = router({
             });
           }
           // Remove used backup code
-          if (isValidBackup && totpData.backupCodes) {
-            totpData.backupCodes = totpData.backupCodes.filter((c) => c !== input.totpCode);
+          if (isValidBackup) {
             await ctx.db.apiKey.update({
               where: { id: twoFactorKey.id },
-              data: { key: JSON.stringify(totpData) },
+              data: { key: consumeBackupCode(totpData, input.totpCode) },
+            });
+          } else if (totpData.needsMigration) {
+            await ctx.db.apiKey.update({
+              where: { id: twoFactorKey.id },
+              data: {
+                key: serializeTwoFactorData(
+                  totpData.totpSecret,
+                  totpData.backupCodes ?? []
+                ),
+              },
             });
           }
         }
@@ -172,15 +193,14 @@ export const authRouter = router({
 
       return {
         user: { id: user.id, email: user.email, name: user.name },
-        token,
       };
     }),
 
-  logout: publicProcedure
-    .input(z.object({ token: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+  logout: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      // Delete only the current user's session using the token from the cookie
       await ctx.db.session.deleteMany({
-        where: { token: input.token },
+        where: { userId: ctx.session.user.id, token: ctx.session.token },
       });
       ctx.headers.set('Set-Cookie', `session-token=; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=0`);
       return { success: true };
@@ -208,26 +228,12 @@ export const authRouter = router({
 
       const backupCodes = generateBackupCodes();
 
-      // Store 2FA settings in user record
-      // We use a JSON approach: store totpSecret, totpEnabled, and backupCodes
-      // Since the User model doesn't have dedicated fields, we update the name field
-      // with a metadata prefix. Better approach: store in a separate table or add fields.
-      // For now, we'll store in the user's avatarUrl field as a workaround...
-      // Actually, let's just add the data properly via raw SQL or a JSON column.
-      // Best approach: store as comma-separated in an unused field, or use raw query.
-
       // Store 2FA data using API key record as metadata store
       const existingKey = await ctx.db.apiKey.findFirst({
-        where: {
-          name: `__2fa_${ctx.session.user.id}`,
-        },
+        where: { name: `__2fa_${ctx.session.user.id}` },
       });
 
-      const totpData = JSON.stringify({
-        totpEnabled: true,
-        totpSecret: input.secret,
-        backupCodes,
-      });
+      const totpData = serializeTwoFactorData(input.secret, backupCodes);
 
       if (existingKey) {
         await ctx.db.apiKey.update({
@@ -235,30 +241,20 @@ export const authRouter = router({
           data: { key: totpData },
         });
       } else {
-        // Find user's workspace
         const membership = await ctx.db.workspaceMember.findFirst({
           where: { userId: ctx.session.user.id },
         });
-        if (membership) {
-          await ctx.db.apiKey.create({
-            data: {
-              workspaceId: membership.workspaceId,
-              name: `__2fa_${ctx.session.user.id}`,
-              key: `2fa_${crypto.randomBytes(16).toString("hex")}`,
-              createdBy: ctx.session.user.id,
-            },
-          });
-          // Store actual data by updating the key
-          const created = await ctx.db.apiKey.findFirst({
-            where: { name: `__2fa_${ctx.session.user.id}` },
-          });
-          if (created) {
-            await ctx.db.apiKey.update({
-              where: { id: created.id },
-              data: { key: totpData },
-            });
-          }
+        if (!membership) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "No workspace found" });
         }
+        await ctx.db.apiKey.create({
+          data: {
+            workspaceId: membership.workspaceId,
+            name: `__2fa_${ctx.session.user.id}`,
+            key: totpData,
+            createdBy: ctx.session.user.id,
+          },
+        });
       }
 
       return { backupCodes };
@@ -302,7 +298,9 @@ export const authRouter = router({
         data: { resetToken, resetTokenExp },
       });
 
-      await sendPasswordResetEmail(input.email, resetToken).catch(() => {});
+      await sendPasswordResetEmail(input.email, resetToken).catch((err) => {
+        console.error("[Auth] Failed to send password reset email:", err);
+      });
       return { success: true };
     }),
 
@@ -357,6 +355,34 @@ export const authRouter = router({
       });
 
       await sendVerificationEmail(user.email, verifyToken);
+      return { success: true };
+    }),
+
+  // ── Email Verification ────────────────────────────────────
+
+  verifyEmail: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = await ctx.db.user.findFirst({
+        where: {
+          verifyToken: input.token,
+          verifyTokenExp: { gte: new Date() },
+        },
+      });
+
+      if (!user) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "유효하지 않거나 만료된 인증 링크입니다" });
+      }
+
+      await ctx.db.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerified: true,
+          verifyToken: null,
+          verifyTokenExp: null,
+        },
+      });
+
       return { success: true };
     }),
 });

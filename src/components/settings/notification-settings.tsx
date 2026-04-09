@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, MessageSquare, AtSign, Share2, UserPlus, ListChecks } from "lucide-react";
+import { Bell, MessageSquare, AtSign, Share2, UserPlus } from "lucide-react";
 import { useToastStore } from "@/stores/toast";
 
 type NotificationType = {
@@ -19,7 +19,6 @@ const DEFAULT_PREFS: NotificationType[] = [
   { id: "comment_reply", label: "Replies", description: "Replies to your comments", icon: <MessageSquare size={16} />, inApp: true, email: true },
   { id: "share", label: "Shares", description: "When someone shares a page with you", icon: <Share2 size={16} />, inApp: true, email: true },
   { id: "invite", label: "Invitations", description: "Workspace invitations", icon: <UserPlus size={16} />, inApp: true, email: true },
-  { id: "task_assigned", label: "Task assigned", description: "When a task is assigned to you", icon: <ListChecks size={16} />, inApp: true, email: true },
   { id: "page_updated", label: "Page updates", description: "Updates to pages you watch", icon: <Bell size={16} />, inApp: false, email: false },
 ];
 

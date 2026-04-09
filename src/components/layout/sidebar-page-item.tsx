@@ -264,6 +264,8 @@ export function SidebarPageItem({
         }}
         onClick={() => {
           setActivePage(page.id);
+          // Signal channel views to close SSE connections before navigation
+          window.dispatchEvent(new CustomEvent("channel:close-stream"));
           router.push(`/${workspaceId}/${page.id}`);
         }}
         onMouseEnter={handleItemMouseEnter}

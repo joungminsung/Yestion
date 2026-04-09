@@ -32,16 +32,24 @@ const BG_COLORS = [
   { name: "빨강", value: "red", css: "var(--color-red-bg)" },
 ];
 
-export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddComment?: (content: string, range: { from: number; to: number }) => void }) {
+export function InlineToolbar({
+  editor,
+  onRequestComment,
+  onSuggestionModeChange,
+}: {
+  editor: Editor;
+  onRequestComment?: (range: { from: number; to: number }, position: { top: number; left: number }) => void;
+  onSuggestionModeChange?: (enabled: boolean) => void;
+}) {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   // Single active panel — only one can be open at a time
-  type PanelType = null | "colors" | "align" | "ai" | "link" | "comment" | "highlight";
+  type PanelType = null | "colors" | "align" | "ai" | "link" | "highlight";
   const [activePanel, setActivePanel] = useState<PanelType>(null);
   const [linkUrl, setLinkUrl] = useState("");
-  const [commentRange, setCommentRange] = useState<{ from: number; to: number } | null>(null);
-  const [commentText, setCommentText] = useState("");
-  const [suggestingMode, setSuggestingMode] = useState(false);
+  const [suggestingMode, setSuggestingMode] = useState(
+    Boolean((editor.storage as { suggestion?: { enabled?: boolean } }).suggestion?.enabled)
+  );
 
   const togglePanel = useCallback((panel: PanelType) => {
     setActivePanel((prev) => (prev === panel ? null : panel));
@@ -52,7 +60,6 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
   const showAlign = activePanel === "align";
   const showAiMenu = activePanel === "ai";
   const showLinkInput = activePanel === "link";
-  const showCommentInput = activePanel === "comment";
 
   const updatePosition = useCallback(() => {
     if (!editor.view || !editor.state) { setIsVisible(false); return; }
@@ -77,6 +84,22 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
       editor.off("selectionUpdate", updatePosition);
     };
   }, [editor, updatePosition]);
+
+  useEffect(() => {
+    const syncSuggestionMode = () => {
+      setSuggestingMode(
+        Boolean((editor.storage as { suggestion?: { enabled?: boolean } }).suggestion?.enabled)
+      );
+    };
+
+    editor.on("selectionUpdate", syncSuggestionMode);
+    editor.on("update", syncSuggestionMode);
+
+    return () => {
+      editor.off("selectionUpdate", syncSuggestionMode);
+      editor.off("update", syncSuggestionMode);
+    };
+  }, [editor]);
 
   const SHORTCUT_HINTS: Record<string, string> = {
     Bold: "\u2318B",
@@ -156,7 +179,10 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
       label: "Suggest",
       icon: <MessageSquarePlus size={14} />,
       action: () => {
-        setSuggestingMode(!suggestingMode);
+        const next = !suggestingMode;
+        editor.chain().focus().setSuggestionMode(next).run();
+        setSuggestingMode(next);
+        onSuggestionModeChange?.(next);
       },
       isActive: () => suggestingMode,
     },
@@ -165,10 +191,13 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
       icon: "\uD83D\uDCAC",
       action: () => {
         const { from, to } = editor.state.selection;
-        setCommentRange({ from, to });
-        togglePanel("comment");
+        if (from === to) return;
+        onRequestComment?.(
+          { from, to },
+          { top: position.top + 52, left: position.left - 120 }
+        );
       },
-      isActive: () => showCommentInput,
+      isActive: () => false,
     },
     {
       label: "AI",
@@ -406,52 +435,6 @@ export function InlineToolbar({ editor, onAddComment }: { editor: Editor; onAddC
               제거
             </button>
           )}
-        </div>
-      )}
-      {showCommentInput && commentRange && (
-        <div
-          className="absolute top-full left-0 mt-2 p-3 rounded-lg"
-          style={{
-            backgroundColor: "var(--bg-primary)",
-            boxShadow: "var(--shadow-popup)",
-            width: "280px",
-            zIndex: 1,
-          }}
-        >
-          <textarea
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            placeholder="댓글 작성..."
-            className="w-full rounded px-2 py-1.5 text-sm border resize-none"
-            rows={3}
-            style={{
-              borderColor: "var(--border-default)",
-              backgroundColor: "var(--bg-primary)",
-              color: "var(--text-primary)",
-            }}
-            autoFocus
-          />
-          <div className="flex justify-end gap-2 mt-2">
-            <button
-              onClick={() => { setActivePanel(null); setCommentText(""); }}
-              className="px-3 py-1 text-sm rounded hover:bg-notion-bg-hover"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              취소
-            </button>
-            <button
-              onClick={async () => {
-                if (onAddComment) onAddComment(commentText, commentRange);
-                setActivePanel(null);
-                setCommentText("");
-              }}
-              className="px-3 py-1 text-sm rounded text-white"
-              style={{ backgroundColor: "#2383e2" }}
-              disabled={!commentText.trim()}
-            >
-              댓글
-            </button>
-          </div>
         </div>
       )}
       {activePanel === "highlight" && (

@@ -9,6 +9,7 @@ export type SessionUser = {
 
 export type Session = {
   user: SessionUser;
+  token: string;
 };
 
 export async function getServerSession(): Promise<Session | null> {
@@ -29,5 +30,5 @@ export async function getServerSession(): Promise<Session | null> {
     return null;
   }
 
-  return { user: session.user };
+  return { user: session.user, token };
 }

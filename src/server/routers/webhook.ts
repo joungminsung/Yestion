@@ -1,6 +1,11 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "@/server/trpc/init";
 import { randomBytes, createHmac } from "crypto";
+import {
+  requireWorkspaceMembership,
+  requireWorkspacePermission,
+} from "@/lib/permissions";
 
 function generateSecret(): string {
   return randomBytes(32).toString("hex");
@@ -10,31 +15,52 @@ export function signPayload(payload: string, secret: string): string {
   return createHmac("sha256", secret).update(payload).digest("hex");
 }
 
+function isValidOutgoingWebhookUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 const SUBSCRIBABLE_EVENTS = [
   "page.created", "page.updated", "page.deleted",
-  "task.created", "task.updated", "task.status_changed", "task.completed",
   "comment.created", "comment.resolved",
   "member.joined", "member.removed",
 ] as const;
 
-async function verifyWebhookAccess(db: import("@prisma/client").PrismaClient, webhookId: string, userId: string) {
+async function verifyWebhookAccess(db: import("@prisma/client").PrismaClient, webhookId: string, userId: string, requireAdmin = false) {
   const webhook = await db.webhook.findUnique({ where: { id: webhookId } });
-  if (!webhook) throw new Error("Webhook not found");
-  const member = await db.workspaceMember.findFirst({
-    where: { workspaceId: webhook.workspaceId, userId },
-  });
-  if (!member) throw new Error("Not authorized");
+  if (!webhook) throw new TRPCError({ code: "NOT_FOUND", message: "Webhook not found" });
+  await requireWorkspaceMembership(db, userId, webhook.workspaceId);
+  if (requireAdmin) {
+    await requireWorkspacePermission(
+      db,
+      userId,
+      webhook.workspaceId,
+      "webhook.manage",
+      "Webhook management permission is required",
+    );
+  }
   return webhook;
+}
+
+async function verifyWorkspaceAdmin(db: import("@prisma/client").PrismaClient, workspaceId: string, userId: string) {
+  return requireWorkspacePermission(
+    db,
+    userId,
+    workspaceId,
+    "webhook.manage",
+    "Webhook management permission is required",
+  );
 }
 
 export const webhookRouter = router({
   list: protectedProcedure
     .input(z.object({ workspaceId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const member = await ctx.db.workspaceMember.findFirst({
-        where: { workspaceId: input.workspaceId, userId: ctx.session.user.id },
-      });
-      if (!member) throw new Error("Not authorized");
+      await requireWorkspaceMembership(ctx.db, ctx.session.user.id, input.workspaceId);
 
       const webhooks = await ctx.db.webhook.findMany({
         where: { workspaceId: input.workspaceId },
@@ -53,15 +79,39 @@ export const webhookRouter = router({
       name: z.string().min(1),
       type: z.enum(["incoming", "outgoing"]),
       url: z.string().url().optional(),
-      events: z.array(z.string()).default([]),
+      events: z.array(z.enum(SUBSCRIBABLE_EVENTS)).default([]),
       description: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // Require admin role to create webhooks
+      await verifyWorkspaceAdmin(ctx.db, input.workspaceId, ctx.session.user.id);
+
       const secret = generateSecret();
+      const isIncoming = input.type === "incoming";
+      const generatedPath = isIncoming ? `/api/webhooks/${randomBytes(12).toString("hex")}` : undefined;
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      const webhookUrl = isIncoming
+        ? `${baseUrl}${generatedPath}`
+        : input.url;
+
+      if (!isIncoming && !webhookUrl) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Outgoing webhooks require a target URL",
+        });
+      }
+      if (!isIncoming && webhookUrl && !isValidOutgoingWebhookUrl(webhookUrl)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Outgoing webhooks must use an HTTPS URL",
+        });
+      }
+
       // Return full secret on create — intentional one-time view for initial setup
       return ctx.db.webhook.create({
         data: {
           ...input,
+          url: webhookUrl,
           secret,
           createdBy: ctx.session.user.id,
         },
@@ -78,7 +128,19 @@ export const webhookRouter = router({
       description: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      await verifyWebhookAccess(ctx.db, input.id, ctx.session.user.id);
+      const webhook = await verifyWebhookAccess(ctx.db, input.id, ctx.session.user.id, true);
+      if (webhook.type === "incoming" && input.url) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Incoming webhook URLs are generated automatically",
+        });
+      }
+      if (webhook.type === "outgoing" && input.url && !isValidOutgoingWebhookUrl(input.url)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Outgoing webhooks must use an HTTPS URL",
+        });
+      }
       const { id, ...data } = input;
       return ctx.db.webhook.update({ where: { id }, data });
     }),
@@ -86,7 +148,7 @@ export const webhookRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await verifyWebhookAccess(ctx.db, input.id, ctx.session.user.id);
+      await verifyWebhookAccess(ctx.db, input.id, ctx.session.user.id, true);
       return ctx.db.webhook.delete({ where: { id: input.id } });
     }),
 
@@ -110,7 +172,7 @@ export const webhookRouter = router({
   regenerateSecret: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await verifyWebhookAccess(ctx.db, input.id, ctx.session.user.id);
+      await verifyWebhookAccess(ctx.db, input.id, ctx.session.user.id, true);
       const secret = generateSecret();
       return ctx.db.webhook.update({
         where: { id: input.id },

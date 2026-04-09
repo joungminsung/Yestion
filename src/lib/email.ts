@@ -37,7 +37,16 @@ function wrapHtml(title: string, body: string): string {
 }
 
 function buttonHtml(text: string, href: string): string {
-  return `<a href="${href}" style="display:inline-block;padding:10px 24px;background:#2383e2;color:#fff;text-decoration:none;border-radius:4px;font-size:14px;font-weight:500;margin:16px 0;">${text}</a>`;
+  return `<a href="${escapeHtml(href)}" style="display:inline-block;padding:10px 24px;background:#2383e2;color:#fff;text-decoration:none;border-radius:4px;font-size:14px;font-weight:500;margin:16px 0;">${escapeHtml(text)}</a>`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 // ── Email verification ───────────────────────────────────────
@@ -99,11 +108,13 @@ export async function sendShareNotificationEmail(
   permission: string,
 ) {
   const permLabel = permission === "edit" ? "편집" : permission === "comment" ? "댓글" : "보기";
+  const safeSharedBy = escapeHtml(sharedBy);
+  const safePageTitle = escapeHtml(pageTitle);
   const html = wrapHtml(
     "페이지가 공유되었습니다",
     `<p style="color:#37352f;font-size:14px;line-height:1.6;">
-      <strong>${sharedBy}</strong>님이 <strong>"${pageTitle}"</strong> 페이지를
-      <span style="color:#2383e2;">${permLabel}</span> 권한으로 공유했습니다.
+      <strong>${safeSharedBy}</strong>님이 <strong>"${safePageTitle}"</strong> 페이지를
+      <span style="color:#2383e2;">${escapeHtml(permLabel)}</span> 권한으로 공유했습니다.
     </p>
     ${buttonHtml("페이지 열기", pageUrl)}`
   );
@@ -126,13 +137,16 @@ export async function sendCommentNotificationEmail(
   pageUrl: string,
 ) {
   const preview = commentText.length > 200 ? commentText.slice(0, 200) + "..." : commentText;
+  const safeCommenter = escapeHtml(commenter);
+  const safePageTitle = escapeHtml(pageTitle);
+  const safePreview = escapeHtml(preview);
   const html = wrapHtml(
     "새 댓글",
     `<p style="color:#37352f;font-size:14px;line-height:1.6;">
-      <strong>${commenter}</strong>님이 <strong>"${pageTitle}"</strong> 페이지에 댓글을 남겼습니다:
+      <strong>${safeCommenter}</strong>님이 <strong>"${safePageTitle}"</strong> 페이지에 댓글을 남겼습니다:
     </p>
     <blockquote style="margin:16px 0;padding:12px 16px;background:#f7f6f3;border-left:3px solid #e8e7e4;border-radius:4px;">
-      <p style="margin:0;color:#37352f;font-size:14px;">${preview}</p>
+      <p style="margin:0;color:#37352f;font-size:14px;">${safePreview}</p>
     </blockquote>
     ${buttonHtml("댓글 보기", pageUrl)}`
   );
@@ -148,8 +162,9 @@ export async function sendCommentNotificationEmail(
 // ── Welcome email ────────────────────────────────────────────
 
 export async function sendWelcomeEmail(to: string, name: string) {
+  const safeName = escapeHtml(name);
   const html = wrapHtml(
-    `환영합니다, ${name}님!`,
+    `환영합니다, ${safeName}님!`,
     `<p style="color:#37352f;font-size:14px;line-height:1.6;">
       ${APP_NAME}에 가입해 주셔서 감사합니다.<br/>
       이제 페이지를 만들고, 팀과 협업하고, 아이디어를 정리할 수 있습니다.

@@ -290,11 +290,7 @@ export function BlockContextMenu({ editor, onTurnIntoPage, onAddComment }: Conte
       action: () => {
         const { from, to } = editor.state.selection;
         if (onAddComment && from !== to) {
-          editor.state.doc.textBetween(from, to); // get selected text for context
-          const comment = window.prompt("댓글 작성:");
-          if (comment) {
-            onAddComment(comment, { from, to });
-          }
+          onAddComment("", { from, to });
         }
         setPosition(null);
       },

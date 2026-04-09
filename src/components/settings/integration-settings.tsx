@@ -243,12 +243,12 @@ function ServiceConfig({
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
-              checked={(localConfig.notifyOnTaskComplete as boolean) ?? true}
-              onChange={(e) => updateField("notifyOnTaskComplete", e.target.checked)}
+              checked={(localConfig.notifyOnWorkspaceUpdates as boolean) ?? true}
+              onChange={(e) => updateField("notifyOnWorkspaceUpdates", e.target.checked)}
               className="rounded"
             />
             <label className="text-xs" style={{ color: "var(--text-secondary)" }}>
-              Notify when tasks are completed
+              Notify on workspace activity
             </label>
           </div>
           <div className="flex items-center gap-2">
@@ -287,7 +287,7 @@ function ServiceConfig({
               className="rounded"
             />
             <label className="text-xs" style={{ color: "var(--text-secondary)" }}>
-              Create tasks from GitHub issues
+              Issue activity notifications
             </label>
           </div>
           <div className="flex items-center gap-2">
@@ -321,12 +321,12 @@ function ServiceConfig({
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
-              checked={(localConfig.autoCreateEvents as boolean) ?? true}
-              onChange={(e) => updateField("autoCreateEvents", e.target.checked)}
+              checked={(localConfig.syncCalendarUpdates as boolean) ?? true}
+              onChange={(e) => updateField("syncCalendarUpdates", e.target.checked)}
               className="rounded"
             />
             <label className="text-xs" style={{ color: "var(--text-secondary)" }}>
-              Auto-create events for tasks with due dates
+              Sync calendar updates
             </label>
           </div>
         </>
@@ -337,12 +337,12 @@ function ServiceConfig({
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
-              checked={(localConfig.taskAssignmentEmails as boolean) ?? true}
-              onChange={(e) => updateField("taskAssignmentEmails", e.target.checked)}
+              checked={(localConfig.workspaceDigestEmails as boolean) ?? true}
+              onChange={(e) => updateField("workspaceDigestEmails", e.target.checked)}
               className="rounded"
             />
             <label className="text-xs" style={{ color: "var(--text-secondary)" }}>
-              Send email on task assignment
+              Send workspace digest emails
             </label>
           </div>
           <div>

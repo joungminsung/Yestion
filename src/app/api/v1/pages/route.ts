@@ -11,6 +11,25 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { title = "", parentId, icon } = body;
 
+    if (parentId) {
+      const parentPage = await db.page.findUnique({
+        where: { id: parentId },
+        select: {
+          id: true,
+          workspaceId: true,
+          isDeleted: true,
+        },
+      });
+
+      if (!parentPage || parentPage.isDeleted) {
+        return badRequest("Parent page not found");
+      }
+
+      if (parentPage.workspaceId !== auth.workspaceId) {
+        return badRequest("Parent page must belong to the same workspace");
+      }
+    }
+
     // Get next position
     const last = await db.page.findFirst({
       where: {
@@ -30,8 +49,8 @@ export async function POST(request: NextRequest) {
         parentId: parentId ?? null,
         icon: icon ?? null,
         position,
-        createdBy: "api",
-        lastEditedBy: "api",
+        createdBy: auth.createdBy,
+        lastEditedBy: auth.createdBy,
       },
     });
 

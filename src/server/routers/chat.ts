@@ -87,28 +87,40 @@ export const chatRouter = router({
     .input(z.object({
       pageId: z.string(),
       blockId: z.string(),
+      blockType: z.string().optional(),
+      blockPreview: z.string().optional(),
       comment: z.string().default(""),
     }))
     .mutation(async ({ ctx, input }) => {
       await verifyPageAccess(ctx.db, ctx.session.user.id, input.pageId);
-      // Fetch block preview
-      const block = await ctx.db.block.findUnique({
-        where: { id: input.blockId },
-        select: { type: true, content: true },
-      });
-      const content = (block?.content ?? {}) as Record<string, unknown>;
-      const richText = content.richText as { text: string }[] | undefined;
-      const preview = richText?.map((r) => r.text).join("") || String(content.text ?? content.code ?? content.url ?? "");
+
+      let blockType = input.blockType ?? "unknown";
+      let preview = input.blockPreview ?? "";
+
+      // If client didn't provide metadata, try to look up from DB
+      if (!input.blockType) {
+        const block = await ctx.db.block.findUnique({
+          where: { id: input.blockId },
+          select: { type: true, content: true },
+        });
+        if (block) {
+          blockType = block.type;
+          const content = (block.content ?? {}) as Record<string, unknown>;
+          const richText = content.richText as { text: string }[] | undefined;
+          preview = richText?.map((r) => r.text).join("") || String(content.text ?? content.code ?? content.url ?? "");
+          preview = preview.slice(0, 200);
+        }
+      }
 
       const msg = await ctx.db.chatMessage.create({
         data: {
           pageId: input.pageId,
           userId: ctx.session.user.id,
-          content: input.comment || `블록 참조`,
+          content: input.comment || "블록 참조",
           type: "block_ref",
           metadata: {
             blockId: input.blockId,
-            blockType: block?.type ?? "unknown",
+            blockType,
             blockPreview: preview.slice(0, 200),
           },
         },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NotionEditor, type NotionEditorHandle } from "./editor";
 import { createCollaborationProvider, getColorForUser } from "@/lib/collaboration/provider";
 import { usePresenceStore } from "@/stores/presence";
@@ -15,21 +15,44 @@ type Props = {
   user: { id: string; name: string };
   isLocked?: boolean;
   initialBlocks?: { id: string; type: string; content: unknown; position: number; parentId: string | null }[];
+  onUpdate?: (json: Record<string, unknown>) => void;
+  hasPersistedCollabState?: boolean;
 };
 
-export function CollaborativeEditor({ pageId, sessionToken, user, isLocked, initialBlocks }: Props) {
+export function CollaborativeEditor({
+  pageId,
+  sessionToken,
+  user,
+  isLocked,
+  initialBlocks,
+  onUpdate,
+  hasPersistedCollabState = false,
+}: Props) {
   const [provider, setProvider] = useState<HocuspocusProvider | null>(null);
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [needsHydration, setNeedsHydration] = useState(false);
+  const [useFallbackEditor, setUseFallbackEditor] = useState(false);
   const editorRef = useRef<NotionEditorHandle | null>(null);
   const [typingUsers, setTypingUsers] = useState<{ id: string; name: string; color: string }[]>([]);
   const typingTimeout = useRef<NodeJS.Timeout | null>(null);
   const presenceUsers = usePresenceStore((s) => s.users);
+  const hasSyncedRef = useRef(false);
 
   // Follow mode: track scroll position via awareness
   const followingUserId = usePresenceStore((s) => s.followingUserId);
   const setFollowing = usePresenceStore((s) => s.setFollowing);
+
+  const initialContent = useMemo(() => blocksToTiptap(
+    (initialBlocks ?? []).map((block) => ({
+      id: block.id,
+      pageId,
+      parentId: block.parentId,
+      type: block.type as BlockType,
+      content: block.content as BlockContent,
+      position: block.position,
+    })),
+  ), [initialBlocks, pageId]);
 
   // Broadcast local scroll position and cursor block via awareness
   useEffect(() => {
@@ -105,14 +128,30 @@ export function CollaborativeEditor({ pageId, sessionToken, user, isLocked, init
 
   useEffect(() => {
     let cancelled = false;
+    hasSyncedRef.current = false;
 
     const { ydoc: doc, provider: prov } = createCollaborationProvider({ pageId, token: sessionToken });
+    const fragment = doc.getXmlFragment("default");
+
+    if (!hasPersistedCollabState && fragment.length === 0 && initialBlocks && initialBlocks.length > 0) {
+      setNeedsHydration(true);
+    }
+
+    const fallbackTimer = setTimeout(() => {
+      if (!cancelled && !hasSyncedRef.current) {
+        setUseFallbackEditor(true);
+        prov.destroy();
+        doc.destroy();
+      }
+    }, 3000);
 
     prov.on("synced", () => {
       if (cancelled) return;
+      hasSyncedRef.current = true;
+      clearTimeout(fallbackTimer);
       setIsConnected(true);
+      setUseFallbackEditor(false);
 
-      const fragment = doc.getXmlFragment("default");
       if (fragment.length === 0 && initialBlocks && initialBlocks.length > 0) {
         setNeedsHydration(true);
       }
@@ -151,34 +190,24 @@ export function CollaborativeEditor({ pageId, sessionToken, user, isLocked, init
 
     return () => {
       cancelled = true;
+      clearTimeout(fallbackTimer);
       prov.awareness?.off("change", updatePresence);
       usePresenceStore.getState().setUsers([]);
       prov.destroy();
       doc.destroy();
     };
-  }, [pageId, sessionToken, user.id, user.name, initialBlocks]);
+  }, [hasPersistedCollabState, initialBlocks, pageId, sessionToken, user.id, user.name]);
 
   // Hydrate Yjs doc from initial blocks once editor is mounted and doc is synced
   useEffect(() => {
     if (!needsHydration || !initialBlocks || initialBlocks.length === 0) return;
     if (!editorRef.current) return;
 
-    const tiptapDoc = blocksToTiptap(
-      initialBlocks.map((b) => ({
-        id: b.id,
-        pageId,
-        parentId: b.parentId,
-        type: b.type as BlockType,
-        content: b.content as BlockContent,
-        position: b.position,
-      }))
-    );
-
-    if (tiptapDoc.content.length > 0) {
-      editorRef.current.commands.setContent(tiptapDoc);
+    if (initialContent.content.length > 0) {
+      editorRef.current.commands.setContent(initialContent, { emitUpdate: false });
     }
     setNeedsHydration(false);
-  }, [needsHydration, initialBlocks, pageId]);
+  }, [initialContent, initialBlocks, needsHydration]);
 
   const handleTyping = useCallback(() => {
     if (!provider?.awareness) return;
@@ -190,6 +219,26 @@ export function CollaborativeEditor({ pageId, sessionToken, user, isLocked, init
       provider.awareness?.setLocalStateField("user", { id: user.id, name: user.name, color, isTyping: false });
     }, 2000);
   }, [provider, user.id, user.name]);
+
+  if (useFallbackEditor) {
+    return (
+      <div>
+        <div
+          className="mb-2 px-3 py-1 rounded text-xs"
+          style={{ backgroundColor: "rgba(217, 115, 13, 0.12)", color: "var(--color-orange, #d9730d)" }}
+        >
+          실시간 협업 서버에 연결되지 않아 일반 저장 모드로 전환되었습니다
+        </div>
+        <NotionEditor
+          pageId={pageId}
+          currentUser={{ id: user.id, name: user.name }}
+          initialContent={initialContent.content.length > 0 ? initialContent : undefined}
+          editable={!isLocked}
+          onUpdate={onUpdate}
+        />
+      </div>
+    );
+  }
 
   if (!provider || !ydoc) {
     return <div className="py-8 text-center" style={{ color: "var(--text-tertiary)" }}>연결 중...</div>;
@@ -223,9 +272,12 @@ export function CollaborativeEditor({ pageId, sessionToken, user, isLocked, init
 
       <NotionEditor
         ref={editorRef}
+        pageId={pageId}
+        currentUser={{ id: user.id, name: user.name }}
         collaboration={{ ydoc, provider, user: { id: user.id, name: user.name, color: getColorForUser(user.id) } }}
         editable={!isLocked}
         onTyping={handleTyping}
+        onUpdate={onUpdate}
       />
       {typingUsers.length > 0 && (
         <div className="px-4 py-1 text-xs" style={{ color: "var(--text-tertiary)" }}>

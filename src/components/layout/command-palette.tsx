@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCommandPaletteStore } from "@/stores/command-palette";
 import { trpc } from "@/server/trpc/client";
 import { useTranslations } from "next-intl";
-import { Search, FileText, Plus, Settings, Moon, Sun } from "lucide-react";
+import { Search, FileText, Hash, Moon, Plus, Settings, Sun, Volume2 } from "lucide-react";
 import { useThemeStore } from "@/stores/theme";
 import { useToastStore } from "@/stores/toast";
 import { AnimatedDialog } from "@/components/ui/animated-dialog";
@@ -53,12 +53,39 @@ export function CommandPalette() {
     { workspaceId: workspaceId! },
     { enabled: isOpen && !isSearching && !!workspaceId },
   );
+  const { data: channels } = trpc.channel.list.useQuery(
+    { workspaceId: workspaceId! },
+    { enabled: isOpen && !!workspaceId, refetchOnWindowFocus: false },
+  );
 
   const results = isSearching ? searchResults : recentPages;
+  const matchedChannels = (channels ?? [])
+    .filter((channel) => {
+      if (!isSearching) {
+        return true;
+      }
+
+      const haystack = [
+        channel.name,
+        channel.description,
+        channel.topic,
+        channel.teamspace?.name,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(query.toLowerCase());
+    })
+    .slice(0, isSearching ? 8 : 5);
 
   const handleSelect = (pageId: string) => {
     close();
     router.push(`/${workspaceId}/${pageId}`);
+  };
+  const handleChannelSelect = (channelId: string) => {
+    close();
+    router.push(`/${workspaceId}/channels/${channelId}`);
   };
 
   const { resolvedTheme, setTheme } = useThemeStore();
@@ -159,6 +186,51 @@ export function CommandPalette() {
             <div className="px-4 py-3 text-center" style={{ color: "var(--text-tertiary)" }}>
               {isSearching && isSearchLoading ? t("searching") : t("noResults")}
             </div>
+          )}
+
+          {matchedChannels.length > 0 && (
+            <>
+              <div className="px-4 py-2 mt-1" style={{ fontSize: "12px", color: "var(--text-tertiary)", fontWeight: 500 }}>
+                Channels
+              </div>
+              {matchedChannels.map((channel) => {
+                const Icon = channel.type === "voice" ? Volume2 : Hash;
+
+                return (
+                  <button
+                    key={channel.id}
+                    onClick={() => handleChannelSelect(channel.id)}
+                    className="w-full flex items-center gap-3 px-4 py-2 hover:bg-notion-bg-hover text-left"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center" style={{ color: "var(--text-tertiary)" }}>
+                      <Icon size={16} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate">{channel.name}</div>
+                      {(channel.description || channel.teamspace?.name) && (
+                        <div className="truncate text-xs" style={{ color: "var(--text-tertiary)" }}>
+                          {channel.teamspace?.name
+                            ? `${channel.teamspace.name} · ${channel.description || channel.topic || ""}`
+                            : channel.description || channel.topic || ""}
+                        </div>
+                      )}
+                    </div>
+                    {(channel.unreadMessageCount ?? 0) > 0 && (
+                      <span
+                        className="flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                        style={{
+                          backgroundColor: "rgba(35, 131, 226, 0.12)",
+                          color: "#2383e2",
+                        }}
+                      >
+                        {Math.min(channel.unreadMessageCount ?? 0, 99)}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </>
           )}
 
           {/* Quick Actions */}

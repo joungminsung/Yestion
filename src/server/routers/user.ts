@@ -2,6 +2,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "@/server/trpc/init";
+import { parseTwoFactorData } from "@/lib/two-factor-storage";
 
 export const userRouter = router({
   me: protectedProcedure.query(async ({ ctx }) => {
@@ -18,7 +19,7 @@ export const userRouter = router({
     let totpEnabled = false;
     if (twoFactorKey) {
       try {
-        const data = JSON.parse(twoFactorKey.key);
+        const data = parseTwoFactorData(twoFactorKey.key);
         totpEnabled = data.totpEnabled === true;
       } catch {
         // ignore

@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "@/server/trpc/init";
 import type { Context } from "@/server/trpc/init";
 import { sendCommentNotificationEmail } from "@/lib/email";
+import { emitWorkspaceEvent } from "@/lib/events/emit-workspace-event";
 
 async function verifyPageAccess(
   db: Context["db"],
@@ -91,16 +92,18 @@ export const commentRouter = router({
           where: { id: page.createdBy },
           select: { email: true, emailNotify: true },
         });
-        if (owner?.emailNotify !== false) {
+        if (owner && owner.emailNotify !== false) {
           const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
           const pageUrl = `${appUrl}/${page.workspaceId}/${input.pageId}`;
           sendCommentNotificationEmail(
-            owner!.email,
+            owner.email,
             ctx.session.user.name,
             page.title || "제목 없음",
             input.content,
             pageUrl,
-          ).catch(() => {});
+          ).catch((err) => {
+            console.error("[Comment] Failed to send comment notification email:", err);
+          });
         }
       }
 
@@ -113,6 +116,24 @@ export const commentRouter = router({
           metadata: { commentId: comment.id, parentId: input.parentId ?? null },
         },
       });
+
+      if (page) {
+        await emitWorkspaceEvent(
+          ctx.db,
+          page.workspaceId,
+          "comment.created",
+          {
+            entityType: "comment",
+            entityId: comment.id,
+            commentId: comment.id,
+            pageId: input.pageId,
+            parentId: input.parentId ?? null,
+            authorId: ctx.session.user.id,
+            content: input.content,
+          },
+          ctx.session.user.id,
+        );
+      }
 
       return comment;
     }),
@@ -180,29 +201,52 @@ export const commentRouter = router({
     }),
 
   addReaction: protectedProcedure
-    .input(z.object({ commentId: z.string(), emoji: z.string() }))
+    .input(z.object({ commentId: z.string(), emoji: z.string().min(1).max(32) }))
     .mutation(async ({ ctx, input }) => {
       const comment = await ctx.db.comment.findUnique({ where: { id: input.commentId } });
       if (!comment) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Comment not found" });
       }
+      await verifyPageAccess(ctx.db, ctx.session.user.id, comment.pageId);
 
-      const reactions = (comment.reactions as Record<string, string[]>) || {};
-      const users = reactions[input.emoji] || [];
+      // Use a transaction to prevent race conditions in the toggle
+      return ctx.db.$transaction(async (tx) => {
+        const existing = await tx.commentReaction.findUnique({
+          where: {
+            commentId_userId_emoji: {
+              commentId: input.commentId,
+              userId: ctx.session.user.id,
+              emoji: input.emoji,
+            },
+          },
+        });
 
-      if (users.includes(ctx.session.user.id)) {
-        // Remove reaction (toggle off)
-        const filtered = users.filter((id) => id !== ctx.session.user.id);
-        if (filtered.length === 0) delete reactions[input.emoji];
-        else reactions[input.emoji] = filtered;
-      } else {
-        // Add reaction
-        reactions[input.emoji] = [...users, ctx.session.user.id];
-      }
+        if (existing) {
+          await tx.commentReaction.delete({ where: { id: existing.id } });
+        } else {
+          await tx.commentReaction.create({
+            data: {
+              commentId: input.commentId,
+              userId: ctx.session.user.id,
+              emoji: input.emoji,
+            },
+          });
+        }
 
-      return ctx.db.comment.update({
-        where: { id: input.commentId },
-        data: { reactions },
+        // Return updated reactions as a map for backward compatibility
+        const allReactions = await tx.commentReaction.findMany({
+          where: { commentId: input.commentId },
+        });
+        const reactions: Record<string, string[]> = {};
+        for (const r of allReactions) {
+          if (!reactions[r.emoji]) reactions[r.emoji] = [];
+          reactions[r.emoji]!.push(r.userId);
+        }
+
+        return tx.comment.update({
+          where: { id: input.commentId },
+          data: { reactions },
+        });
       });
     }),
 });

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { trpc } from "@/server/trpc/client";
 import { useToastStore } from "@/stores/toast";
-import { Send, X, Trash2, MessageCircle, FileText, Vote, CheckSquare, Hash } from "lucide-react";
+import { Send, X, Trash2, MessageCircle, FileText, Vote, CheckSquare, Hash, Loader2 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -240,6 +240,22 @@ export function ChatPanel({
     onError: (err) => addToast({ message: err.message, type: "error" }),
   });
 
+  const pendingActionLabel = sendMutation.isPending
+    ? "메시지를 전송하고 있습니다."
+    : sendBlockRefMutation.isPending
+      ? "문서 블록을 채팅에 첨부하고 있습니다."
+      : createPollMutation.isPending
+        ? "투표를 만들고 있습니다."
+        : createTaskMutation.isPending
+          ? "할 일을 만들고 있습니다."
+          : votePollMutation.isPending
+            ? "투표 결과를 업데이트하고 있습니다."
+            : toggleTaskMutation.isPending
+              ? "할 일 상태를 업데이트하고 있습니다."
+              : deleteMutation.isPending
+                ? "메시지를 삭제하고 있습니다."
+                : "";
+
   // ── Send logic ─────────────────────────────────────────
 
   const handleSend = useCallback(() => {
@@ -312,7 +328,9 @@ export function ChatPanel({
     setIsDragOver(false);
     const blockId = e.dataTransfer.getData("text/block-id");
     if (blockId) {
-      sendBlockRefMutation.mutate({ pageId, blockId, comment: "" });
+      const blockType = e.dataTransfer.getData("text/block-type") || "paragraph";
+      const blockPreview = e.dataTransfer.getData("text/block-preview") || "";
+      sendBlockRefMutation.mutate({ pageId, blockId, blockType, blockPreview, comment: "" });
       return;
     }
     // Fallback: plain text
@@ -386,9 +404,12 @@ export function ChatPanel({
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1 relative">
         {isLoading && (
-          <div className="flex justify-center py-8">
+          <div className="flex flex-col items-center justify-center gap-2 py-8">
             <div className="animate-spin w-5 h-5 border-2 border-t-transparent rounded-full"
               style={{ borderColor: "var(--text-tertiary)", borderTopColor: "transparent" }} />
+            <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+              채팅 기록을 불러오고 있습니다.
+            </p>
           </div>
         )}
 
@@ -539,13 +560,19 @@ export function ChatPanel({
             disabled={!message.trim() || sendMutation.isPending}
             className="p-1.5 rounded-md transition-colors disabled:opacity-30"
             style={{ backgroundColor: message.trim() ? "#2383e2" : "transparent", color: message.trim() ? "#fff" : "var(--text-tertiary)" }}>
-            <Send size={14} />
+            {pendingActionLabel ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
           </button>
         </div>
         <div className="flex items-center gap-3 mt-1.5 px-1">
-          <span className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>
-            <code>/</code> 명령어 · 블록 드래그로 첨부
-          </span>
+          {pendingActionLabel ? (
+            <span className="text-[10px]" style={{ color: "#2383e2" }}>
+              {pendingActionLabel}
+            </span>
+          ) : (
+            <span className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>
+              <code>/</code> 명령어 · 블록 드래그로 첨부
+            </span>
+          )}
         </div>
       </div>
     </div>

@@ -18,15 +18,12 @@ import { syncedBlockRouter } from "@/server/routers/synced-block";
 import { sessionRouter } from "@/server/routers/session";
 import { chatRouter } from "@/server/routers/chat";
 import { templateRouter } from "@/server/routers/template";
-import { projectRouter } from "@/server/routers/project";
-import { taskRouter } from "@/server/routers/task";
-import { automationRouter } from "@/server/routers/automation";
 import { webhookRouter } from "@/server/routers/webhook";
-import { sprintRouter } from "@/server/routers/sprint";
-import { timeEntryRouter } from "@/server/routers/time-entry";
-import { workflowRouter } from "@/server/routers/workflow";
 import { integrationRouter } from "@/server/routers/integration";
 import { roleRouter } from "@/server/routers/role";
+import { teamspaceRouter } from "@/server/routers/teamspace";
+import { meetingRouter } from "@/server/routers/meeting";
+import { channelRouter } from "@/server/routers/channel";
 
 export const appRouter = router({
   auth: authRouter,
@@ -48,15 +45,12 @@ export const appRouter = router({
   session: sessionRouter,
   chat: chatRouter,
   template: templateRouter,
-  project: projectRouter,
-  task: taskRouter,
-  automation: automationRouter,
   webhook: webhookRouter,
-  sprint: sprintRouter,
-  timeEntry: timeEntryRouter,
-  workflow: workflowRouter,
   integration: integrationRouter,
   role: roleRouter,
+  teamspace: teamspaceRouter,
+  meeting: meetingRouter,
+  channel: channelRouter,
 });
 
 export type AppRouter = typeof appRouter;

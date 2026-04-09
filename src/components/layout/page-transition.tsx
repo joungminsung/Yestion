@@ -1,25 +1,25 @@
 "use client";
 
-import { AnimatePresence, m } from "framer-motion";
-import { usePathname } from "next/navigation";
-import { fadeIn } from "@/lib/motion/variants";
+import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
-export function PageTransition({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
-
+export function PageTransition({
+  children,
+  isChannel,
+}: {
+  children: ReactNode;
+  isChannel?: boolean;
+}) {
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <m.div
-        key={pathname}
-        variants={fadeIn}
-        initial="hidden"
-        animate="visible"
-        exit="exit"
-        className="flex-1 overflow-y-auto"
-      >
-        {children}
-      </m.div>
-    </AnimatePresence>
+    <div
+      className={cn(
+        "flex-1 min-w-0 min-h-0",
+        isChannel
+          ? "flex flex-col overflow-hidden"
+          : "overflow-x-hidden overflow-y-auto",
+      )}
+    >
+      {children}
+    </div>
   );
 }

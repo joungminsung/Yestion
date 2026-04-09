@@ -14,11 +14,11 @@ class GoogleCalendarAdapter extends BaseIntegrationAdapter {
   readonly info: IntegrationInfo = {
     service: "GOOGLE_CALENDAR",
     name: "Google Calendar",
-    description: "Sync task due dates with Google Calendar events",
+    description: "Connect meeting and schedule data with Google Calendar",
     icon: "CalendarDays",
     features: [
-      "Auto-create calendar events for tasks with due dates",
-      "Two-way sync: update task dates from calendar",
+      "Subscribe to calendar updates in the workspace",
+      "Prepare meeting pages around calendar context",
       "Meeting notes linked to calendar events",
     ],
     requiresOAuth: true,
@@ -164,43 +164,13 @@ class GoogleCalendarAdapter extends BaseIntegrationAdapter {
   }
 }
 
-/** Create a Google Calendar event from a task */
-export async function createCalendarEvent(
-  accessToken: string,
-  calendarId: string,
-  task: { title: string; description?: string; dueDate: Date; startDate?: Date }
-): Promise<string> {
-  const start = task.startDate ?? task.dueDate;
-  const body = {
-    summary: task.title,
-    description: task.description,
-    start: { dateTime: start.toISOString(), timeZone: "UTC" },
-    end: { dateTime: task.dueDate.toISOString(), timeZone: "UTC" },
-  };
-
-  const response = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    }
-  );
-
-  const data = await response.json();
-  if (!response.ok) throw new Error(`Google Calendar error: ${data.error?.message}`);
-  return data.id;
-}
-
 /** Set up a push notification channel (watch) for a calendar */
 export async function watchCalendar(
   accessToken: string,
   calendarId: string,
   webhookUrl: string,
-  channelId: string
+  channelId: string,
+  channelToken?: string
 ): Promise<{ resourceId: string; expiration: string }> {
   const response = await fetch(
     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/watch`,
@@ -214,6 +184,7 @@ export async function watchCalendar(
         id: channelId,
         type: "web_hook",
         address: webhookUrl,
+        ...(channelToken ? { token: channelToken } : {}),
       }),
     }
   );

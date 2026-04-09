@@ -6,6 +6,7 @@ import { trpc } from "@/server/trpc/client";
 
 type RelationCellEditorProps = {
   databaseId: string; // target database ID
+  workspaceId: string;
   value: string[]; // array of related row IDs
   onChange: (value: string[]) => void;
   onClose: () => void;
@@ -13,6 +14,7 @@ type RelationCellEditorProps = {
 
 export function RelationCellEditor({
   databaseId,
+  workspaceId,
   value,
   onChange,
   onClose,
@@ -50,7 +52,7 @@ export function RelationCellEditor({
 
   // Fetch currently related rows
   const { data: relatedRows } = trpc.database.getRelatedRows.useQuery(
-    { rowIds: value },
+    { rowIds: value, workspaceId },
     { enabled: value.length > 0 },
   );
 

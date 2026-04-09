@@ -15,7 +15,7 @@ class EmailAdapter extends BaseIntegrationAdapter {
     features: [
       "Email notifications for page mentions",
       "Daily/weekly workspace activity digest",
-      "Task assignment email alerts",
+      "Workspace digest email alerts",
       "Custom email templates",
     ],
     requiresOAuth: false,
@@ -106,39 +106,6 @@ function escapeHtml(str: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
-}
-
-/** Generate an HTML email for task assignment */
-export function taskAssignmentTemplate(params: {
-  taskTitle: string;
-  projectName: string;
-  assignerName: string;
-  taskUrl: string;
-}): string {
-  const taskTitle = escapeHtml(params.taskTitle);
-  const projectName = escapeHtml(params.projectName);
-  const assignerName = escapeHtml(params.assignerName);
-  const taskUrl = escapeHtml(params.taskUrl);
-
-  return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px;">
-      <h2 style="font-size: 18px; color: #1a1a1a; margin-bottom: 16px;">
-        You've been assigned a task
-      </h2>
-      <div style="padding: 16px; border: 1px solid #e5e5e5; border-radius: 8px; margin-bottom: 24px;">
-        <p style="font-size: 16px; font-weight: 600; color: #1a1a1a; margin: 0 0 4px;">
-          ${taskTitle}
-        </p>
-        <p style="font-size: 13px; color: #666; margin: 0;">
-          in ${projectName} &middot; assigned by ${assignerName}
-        </p>
-      </div>
-      <a href="${taskUrl}"
-         style="display: inline-block; padding: 10px 20px; background: #2383e2; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500;">
-        View Task
-      </a>
-    </div>
-  `;
 }
 
 /** Generate an HTML email for a workspace activity digest */

@@ -1,7 +1,12 @@
 import { Mark, mergeAttributes } from "@tiptap/core";
+import { Plugin, TextSelection } from "@tiptap/pm/state";
 
 export interface SuggestionMarkOptions {
   HTMLAttributes: Record<string, string>;
+  currentUser?: {
+    id: string;
+    name: string;
+  };
 }
 
 declare module "@tiptap/core" {
@@ -17,6 +22,8 @@ declare module "@tiptap/core" {
       unsetSuggestion: () => ReturnType;
       acceptSuggestion: () => ReturnType;
       rejectSuggestion: () => ReturnType;
+      toggleSuggestionMode: () => ReturnType;
+      setSuggestionMode: (enabled: boolean) => ReturnType;
     };
   }
 }
@@ -30,6 +37,13 @@ export const SuggestionMark = Mark.create<SuggestionMarkOptions>({
   addOptions() {
     return {
       HTMLAttributes: {},
+      currentUser: undefined,
+    };
+  },
+
+  addStorage() {
+    return {
+      enabled: false,
     };
   },
 
@@ -133,6 +147,91 @@ export const SuggestionMark = Mark.create<SuggestionMarkOptions>({
           if (found && dispatch) dispatch(tr);
           return found;
         },
+      toggleSuggestionMode:
+        () =>
+        () => {
+          this.storage.enabled = !this.storage.enabled;
+          return true;
+        },
+      setSuggestionMode:
+        (enabled) =>
+        () => {
+          this.storage.enabled = enabled;
+          return true;
+        },
     };
+  },
+
+  addProseMirrorPlugins() {
+    const getAttrs = (
+      action: "insert" | "delete" | "replace",
+      originalText?: string
+    ) => ({
+      authorId: this.options.currentUser?.id ?? "unknown",
+      authorName: this.options.currentUser?.name ?? "Unknown",
+      action,
+      originalText: originalText ?? null,
+      createdAt: new Date().toISOString(),
+    });
+
+    return [
+      new Plugin({
+        props: {
+          handleTextInput: (view, from, to, text) => {
+            if (!this.storage.enabled) return false;
+
+            const suggestionType = view.state.schema.marks.suggestion;
+            if (!suggestionType) return false;
+
+            const originalText = from !== to ? view.state.doc.textBetween(from, to, "\n", "\n") : "";
+            const action = from !== to ? "replace" : "insert";
+            const mark = suggestionType.create(getAttrs(action, originalText || undefined));
+            const tr = view.state.tr.replaceRangeWith(from, to, view.state.schema.text(text, [mark]));
+            view.dispatch(tr.scrollIntoView());
+            return true;
+          },
+          handleKeyDown: (view, event) => {
+            if (!this.storage.enabled) return false;
+            if (event.key !== "Backspace" && event.key !== "Delete") return false;
+
+            const suggestionType = view.state.schema.marks.suggestion;
+            if (!suggestionType) return false;
+
+            const { selection } = view.state;
+            let from = selection.from;
+            let to = selection.to;
+
+            if (selection.empty) {
+              if (event.key === "Backspace") {
+                if (from <= 1) return false;
+                from -= 1;
+              } else {
+                if (to >= view.state.doc.content.size) return false;
+                to += 1;
+              }
+            }
+
+            const originalText = view.state.doc.textBetween(from, to, "\n", "\n");
+            if (!originalText.trim() && originalText.length === 0) return false;
+
+            let hasSuggestion = false;
+            view.state.doc.nodesBetween(from, to, (node) => {
+              if (node.marks.some((mark) => mark.type.name === "suggestion")) {
+                hasSuggestion = true;
+                return false;
+              }
+              return undefined;
+            });
+            if (hasSuggestion) return false;
+
+            event.preventDefault();
+            const tr = view.state.tr.addMark(from, to, suggestionType.create(getAttrs("delete", originalText)));
+            tr.setSelection(TextSelection.create(tr.doc, from, from));
+            view.dispatch(tr.scrollIntoView());
+            return true;
+          },
+        },
+      }),
+    ];
   },
 });

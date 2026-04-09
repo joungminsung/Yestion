@@ -7,12 +7,24 @@ const TEMPLATE_CATEGORIES = [
   "documents",
   "personal",
   "team",
-  "project",
   "engineering",
-  "education",
+  "design",
   "marketing",
+  "hr",
   "custom",
 ] as const;
+
+const TEMPLATE_SORTS = ["popular", "latest", "alphabetical"] as const;
+
+function normalizeTemplateCategory(category: string | null | undefined) {
+  if (category === "education") {
+    return "design";
+  }
+  if (category === "project") {
+    return "team";
+  }
+  return category ?? "custom";
+}
 
 export const templateRouter = router({
   list: protectedProcedure
@@ -23,6 +35,7 @@ export const templateRouter = router({
         search: z.string().optional(),
         limit: z.number().min(1).max(100).default(50),
         cursor: z.string().optional(),
+        sort: z.enum(TEMPLATE_SORTS).default("popular"),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -34,7 +47,10 @@ export const templateRouter = router({
         ],
       };
       if (input.category && input.category !== "all") {
-        where.category = input.category;
+        where.category =
+          input.category === "design"
+            ? { in: ["design", "education"] }
+            : input.category;
       }
       if (input.search?.trim()) {
         const q = input.search.trim();
@@ -52,9 +68,15 @@ export const templateRouter = router({
         ];
         delete where.OR;
       }
+      const orderBy =
+        input.sort === "latest"
+          ? [{ updatedAt: "desc" as const }, { usageCount: "desc" as const }]
+          : input.sort === "alphabetical"
+            ? [{ name: "asc" as const }, { usageCount: "desc" as const }]
+            : [{ isDefault: "desc" as const }, { usageCount: "desc" as const }, { name: "asc" as const }];
       const templates = await ctx.db.template.findMany({
         where,
-        orderBy: [{ isDefault: "desc" }, { usageCount: "desc" }, { name: "asc" }],
+        orderBy,
         take: input.limit + 1,
         ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
       });
@@ -65,7 +87,13 @@ export const templateRouter = router({
         nextCursor = next?.id;
       }
 
-      return { templates, nextCursor };
+      return {
+        templates: templates.map((template) => ({
+          ...template,
+          category: normalizeTemplateCategory(template.category),
+        })),
+        nextCursor,
+      };
     }),
 
   getById: protectedProcedure
@@ -75,7 +103,19 @@ export const templateRouter = router({
         where: { id: input.id },
       });
       if (!template) throw new TRPCError({ code: "NOT_FOUND" });
-      return template;
+
+      // For workspace-specific (non-public) templates, verify workspace access
+      if (template.workspaceId && !template.isPublic) {
+        const member = await ctx.db.workspaceMember.findUnique({
+          where: { userId_workspaceId: { userId: ctx.session.user.id, workspaceId: template.workspaceId } },
+        });
+        if (!member) throw new TRPCError({ code: "FORBIDDEN", message: "No access to this template" });
+      }
+
+      return {
+        ...template,
+        category: normalizeTemplateCategory(template.category),
+      };
     }),
 
   create: protectedProcedure
@@ -95,6 +135,14 @@ export const templateRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Verify workspace membership
+      const member = await ctx.db.workspaceMember.findUnique({
+        where: { userId_workspaceId: { userId: ctx.session.user.id, workspaceId: input.workspaceId } },
+      });
+      if (!member) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "No access to this workspace" });
+      }
+
       return ctx.db.template.create({
         data: {
           ...input,
@@ -131,7 +179,7 @@ export const templateRouter = router({
           message: "Cannot edit system templates",
         });
       }
-      if (template.creatorId && template.creatorId !== ctx.session.user.id) {
+      if (template.creatorId !== ctx.session.user.id) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Not authorized",
@@ -158,7 +206,7 @@ export const templateRouter = router({
           message: "Cannot delete system templates",
         });
       }
-      if (template.creatorId && template.creatorId !== ctx.session.user.id) {
+      if (template.creatorId !== ctx.session.user.id) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Not authorized",
@@ -174,6 +222,21 @@ export const templateRouter = router({
         where: { id: input.id },
       });
       if (!source) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const member = await ctx.db.workspaceMember.findUnique({
+        where: {
+          userId_workspaceId: {
+            userId: ctx.session.user.id,
+            workspaceId: input.workspaceId,
+          },
+        },
+      });
+      if (!member) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "No access to the target workspace",
+        });
+      }
 
       return ctx.db.template.create({
         data: {
@@ -204,28 +267,55 @@ export const templateRouter = router({
     }),
 
   seed: protectedProcedure.mutation(async ({ ctx }) => {
-    const existing = await ctx.db.template.count({
-      where: { isDefault: true },
+    // Only workspace owners can seed templates
+    const membership = await ctx.db.workspaceMember.findFirst({
+      where: { userId: ctx.session.user.id, role: { in: ["OWNER", "ADMIN"] } },
     });
-    if (existing > 0) return { seeded: false, count: existing };
+    if (!membership) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Only owners and admins can seed templates" });
+    }
 
-    // Import seed data
+    const existingDefaults = await ctx.db.template.findMany({
+      where: { isDefault: true },
+      select: { id: true, name: true },
+    });
+    const existingByName = new Map(existingDefaults.map((template) => [template.name, template]));
+
     const { SEED_TEMPLATES } = await import("@/../prisma/seed-templates");
-    const created = await ctx.db.template.createMany({
-      data: SEED_TEMPLATES.map((t) => ({
-        name: t.name,
-        nameKo: t.nameKo,
-        description: t.description,
-        descriptionKo: t.descriptionKo,
-        icon: t.icon,
-        category: t.category,
-        tags: t.tags,
-        blocks: t.blocks as unknown as object,
+    let created = 0;
+    let updated = 0;
+
+    for (const template of SEED_TEMPLATES) {
+      const existing = existingByName.get(template.name);
+      const data = {
+        nameKo: template.nameKo,
+        description: template.description,
+        descriptionKo: template.descriptionKo,
+        icon: template.icon,
+        category: normalizeTemplateCategory(template.category),
+        tags: template.tags,
+        blocks: template.blocks as unknown as object,
         isDefault: true,
         isPublic: true,
-      })),
-      skipDuplicates: true,
-    });
-    return { seeded: true, count: created.count };
+      };
+
+      if (existing) {
+        await ctx.db.template.update({
+          where: { id: existing.id },
+          data,
+        });
+        updated += 1;
+      } else {
+        await ctx.db.template.create({
+          data: {
+            name: template.name,
+            ...data,
+          },
+        });
+        created += 1;
+      }
+    }
+
+    return { seeded: true, count: created + updated, created, updated };
   }),
 });

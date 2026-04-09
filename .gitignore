@@ -39,6 +39,7 @@ prisma/*.db
 # uploads
 public/uploads/*
 !public/uploads/.gitkeep
+private_uploads/
 
 # typescript
 *.tsbuildinfo

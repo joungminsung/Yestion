@@ -15,7 +15,11 @@ export async function authenticateApiKey(request: Request) {
     include: { workspace: true },
   });
   if (!apiKey) return null;
-  return { workspaceId: apiKey.workspaceId, apiKeyId: apiKey.id };
+
+  // Verify the workspace still exists (FK may have been broken if workspace deleted)
+  if (!apiKey.workspace) return null;
+
+  return { workspaceId: apiKey.workspaceId, apiKeyId: apiKey.id, createdBy: apiKey.createdBy };
 }
 
 export function unauthorized() {

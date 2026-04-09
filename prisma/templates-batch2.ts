@@ -665,7 +665,7 @@ export const BATCH2_TEMPLATES: SeedTemplate[] = [
     description: "Comprehensive project plan with scope, timeline, and resources",
     descriptionKo: "프로젝트 범위, 일정, 리소스 종합 계획서",
     icon: "📋",
-    category: "project",
+    category: "team",
     tags: ["plan", "project", "scope", "계획", "프로젝트"],
     blocks: [
       callout("프로젝트: 커머스 결제 시스템 v2 — 시작: 2026.03.01 / 종료: 2026.06.30", "📋"),
@@ -732,7 +732,7 @@ export const BATCH2_TEMPLATES: SeedTemplate[] = [
     description: "Product or project roadmap with quarterly milestones",
     descriptionKo: "제품/프로젝트 로드맵 — 분기별 마일스톤",
     icon: "🗺️",
-    category: "project",
+    category: "team",
     tags: ["roadmap", "timeline", "milestones", "로드맵", "일정"],
     blocks: [
       callout("2026년 커머스 플랫폼 로드맵 — 연간 계획", "🗺️"),
@@ -798,7 +798,7 @@ export const BATCH2_TEMPLATES: SeedTemplate[] = [
     description: "Project risk register with mitigation strategies",
     descriptionKo: "프로젝트 리스크 등록부 및 완화 전략",
     icon: "⚠️",
-    category: "project",
+    category: "team",
     tags: ["risk", "management", "mitigation", "리스크", "관리"],
     blocks: [
       callout("결제 시스템 v2 프로젝트 리스크 관리 대장 — 최종 업데이트: 2026-04-01", "⚠️"),
@@ -872,7 +872,7 @@ export const BATCH2_TEMPLATES: SeedTemplate[] = [
     description: "Product backlog with prioritized user stories",
     descriptionKo: "우선순위 기반 제품 백로그",
     icon: "📦",
-    category: "project",
+    category: "team",
     tags: ["backlog", "stories", "priority", "백로그", "우선순위"],
     blocks: [
       callout("결제 시스템 v2 제품 백로그 — 총 42개 스토리 / 완료 18개", "📦"),
@@ -941,7 +941,7 @@ export const BATCH2_TEMPLATES: SeedTemplate[] = [
     description: "Bug tracking with severity, status, and reproduction steps",
     descriptionKo: "버그 추적 — 심각도, 상태, 재현 방법",
     icon: "🐛",
-    category: "project",
+    category: "team",
     tags: ["bug", "tracker", "issue", "버그", "이슈"],
     blocks: [
       callout("결제 시스템 v2 버그 트래커 — 미해결: 7건 / 해결: 23건", "🐛"),
@@ -1021,7 +1021,7 @@ export const BATCH2_TEMPLATES: SeedTemplate[] = [
     description: "Release planning with checklist and rollout strategy",
     descriptionKo: "릴리스 계획 — 체크리스트 및 배포 전략",
     icon: "🚀",
-    category: "project",
+    category: "team",
     tags: ["release", "deploy", "launch", "릴리스", "배포"],
     blocks: [
       callout("결제 시스템 v2.0 릴리스 계획 — 목표일: 2026-06-16", "🚀"),
@@ -1097,7 +1097,7 @@ export const BATCH2_TEMPLATES: SeedTemplate[] = [
     description: "At-a-glance project status dashboard",
     descriptionKo: "프로젝트 현황 한눈에 보기 대시보드",
     icon: "📊",
-    category: "project",
+    category: "team",
     tags: ["dashboard", "status", "overview", "대시보드", "현황"],
     blocks: [
       callout("결제 시스템 v2 프로젝트 대시보드 — 2026-04-02 기준", "📊"),
@@ -1169,7 +1169,7 @@ export const BATCH2_TEMPLATES: SeedTemplate[] = [
     description: "Track project milestones with status and deliverables",
     descriptionKo: "프로젝트 마일스톤 추적 — 상태 및 산출물",
     icon: "🏁",
-    category: "project",
+    category: "team",
     tags: ["milestone", "tracker", "deadline", "마일스톤", "추적"],
     blocks: [
       callout("결제 시스템 v2 마일스톤 트래커 — 총 8개 마일스톤 / 완료 3개", "🏁"),
@@ -1254,7 +1254,7 @@ export const BATCH2_TEMPLATES: SeedTemplate[] = [
     description: "Stakeholder identification, influence, and communication plan",
     descriptionKo: "이해관계자 식별, 영향력, 커뮤니케이션 계획",
     icon: "👥",
-    category: "project",
+    category: "team",
     tags: ["stakeholder", "communication", "이해관계자", "소통"],
     blocks: [
       callout("결제 시스템 v2 이해관계자 맵 — 핵심 이해관계자 12명", "👥"),
@@ -1340,7 +1340,7 @@ export const BATCH2_TEMPLATES: SeedTemplate[] = [
     description: "End-of-project retrospective with outcomes and lessons",
     descriptionKo: "프로젝트 완료 후 전체 회고 — 성과 및 교훈",
     icon: "🔍",
-    category: "project",
+    category: "team",
     tags: ["retro", "project", "postmortem", "회고", "프로젝트"],
     blocks: [
       callout("검색 엔진 마이그레이션 프로젝트 회고 — 2026.01.05 ~ 2026.03.15", "🔍"),

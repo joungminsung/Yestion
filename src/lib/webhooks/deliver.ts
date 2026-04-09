@@ -17,7 +17,7 @@ type DeliveryResult = {
 function validateWebhookUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
+    if (parsed.protocol !== "https:") return false;
     const hostname = parsed.hostname.toLowerCase();
     if (
       hostname === "localhost" ||
@@ -49,7 +49,11 @@ export async function deliverWebhook(
   payload: Record<string, unknown>
 ): Promise<DeliveryResult> {
   if (!validateWebhookUrl(target.url)) {
-    return { success: false, durationMs: 0, error: "Blocked: URL targets private/internal network" };
+    return {
+      success: false,
+      durationMs: 0,
+      error: "Blocked: outgoing webhooks require HTTPS and cannot target private/internal networks",
+    };
   }
 
   const body = JSON.stringify({

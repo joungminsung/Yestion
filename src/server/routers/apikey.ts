@@ -2,6 +2,10 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { randomBytes, createHash } from "crypto";
 import { router, protectedProcedure } from "@/server/trpc/init";
+import {
+  requireWorkspaceMembership,
+  requireWorkspacePermission,
+} from "@/lib/permissions";
 
 function hashKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
@@ -16,18 +20,13 @@ export const apiKeyRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify OWNER or ADMIN
-      const membership = await ctx.db.workspaceMember.findUnique({
-        where: {
-          userId_workspaceId: {
-            userId: ctx.session.user.id,
-            workspaceId: input.workspaceId,
-          },
-        },
-      });
-      if (!membership || !["OWNER", "ADMIN"].includes(membership.role)) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
+      await requireWorkspacePermission(
+        ctx.db,
+        ctx.session.user.id,
+        input.workspaceId,
+        "apikey.manage",
+        "API key management permission is required",
+      );
 
       const rawKey = `nclone_${randomBytes(32).toString("hex")}`;
       const hashedKey = hashKey(rawKey);
@@ -48,20 +47,13 @@ export const apiKeyRouter = router({
   list: protectedProcedure
     .input(z.object({ workspaceId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const membership = await ctx.db.workspaceMember.findUnique({
-        where: {
-          userId_workspaceId: {
-            userId: ctx.session.user.id,
-            workspaceId: input.workspaceId,
-          },
-        },
-      });
-      if (!membership) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
+      await requireWorkspaceMembership(ctx.db, ctx.session.user.id, input.workspaceId);
 
       const keys = await ctx.db.apiKey.findMany({
-        where: { workspaceId: input.workspaceId },
+        where: {
+          workspaceId: input.workspaceId,
+          NOT: { name: { startsWith: "__2fa_" } }, // Exclude internal 2FA entries
+        },
         orderBy: { createdAt: "desc" },
       });
 
@@ -75,17 +67,13 @@ export const apiKeyRouter = router({
   revoke: protectedProcedure
     .input(z.object({ id: z.string(), workspaceId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const membership = await ctx.db.workspaceMember.findUnique({
-        where: {
-          userId_workspaceId: {
-            userId: ctx.session.user.id,
-            workspaceId: input.workspaceId,
-          },
-        },
-      });
-      if (!membership || !["OWNER", "ADMIN"].includes(membership.role)) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
+      await requireWorkspacePermission(
+        ctx.db,
+        ctx.session.user.id,
+        input.workspaceId,
+        "apikey.manage",
+        "API key management permission is required",
+      );
 
       const apiKey = await ctx.db.apiKey.findUnique({
         where: { id: input.id },

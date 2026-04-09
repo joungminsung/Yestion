@@ -1,4 +1,6 @@
 import { Node, mergeAttributes } from "@tiptap/core";
+import { ReactNodeViewRenderer } from "@tiptap/react";
+import { LinkedDatabaseBlockView } from "../node-views/linked-database-block-view";
 
 export interface LinkedDatabaseBlockOptions {
   HTMLAttributes: Record<string, string>;
@@ -42,6 +44,10 @@ export const LinkedDatabaseBlock = Node.create<LinkedDatabaseBlockOptions>({
         "data-type": "linked-database",
       }),
     ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(LinkedDatabaseBlockView);
   },
 
   addCommands() {

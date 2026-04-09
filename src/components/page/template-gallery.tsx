@@ -1,7 +1,7 @@
 // src/components/page/template-gallery.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { X, Search, LayoutTemplate, Star, Copy, Trash2 } from "lucide-react";
 import { trpc } from "@/server/trpc/client";
 
@@ -10,11 +10,17 @@ const CATEGORIES = [
   { id: "documents", label: "문서", labelEn: "Documents" },
   { id: "personal", label: "개인", labelEn: "Personal" },
   { id: "team", label: "팀", labelEn: "Team" },
-  { id: "project", label: "프로젝트", labelEn: "Project" },
   { id: "engineering", label: "엔지니어링", labelEn: "Engineering" },
-  { id: "education", label: "교육", labelEn: "Education" },
+  { id: "design", label: "디자인", labelEn: "Design" },
   { id: "marketing", label: "마케팅", labelEn: "Marketing" },
+  { id: "hr", label: "인사", labelEn: "HR" },
   { id: "custom", label: "내 템플릿", labelEn: "My Templates" },
+] as const;
+
+const SORT_OPTIONS = [
+  { id: "popular", label: "인기순" },
+  { id: "latest", label: "최신순" },
+  { id: "alphabetical", label: "이름순" },
 ] as const;
 
 type TemplateData = {
@@ -43,13 +49,19 @@ export function TemplateGallery({ workspaceId, onSelect, onClose }: Props) {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [search, setSearch] = useState("");
   const [previewTemplate, setPreviewTemplate] = useState<TemplateData | null>(null);
+  const [sort, setSort] = useState<(typeof SORT_OPTIONS)[number]["id"]>("popular");
 
   const { data, isLoading } = trpc.template.list.useQuery(
-    { workspaceId, category: selectedCategory === "all" ? undefined : selectedCategory, search: search || undefined },
+    {
+      workspaceId,
+      category: selectedCategory === "all" ? undefined : selectedCategory,
+      search: search || undefined,
+      sort,
+    },
     { enabled: !!workspaceId }
   );
 
-  const templates = data?.templates ?? [];
+  const templates = useMemo(() => data?.templates ?? [], [data?.templates]);
 
   // Seed system templates on first load if none exist
   const seedMutation = trpc.template.seed.useMutation();
@@ -177,24 +189,42 @@ export function TemplateGallery({ workspaceId, onSelect, onClose }: Props) {
           <div className="flex-1 flex flex-col min-w-0">
             {/* Search */}
             <div className="px-4 py-3 border-b shrink-0" style={{ borderColor: "var(--border-divider)" }}>
-              <div className="relative">
-                <Search
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2"
-                  style={{ color: "var(--text-placeholder)" }}
-                />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="템플릿 검색..."
-                  className="w-full pl-9 pr-3 py-2 text-sm border rounded-md outline-none focus:ring-1 focus:ring-[#2383e2]"
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <Search
+                    size={16}
+                    className="absolute left-3 top-1/2 -translate-y-1/2"
+                    style={{ color: "var(--text-placeholder)" }}
+                  />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="템플릿 검색..."
+                    className="w-full pl-9 pr-3 py-2 text-sm border rounded-md outline-none focus:ring-1 focus:ring-[#2383e2]"
+                    style={{
+                      backgroundColor: "var(--bg-primary)",
+                      borderColor: "var(--border-default)",
+                      color: "var(--text-primary)",
+                    }}
+                  />
+                </div>
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as (typeof SORT_OPTIONS)[number]["id"])}
+                  className="px-3 py-2 text-sm border rounded-md bg-transparent outline-none"
                   style={{
                     backgroundColor: "var(--bg-primary)",
                     borderColor: "var(--border-default)",
                     color: "var(--text-primary)",
                   }}
-                />
+                >
+                  {SORT_OPTIONS.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 

@@ -66,6 +66,14 @@ export function FindReplace({ editor }: Props) {
     editor.view.dispatch(tr);
   }, [matches, currentIndex, editor]);
 
+  const clearHighlights = useCallback(() => {
+    setMatches([]);
+    if (editor && findPluginRef.current) {
+      const tr = editor.state.tr.setMeta(findPluginKey, { matches: [], currentIndex: -1 });
+      editor.view.dispatch(tr);
+    }
+  }, [editor]);
+
   // Cmd+F to open, Cmd+H to open with replace
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -89,7 +97,7 @@ export function FindReplace({ editor }: Props) {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [isOpen]);
+  }, [isOpen, clearHighlights]);
 
   // Find matches when query changes
   const findMatches = useCallback(() => {
@@ -133,22 +141,15 @@ export function FindReplace({ editor }: Props) {
   };
 
   const replaceAll = () => {
-    // Replace from end to start to preserve positions
+    if (matches.length === 0) return;
+    // Build a single transaction that replaces all matches from end to start
+    // to preserve positions within one dispatch
+    const { tr } = editor.state;
     [...matches].reverse().forEach(match => {
-      editor.chain().focus()
-        .setTextSelection(match)
-        .insertContent(replacement)
-        .run();
+      tr.replaceWith(match.from, match.to, editor.state.schema.text(replacement));
     });
+    editor.view.dispatch(tr);
     findMatches();
-  };
-
-  const clearHighlights = () => {
-    setMatches([]);
-    if (editor && findPluginRef.current) {
-      const tr = editor.state.tr.setMeta(findPluginKey, { matches: [], currentIndex: -1 });
-      editor.view.dispatch(tr);
-    }
   };
 
   if (!isOpen) return null;
@@ -161,8 +162,13 @@ export function FindReplace({ editor }: Props) {
           placeholder="찾기..." className="px-2 py-1 rounded text-sm border outline-none"
           style={{ borderColor: "var(--border-default)", backgroundColor: "var(--bg-primary)", color: "var(--text-primary)", width: "200px" }}
           onKeyDown={e => {
-            if (e.key === "Enter") goToMatch((currentIndex + 1) % matches.length);
-            if (e.key === "Enter" && e.shiftKey) goToMatch((currentIndex - 1 + matches.length) % matches.length);
+            if (e.key === "Enter" && matches.length > 0) {
+              if (e.shiftKey) {
+                goToMatch((currentIndex - 1 + matches.length) % matches.length);
+              } else {
+                goToMatch((currentIndex + 1) % matches.length);
+              }
+            }
           }}
         />
         {showReplace && (
@@ -174,8 +180,8 @@ export function FindReplace({ editor }: Props) {
       </div>
       <div className="flex items-center gap-1 text-sm" style={{ color: "var(--text-secondary)" }}>
         <span>{matches.length > 0 ? `${currentIndex + 1}/${matches.length}` : "0/0"}</span>
-        <button onClick={() => goToMatch((currentIndex - 1 + matches.length) % matches.length)} className="px-1 rounded hover:bg-notion-bg-hover">&#8593;</button>
-        <button onClick={() => goToMatch((currentIndex + 1) % matches.length)} className="px-1 rounded hover:bg-notion-bg-hover">&#8595;</button>
+        <button onClick={() => matches.length > 0 && goToMatch((currentIndex - 1 + matches.length) % matches.length)} className="px-1 rounded hover:bg-notion-bg-hover">&#8593;</button>
+        <button onClick={() => matches.length > 0 && goToMatch((currentIndex + 1) % matches.length)} className="px-1 rounded hover:bg-notion-bg-hover">&#8595;</button>
         <button onClick={() => setCaseSensitive(!caseSensitive)} className={`px-1 rounded ${caseSensitive ? "bg-notion-bg-active" : "hover:bg-notion-bg-hover"}`}>Aa</button>
         {showReplace && (
           <>

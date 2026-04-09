@@ -1,6 +1,16 @@
 import { z } from "zod";
+import { randomBytes, randomUUID } from "crypto";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "@/server/trpc/init";
 import { getAdapter, getAllAdapters } from "@/lib/integrations/base-adapter";
+import { encryptToken, decryptToken } from "@/lib/integrations/crypto";
+import { ensureRepositoryWebhook } from "@/lib/integrations/github";
+import { watchCalendar } from "@/lib/integrations/google-calendar";
+import { getIntegrationServiceSlug } from "@/lib/integrations/service-slug";
+import {
+  requireWorkspaceMembership,
+  requireWorkspacePermission,
+} from "@/lib/permissions";
 import type { IntegrationServiceType } from "@/lib/integrations/types";
 
 // Import adapters to trigger registration
@@ -11,16 +21,29 @@ import "@/lib/integrations/email";
 
 const serviceEnum = z.enum(["SLACK", "GITHUB", "GOOGLE_CALENDAR", "EMAIL"]);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function verifyWorkspaceAdmin(db: any, workspaceId: string, userId: string) {
-  const member = await db.workspaceMember.findFirst({
-    where: { workspaceId, userId },
-  });
-  if (!member) throw new Error("Not authorized");
-  if (member.role !== "OWNER" && member.role !== "ADMIN") {
-    throw new Error("Only owners and admins can manage integrations");
-  }
-  return member;
+async function verifyWorkspaceAdmin(db: Parameters<typeof requireWorkspacePermission>[0], workspaceId: string, userId: string) {
+  return requireWorkspacePermission(
+    db,
+    userId,
+    workspaceId,
+    "integration.manage",
+    "Integration management permission is required",
+  );
+}
+
+function getIntegrationCallbackUrl(service: IntegrationServiceType): string {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  return `${baseUrl}/api/integrations/${getIntegrationServiceSlug(service)}/callback`;
+}
+
+function getGoogleCalendarWebhookUrl(): string {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  return `${baseUrl}/api/integrations/google-calendar/webhook`;
+}
+
+function getGitHubWebhookUrl(): string {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  return `${baseUrl}/api/integrations/github/webhook`;
 }
 
 export const integrationRouter = router({
@@ -28,10 +51,7 @@ export const integrationRouter = router({
   list: protectedProcedure
     .input(z.object({ workspaceId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const member = await ctx.db.workspaceMember.findFirst({
-        where: { workspaceId: input.workspaceId, userId: ctx.session.user.id },
-      });
-      if (!member) throw new Error("Not authorized");
+      await requireWorkspaceMembership(ctx.db, ctx.session.user.id, input.workspaceId);
 
       const integrations = await ctx.db.integration.findMany({
         where: { workspaceId: input.workspaceId },
@@ -70,11 +90,10 @@ export const integrationRouter = router({
       await verifyWorkspaceAdmin(ctx.db, input.workspaceId, ctx.session.user.id);
 
       const adapter = getAdapter(input.service as IntegrationServiceType);
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-      const redirectUri = `${baseUrl}/api/integrations/${input.service.toLowerCase()}/callback`;
+      const redirectUri = getIntegrationCallbackUrl(input.service as IntegrationServiceType);
 
       // Create or update the integration record as pending
-      await ctx.db.integration.upsert({
+      const integration = await ctx.db.integration.upsert({
         where: {
           workspaceId_service: {
             workspaceId: input.workspaceId,
@@ -92,6 +111,36 @@ export const integrationRouter = router({
           connectedBy: ctx.session.user.id,
         },
       });
+
+      if (!adapter.info.requiresOAuth) {
+        const isValid = await adapter.verifyConnection("");
+        if (!isValid) {
+          await ctx.db.integration.update({
+            where: { id: integration.id },
+            data: { status: "ERROR" },
+          });
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "This integration is not configured on the server",
+          });
+        }
+
+        const tokens = await adapter.exchangeCode("", redirectUri);
+        await ctx.db.integration.update({
+          where: { id: integration.id },
+          data: {
+            status: "CONNECTED",
+            accessToken: tokens.accessToken ? encryptToken(tokens.accessToken) : null,
+            refreshToken: tokens.refreshToken ? encryptToken(tokens.refreshToken) : null,
+            tokenExpiry: tokens.expiresAt,
+            externalId: tokens.externalId,
+            externalName: tokens.externalName,
+            connectedAt: new Date(),
+          },
+        });
+
+        return { oauthUrl: null };
+      }
 
       const oauthUrl = adapter.getOAuthUrl(input.workspaceId, redirectUri);
       return { oauthUrl };
@@ -152,6 +201,9 @@ export const integrationRouter = router({
       service: serviceEnum,
     }))
     .query(async ({ ctx, input }) => {
+      // Verify workspace membership
+      await requireWorkspaceMembership(ctx.db, ctx.session.user.id, input.workspaceId);
+
       const integration = await ctx.db.integration.findUnique({
         where: {
           workspaceId_service: {
@@ -161,14 +213,19 @@ export const integrationRouter = router({
         },
       });
 
-      if (!integration || !integration.accessToken) {
-        return { connected: false, status: integration?.status ?? "DISCONNECTED" };
+      const adapter = getAdapter(input.service as IntegrationServiceType);
+
+      if (!integration) {
+        return { connected: false, status: "DISCONNECTED" };
       }
 
       // Optionally verify the connection is still valid
       try {
-        const adapter = getAdapter(input.service as IntegrationServiceType);
-        const isValid = await adapter.verifyConnection(integration.accessToken);
+        if (adapter.info.requiresOAuth && !integration.accessToken) {
+          return { connected: false, status: integration.status };
+        }
+
+        const isValid = await adapter.verifyConnection(integration.accessToken ?? "");
         if (!isValid) {
           await ctx.db.integration.update({
             where: { id: integration.id },
@@ -181,7 +238,7 @@ export const integrationRouter = router({
       }
 
       return {
-        connected: true,
+        connected: integration.status === "CONNECTED",
         status: integration.status,
         externalName: integration.externalName,
         connectedAt: integration.connectedAt,
@@ -197,14 +254,77 @@ export const integrationRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       await verifyWorkspaceAdmin(ctx.db, input.workspaceId, ctx.session.user.id);
-      return ctx.db.integration.update({
+
+      const integration = await ctx.db.integration.findUnique({
         where: {
           workspaceId_service: {
             workspaceId: input.workspaceId,
             service: input.service,
           },
         },
-        data: { config: input.config as unknown as import("@prisma/client").Prisma.InputJsonValue },
+      });
+
+      if (!integration) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Integration not found" });
+      }
+
+      const currentConfig = (integration.config as Record<string, unknown>) ?? {};
+      const nextConfig: Record<string, unknown> = {
+        ...currentConfig,
+        ...input.config,
+      };
+      const updateData: Record<string, unknown> = {
+        config: nextConfig as import("@prisma/client").Prisma.InputJsonValue,
+      };
+
+      if (input.service === "GITHUB" && integration.accessToken) {
+        const repository = typeof nextConfig.repository === "string"
+          ? nextConfig.repository.trim()
+          : "";
+
+        if (repository) {
+          const webhookSecret = integration.webhookSecret ?? randomBytes(32).toString("hex");
+          const webhookId = await ensureRepositoryWebhook(
+            decryptToken(integration.accessToken),
+            repository,
+            getGitHubWebhookUrl(),
+            webhookSecret
+          );
+
+          nextConfig.webhookId = webhookId;
+          updateData.webhookSecret = webhookSecret;
+          updateData.config = nextConfig as import("@prisma/client").Prisma.InputJsonValue;
+        }
+      }
+
+      if (input.service === "GOOGLE_CALENDAR" && integration.accessToken) {
+        const calendarId = typeof nextConfig.calendarId === "string" && nextConfig.calendarId.trim().length > 0
+          ? nextConfig.calendarId.trim()
+          : "primary";
+        const webhookSecret = integration.webhookSecret ?? randomBytes(32).toString("hex");
+        const channelId = typeof currentConfig.channelId === "string"
+          ? currentConfig.channelId
+          : randomUUID();
+
+        const watch = await watchCalendar(
+          decryptToken(integration.accessToken),
+          calendarId,
+          getGoogleCalendarWebhookUrl(),
+          channelId,
+          webhookSecret
+        );
+
+        nextConfig.calendarId = calendarId;
+        nextConfig.channelId = channelId;
+        nextConfig.resourceId = watch.resourceId;
+        nextConfig.watchExpiration = watch.expiration;
+        updateData.webhookSecret = webhookSecret;
+        updateData.config = nextConfig as import("@prisma/client").Prisma.InputJsonValue;
+      }
+
+      return ctx.db.integration.update({
+        where: { id: integration.id },
+        data: updateData,
       });
     }),
 });

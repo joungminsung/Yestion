@@ -44,6 +44,8 @@ const nextConfig = {
 
   // Reduce unnecessary recompilation
   experimental: {
+    // Keep native Node.js packages out of the webpack bundle
+    serverComponentsExternalPackages: ["ws"],
     // Faster refresh with optimized compilation
     optimizePackageImports: [
       "lucide-react",

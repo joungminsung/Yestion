@@ -57,7 +57,7 @@ export function SplitView({ children }: { children: ReactNode }) {
   return (
     <div
       ref={containerRef}
-      className="flex h-full"
+      className="flex h-full min-w-0"
       style={{
         flexDirection: isHorizontal ? "row" : "column",
         userSelect: isDragging ? "none" : "auto",
@@ -65,7 +65,7 @@ export function SplitView({ children }: { children: ReactNode }) {
     >
       {/* Primary pane (current page) */}
       <div
-        className="overflow-y-auto"
+        className="min-w-0 overflow-y-auto"
         style={{
           [isHorizontal ? "width" : "height"]: primarySize,
           flexShrink: 0,
@@ -97,7 +97,7 @@ export function SplitView({ children }: { children: ReactNode }) {
 
       {/* Secondary pane (split tab) */}
       <div
-        className="overflow-y-auto relative"
+        className="relative min-w-0 overflow-y-auto"
         style={{
           [isHorizontal ? "width" : "height"]: secondarySize,
           flexShrink: 0,

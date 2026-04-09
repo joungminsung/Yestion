@@ -13,8 +13,19 @@ export async function POST(request: Request) {
 
     const { prompt, context, action } = await request.json();
 
-    const BASE = `당신은 Yestion의 AI 문서 어시스턴트입니다.
-Yestion은 팀 협업 워크스페이스 도구로, 문서 작성, 프로젝트 관리, 회의록, 기술 문서 등을 다룹니다.
+    // Validate input types and sizes to prevent abuse
+    if (typeof prompt !== "string" || typeof action !== "string") {
+      return NextResponse.json({ error: "Invalid input types" }, { status: 400 });
+    }
+    if (prompt.length > 10000) {
+      return NextResponse.json({ error: "Prompt too long (max 10,000 chars)" }, { status: 400 });
+    }
+    if (typeof context === "string" && context.length > 30000) {
+      return NextResponse.json({ error: "Context too long (max 30,000 chars)" }, { status: 400 });
+    }
+
+const BASE = `당신은 Yestion의 AI 문서 어시스턴트입니다.
+Yestion은 팀 협업 워크스페이스 도구로, 문서 작성, 워크스페이스 협업, 회의록, 기술 문서 등을 다룹니다.
 
 출력 규칙:
 1. 반드시 Markdown 형식으로 출력합니다
@@ -45,32 +56,86 @@ Yestion은 팀 협업 워크스페이스 도구로, 문서 작성, 프로젝트 
 
     const systemMessage = systemMessages.get(action) ?? BASE;
 
-    const stream = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: systemMessage },
-        ...(context
-          ? [{ role: "user" as const, content: `Context:\n${context}` }]
-          : []),
-        { role: "user", content: prompt },
-      ],
-      stream: true,
-      max_tokens: 2000,
-    });
-
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
       async start(controller) {
-        for await (const chunk of stream) {
-          const text = chunk.choices[0]?.delta?.content || "";
-          if (text) {
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
-            );
+        const sendEvent = (payload: Record<string, unknown> | "[DONE]") => {
+          const message =
+            payload === "[DONE]"
+              ? "data: [DONE]\n\n"
+              : `data: ${JSON.stringify(payload)}\n\n`;
+          controller.enqueue(encoder.encode(message));
+        };
+
+        try {
+          sendEvent({
+            type: "status",
+            phase: "preparing",
+            progress: 8,
+            message: "요청을 확인하고 있습니다.",
+          });
+
+          const stream = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+              { role: "system", content: systemMessage },
+              ...(context
+                ? [{ role: "user" as const, content: `Context:\n${context}` }]
+                : []),
+              { role: "user", content: prompt },
+            ],
+            stream: true,
+            max_tokens: 2000,
+          });
+
+          sendEvent({
+            type: "status",
+            phase: "analyzing",
+            progress: 24,
+            message: "문맥을 분석하고 답변 구조를 잡고 있습니다.",
+          });
+
+          let firstTextChunk = true;
+          let chunkCount = 0;
+          for await (const chunk of stream) {
+            const text = chunk.choices[0]?.delta?.content || "";
+            if (text) {
+              if (firstTextChunk) {
+                firstTextChunk = false;
+                sendEvent({
+                  type: "status",
+                  phase: "writing",
+                  progress: 58,
+                  message: "초안을 작성하기 시작했습니다.",
+                });
+              }
+
+              chunkCount += 1;
+              if (chunkCount > 8 && chunkCount % 12 === 0) {
+                sendEvent({
+                  type: "status",
+                  phase: "writing",
+                  progress: Math.min(92, 58 + chunkCount),
+                  message: "문장을 다듬고 결과를 이어서 생성하고 있습니다.",
+                });
+              }
+
+              sendEvent({ type: "text", text });
+            }
           }
+
+          sendEvent({
+            type: "status",
+            phase: "finalizing",
+            progress: 100,
+            message: "응답을 마무리하고 있습니다.",
+          });
+          sendEvent("[DONE]");
+          controller.close();
+        } catch {
+          sendEvent({ type: "error", message: "AI 요청 처리 중 문제가 발생했습니다." });
+          controller.close();
         }
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-        controller.close();
       },
     });
 

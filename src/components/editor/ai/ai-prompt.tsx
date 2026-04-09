@@ -2,6 +2,11 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Sparkles } from "lucide-react";
+import {
+  streamAiResponse,
+  type AiAction,
+  type AiStreamStatus,
+} from "@/lib/ai-stream";
 
 function escapeHtml(str: string): string {
   return str
@@ -42,21 +47,6 @@ function simpleMarkdownToHtml(md: string): string {
   return html;
 }
 
-type AiAction =
-  | "write"
-  | "summarize"
-  | "brainstorm"
-  | "continue"
-  | "makeLonger"
-  | "makeShorter"
-  | "fixGrammar"
-  | "translate_en"
-  | "translate_ko"
-  | "changeTone_professional"
-  | "changeTone_casual"
-  | "extractPoints"
-  | "makeTodos";
-
 type Props = {
   context?: string;
   onInsert: (text: string) => void;
@@ -78,6 +68,9 @@ export function AiPrompt({ context, onInsert, onReplace, onClose }: Props) {
   const [response, setResponse] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [hasResponse, setHasResponse] = useState(false);
+  const [streamStatus, setStreamStatus] = useState<AiStreamStatus | null>(null);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const [lastAction, setLastAction] = useState<AiAction>("write");
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -93,51 +86,62 @@ export function AiPrompt({ context, onInsert, onReplace, onClose }: Props) {
       setIsStreaming(true);
       setResponse("");
       setHasResponse(true);
+      setStreamError(null);
+      setLastAction(actionType);
+      setStreamStatus({
+        type: "status",
+        phase: "preparing",
+        progress: 5,
+        message: "요청을 준비하고 있습니다.",
+      });
 
       abortRef.current = new AbortController();
 
       try {
-        const res = await fetch("/api/ai", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: finalPrompt || "위 내용을 처리해주세요.",
-            context,
-            action: actionType,
-          }),
+        await streamAiResponse({
+          prompt: finalPrompt || "위 내용을 처리해주세요.",
+          context,
+          action: actionType,
           signal: abortRef.current.signal,
+          onStatus: setStreamStatus,
+          onText: (_text, fullText) => {
+            setResponse(fullText);
+          },
+          onError: (message) => {
+            setStreamError(message);
+            setStreamStatus({
+              type: "status",
+              phase: "finalizing",
+              progress: 100,
+              message,
+            });
+          },
         });
-
-        const reader = res.body?.getReader();
-        if (!reader) return;
-        const decoder = new TextDecoder();
-        let fullText = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value);
-          const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
-          for (const line of lines) {
-            const data = line.slice(6);
-            if (data === "[DONE]") break;
-            try {
-              const { text } = JSON.parse(data);
-              fullText += text;
-              setResponse(fullText);
-            } catch {
-              // skip malformed chunks
-            }
-          }
-        }
       } catch (err) {
-        if ((err as Error).name !== "AbortError") {
-          setResponse("AI 요청에 실패했습니다. 다시 시도해주세요.");
+        if ((err as Error).name === "AbortError") {
+          setStreamStatus({
+            type: "status",
+            phase: "finalizing",
+            progress: 100,
+            message:
+              response.trim().length > 0
+                ? "생성을 중지했습니다. 현재까지 작성된 결과를 검토할 수 있습니다."
+                : "생성을 중지했습니다.",
+          });
+        } else if (!streamError) {
+          const message = "AI 요청에 실패했습니다. 다시 시도해주세요.";
+          setStreamError(message);
+          setStreamStatus({
+            type: "status",
+            phase: "finalizing",
+            progress: 100,
+            message,
+          });
         }
       }
       setIsStreaming(false);
     },
-    [prompt, context]
+    [prompt, context, response, streamError]
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -149,6 +153,12 @@ export function AiPrompt({ context, onInsert, onReplace, onClose }: Props) {
       if (isStreaming && abortRef.current) {
         abortRef.current.abort();
         setIsStreaming(false);
+        setStreamStatus({
+          type: "status",
+          phase: "finalizing",
+          progress: 100,
+          message: "생성을 중지했습니다.",
+        });
       } else {
         onClose();
       }
@@ -156,8 +166,13 @@ export function AiPrompt({ context, onInsert, onReplace, onClose }: Props) {
   };
 
   const handleRetry = () => {
-    handleSubmit("write");
+    handleSubmit(lastAction);
   };
+
+  const statusProgress =
+    typeof streamStatus?.progress === "number"
+      ? Math.max(0, Math.min(100, streamStatus.progress))
+      : null;
 
   return (
     <div
@@ -228,8 +243,57 @@ export function AiPrompt({ context, onInsert, onReplace, onClose }: Props) {
 
       {/* Response area — render markdown preview */}
       {hasResponse && (
-        <div
-          className="mx-3 mb-2 p-3 rounded text-sm overflow-y-auto ai-response-preview"
+        <>
+          <div
+            className="mx-3 mb-2 rounded-lg border px-3 py-2.5"
+            style={{
+              borderColor: streamError ? "rgba(224, 62, 62, 0.2)" : "var(--border-default)",
+              backgroundColor: streamError ? "rgba(224, 62, 62, 0.05)" : "var(--bg-secondary)",
+            }}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+                  {streamError
+                    ? "AI 생성 중 문제가 발생했습니다"
+                    : isStreaming
+                      ? "AI 처리 진행 상황"
+                      : "AI 응답 준비 완료"}
+                </p>
+                <p className="mt-1 text-[11px]" style={{ color: "var(--text-secondary)" }}>
+                  {streamError
+                    ? streamError
+                    : streamStatus?.message ??
+                      (response
+                        ? "생성된 내용을 검토하고 삽입하거나 대체할 수 있습니다."
+                        : "응답을 준비하고 있습니다.")}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                  {statusProgress !== null ? `${Math.round(statusProgress)}%` : isStreaming ? "진행 중" : "완료"}
+                </p>
+                <p className="mt-1 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                  {isStreaming ? "실시간 생성" : response ? `${response.length}자 생성` : "대기 중"}
+                </p>
+              </div>
+            </div>
+            <div
+              className="mt-2 h-1.5 overflow-hidden rounded-full"
+              style={{ backgroundColor: "var(--bg-tertiary)" }}
+            >
+              <div
+                className={isStreaming && statusProgress === null ? "h-full animate-pulse rounded-full" : "h-full rounded-full"}
+                style={{
+                  width: `${statusProgress ?? 36}%`,
+                  backgroundColor: streamError ? "#e03e3e" : "#a855f7",
+                }}
+              />
+            </div>
+          </div>
+
+          <div
+            className="mx-3 mb-2 p-3 rounded text-sm overflow-y-auto ai-response-preview"
           style={{
             borderLeft: "3px solid #a855f7",
             backgroundColor: "var(--bg-secondary)",
@@ -239,17 +303,23 @@ export function AiPrompt({ context, onInsert, onReplace, onClose }: Props) {
           }}
           dangerouslySetInnerHTML={
             response
-              ? { __html: simpleMarkdownToHtml(response) + (isStreaming ? '<span class="inline-block w-1.5 h-4 ml-0.5 animate-pulse" style="background:#a855f7"></span>' : '') }
+              ? { __html: simpleMarkdownToHtml(response) + (isStreaming ? '<span class="inline-block w-1.5 h-4 ml-0.5 animate-pulse" style="background:#a855f7"></span>' : "") }
               : undefined
           }
         >
           {!response && (
-            <span
-              className="inline-block w-2 h-4 animate-pulse"
-              style={{ backgroundColor: "#a855f7" }}
-            />
+            <div className="flex items-center gap-2 text-xs" style={{ color: "var(--text-secondary)" }}>
+              <span
+                className="inline-block w-2 h-4 animate-pulse"
+                style={{ backgroundColor: streamError ? "#e03e3e" : "#a855f7" }}
+              />
+              {streamError
+                ? "실패 원인을 확인한 뒤 다시 시도해주세요."
+                : streamStatus?.message ?? "AI가 응답을 준비하고 있습니다."}
+            </div>
           )}
-        </div>
+          </div>
+        </>
       )}
 
       {/* Action buttons after response */}
@@ -300,6 +370,8 @@ export function AiPrompt({ context, onInsert, onReplace, onClose }: Props) {
             onClick={() => {
               setResponse("");
               setHasResponse(false);
+              setStreamError(null);
+              setStreamStatus(null);
             }}
             className="text-xs px-3 py-1.5 rounded transition-colors"
             style={{

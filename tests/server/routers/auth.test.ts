@@ -7,9 +7,19 @@ const createCaller = createCallerFactory(appRouter);
 
 describe("auth router", () => {
   beforeEach(async () => {
+    await db.activityLog.deleteMany();
+    await db.notification.deleteMany();
+    await db.block.deleteMany();
     await db.session.deleteMany();
     await db.favorite.deleteMany();
     await db.page.deleteMany();
+    await db.workspaceChannelAuditLog.deleteMany();
+    await db.workspaceChannelReadState.deleteMany();
+    await db.workspaceChannelBrowserTab.deleteMany();
+    await db.workspaceChannelBrowserSession.deleteMany();
+    await db.workspaceChannelVoicePresence.deleteMany();
+    await db.workspaceChannelMessage.deleteMany();
+    await db.workspaceChannel.deleteMany();
     await db.workspaceMember.deleteMany();
     await db.workspace.deleteMany();
     await db.user.deleteMany();
@@ -31,15 +41,14 @@ describe("auth router", () => {
 
       expect(result.user.email).toBe("test@example.com");
       expect(result.user.name).toBe("Test User");
-      expect(result.token).toBeDefined();
-      expect(typeof result.token).toBe("string");
+      // Token is no longer returned in response body (set via HttpOnly cookie instead)
 
       const memberships = await db.workspaceMember.findMany({
         where: { userId: result.user.id },
         include: { workspace: true },
       });
       expect(memberships).toHaveLength(1);
-      expect(memberships[0].role).toBe("OWNER");
+      expect(memberships[0]!.role).toBe("OWNER");
     });
 
     it("should reject duplicate email", async () => {
@@ -85,7 +94,7 @@ describe("auth router", () => {
       });
 
       expect(result.user.email).toBe("test@example.com");
-      expect(result.token).toBeDefined();
+      // Token is no longer returned in response body (set via HttpOnly cookie instead)
     });
 
     it("should reject invalid password", async () => {

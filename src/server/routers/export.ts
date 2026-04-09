@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "@/server/trpc/init";
 import type { Context } from "@/server/trpc/init";
 import { type BlockData, blocksToMarkdown, blocksToHtml, escapeHtml } from "@/lib/export-utils";
+import { getEffectivePermission } from "@/lib/permissions";
 
 async function verifyPageAccess(
   db: Context["db"],
@@ -13,11 +14,9 @@ async function verifyPageAccess(
   if (!page) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Page not found" });
   }
-  const member = await db.workspaceMember.findUnique({
-    where: { userId_workspaceId: { userId, workspaceId: page.workspaceId } },
-  });
-  if (!member) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "No access to this workspace" });
+  const permission = await getEffectivePermission(db as never, userId, pageId);
+  if (permission === "none") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "No access to this page" });
   }
   return page;
 }

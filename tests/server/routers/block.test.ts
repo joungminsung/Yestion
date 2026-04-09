@@ -24,15 +24,24 @@ async function setup() {
 }
 
 function getCaller() {
-  return createCaller({ db, session: { user: { id: userId, email: "editor@test.com", name: "Editor" } }, headers: new Headers() });
+  return createCaller({ db, session: { user: { id: userId, email: "editor@test.com", name: "Editor" }, token: "test-token" }, headers: new Headers() });
 }
 
 describe("block router", () => {
   beforeEach(async () => {
+    await db.activityLog.deleteMany();
+    await db.notification.deleteMany();
     await db.block.deleteMany();
     await db.session.deleteMany();
     await db.favorite.deleteMany();
     await db.page.deleteMany();
+    await db.workspaceChannelAuditLog.deleteMany();
+    await db.workspaceChannelReadState.deleteMany();
+    await db.workspaceChannelBrowserTab.deleteMany();
+    await db.workspaceChannelBrowserSession.deleteMany();
+    await db.workspaceChannelVoicePresence.deleteMany();
+    await db.workspaceChannelMessage.deleteMany();
+    await db.workspaceChannel.deleteMany();
     await db.workspaceMember.deleteMany();
     await db.workspace.deleteMany();
     await db.user.deleteMany();
@@ -60,7 +69,7 @@ describe("block router", () => {
     const block = await db.block.create({ data: { pageId, type: "paragraph", content: {}, position: 0 } });
     const caller = getCaller();
     const updated = await caller.block.update({ id: block.id, content: { richText: [{ text: "Updated" }] } });
-    expect((updated.content as any).richText[0].text).toBe("Updated");
+    expect((updated.content as { richText: { text: string }[] }).richText[0]!.text).toBe("Updated");
   });
 
   it("should delete a block", async () => {
@@ -77,7 +86,7 @@ describe("block router", () => {
     const caller = getCaller();
     await caller.block.reorder({ pageId, blocks: [{ id: b2.id, position: 0 }, { id: b1.id, position: 1 }] });
     const blocks = await caller.block.list({ pageId });
-    expect(blocks[0].id).toBe(b2.id);
+    expect(blocks[0]!.id).toBe(b2.id);
   });
 
   describe("bulkSave", () => {
@@ -92,7 +101,7 @@ describe("block router", () => {
       });
       const blocks = await caller.block.list({ pageId });
       expect(blocks).toHaveLength(1);
-      expect(blocks[0].id).toBe(blockId);
+      expect(blocks[0]!.id).toBe(blockId);
     });
 
     it("should delete blocks not in the input", async () => {
@@ -108,7 +117,7 @@ describe("block router", () => {
       expect(found).toBeNull();
       const blocks = await caller.block.list({ pageId });
       expect(blocks).toHaveLength(1);
-      expect(blocks[0].type).toBe("heading_1");
+      expect(blocks[0]!.type).toBe("heading_1");
     });
 
     it("should update existing blocks", async () => {
@@ -122,7 +131,7 @@ describe("block router", () => {
       });
       const blocks = await caller.block.list({ pageId });
       expect(blocks).toHaveLength(1);
-      expect(blocks[0].type).toBe("heading_2");
+      expect(blocks[0]!.type).toBe("heading_2");
     });
   });
 });

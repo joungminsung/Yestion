@@ -9,6 +9,7 @@ import { TwoFactorSettings } from "./two-factor-settings";
 import { BackupSettings } from "./backup-settings";
 import { McpSettings } from "./mcp-settings";
 import { IntegrationSettings } from "./integration-settings";
+import { RoleSettings } from "./role-settings";
 
 type Tab = "account" | "workspace" | "sessions" | "2fa" | "backup" | "integrations";
 const tabs: { id: Tab; label: string; section?: string }[] = [
@@ -46,6 +47,11 @@ export function SettingsLayout({ workspaceId }: { workspaceId: string }) {
       <div className="flex-1 overflow-y-auto py-8 px-12">
         {activeTab === "account" && <AccountSettings />}
         {activeTab === "workspace" && <WorkspaceSettings workspaceId={workspaceId} />}
+        {activeTab === "workspace" && (
+          <section className="mt-8">
+            <RoleSettings workspaceId={workspaceId} />
+          </section>
+        )}
         {activeTab === "sessions" && <SessionManagement />}
         {activeTab === "2fa" && <TwoFactorSettings />}
         {activeTab === "backup" && <BackupSettings workspaceId={workspaceId} />}

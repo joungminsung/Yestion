@@ -4,16 +4,23 @@ import crypto from "crypto";
 import { router, protectedProcedure } from "@/server/trpc/init";
 import type { PrismaClient } from "@prisma/client";
 import { sendShareNotificationEmail } from "@/lib/email";
+import {
+  getEffectivePermission,
+  requireWorkspacePermission,
+} from "@/lib/permissions";
 
 async function verifyPageOwnership(db: PrismaClient, userId: string, pageId: string) {
   const page = await db.page.findUnique({ where: { id: pageId }, select: { workspaceId: true } });
   if (!page) throw new TRPCError({ code: "NOT_FOUND" });
-  const membership = await db.workspaceMember.findUnique({
-    where: { userId_workspaceId: { userId, workspaceId: page.workspaceId } },
-  });
-  if (!membership || !["OWNER", "ADMIN"].includes(membership.role)) {
-    throw new TRPCError({ code: "FORBIDDEN" });
-  }
+  const permission = await getEffectivePermission(db, userId, pageId);
+  if (permission === "none") throw new TRPCError({ code: "FORBIDDEN" });
+  await requireWorkspacePermission(
+    db,
+    userId,
+    page.workspaceId,
+    "page.share",
+    "Page sharing permission is required",
+  );
 }
 
 export const shareRouter = router({
@@ -62,7 +69,9 @@ export const shareRouter = router({
             page?.title || "제목 없음",
             pageUrl,
             input.level,
-          ).catch(() => {});
+          ).catch((err) => {
+            console.error("[Share] Failed to send share notification email:", err);
+          });
         }
       }
 
@@ -124,8 +133,14 @@ export const shareRouter = router({
     .query(async ({ ctx, input }) => {
       const page = await ctx.db.page.findUnique({
         where: { id: input.pageId },
-        select: { publicAccessToken: true, publicAccessLevel: true },
+        select: { publicAccessToken: true, publicAccessLevel: true, workspaceId: true },
       });
-      return page;
+      if (!page) throw new TRPCError({ code: "NOT_FOUND" });
+      // Verify the user has access to this page's workspace (read access is sufficient)
+      const member = await ctx.db.workspaceMember.findUnique({
+        where: { userId_workspaceId: { userId: ctx.session.user.id, workspaceId: page.workspaceId } },
+      });
+      if (!member) throw new TRPCError({ code: "FORBIDDEN" });
+      return { publicAccessToken: page.publicAccessToken, publicAccessLevel: page.publicAccessLevel };
     }),
 });

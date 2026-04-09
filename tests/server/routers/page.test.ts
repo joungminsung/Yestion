@@ -31,17 +31,28 @@ async function setup() {
 function getCaller() {
   return createCaller({
     db,
-    session: { user: { id: userId, email: "page-test@example.com", name: "Page Tester" } },
+    session: { user: { id: userId, email: "page-test@example.com", name: "Page Tester" }, token: "test-token" },
     headers: new Headers(),
   });
 }
 
 describe("page router", () => {
   beforeEach(async () => {
+    await db.activityLog.deleteMany();
+    await db.notification.deleteMany();
+    await db.pagePermission.deleteMany();
+    await db.comment.deleteMany();
     await db.block.deleteMany();
     await db.favorite.deleteMany();
     await db.session.deleteMany();
     await db.page.deleteMany();
+    await db.workspaceChannelAuditLog.deleteMany();
+    await db.workspaceChannelReadState.deleteMany();
+    await db.workspaceChannelBrowserTab.deleteMany();
+    await db.workspaceChannelBrowserSession.deleteMany();
+    await db.workspaceChannelVoicePresence.deleteMany();
+    await db.workspaceChannelMessage.deleteMany();
+    await db.workspaceChannel.deleteMany();
     await db.workspaceMember.deleteMany();
     await db.workspace.deleteMany();
     await db.user.deleteMany();
@@ -84,7 +95,7 @@ describe("page router", () => {
 
       const pages = await caller.page.list({ workspaceId });
       expect(pages).toHaveLength(1);
-      expect(pages[0].title).toBe("Active Page");
+      expect(pages[0]!.title).toBe("Active Page");
     });
 
     it("should return flat list including all depths", async () => {
@@ -194,7 +205,7 @@ describe("page router", () => {
 
       const result = await caller.page.listTrash({ workspaceId });
       expect(result).toHaveLength(1);
-      expect(result[0].title).toBe("Trashed");
+      expect(result[0]!.title).toBe("Trashed");
     });
   });
 
@@ -280,7 +291,7 @@ describe("page router", () => {
 
       const blocks = await db.block.findMany({ where: { pageId: dup.id } });
       expect(blocks).toHaveLength(1);
-      expect((blocks[0].content as any).richText[0].text).toBe("Hello");
+      expect((blocks[0]!.content as { richText: { text: string }[] }).richText[0]!.text).toBe("Hello");
     });
   });
 
@@ -299,8 +310,8 @@ describe("page router", () => {
       });
 
       const pages = await caller.page.list({ workspaceId });
-      expect(pages[0].id).toBe(p2.id);
-      expect(pages[1].id).toBe(p1.id);
+      expect(pages[0]!.id).toBe(p2.id);
+      expect(pages[1]!.id).toBe(p1.id);
     });
   });
 });

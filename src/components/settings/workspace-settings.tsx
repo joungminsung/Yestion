@@ -11,8 +11,10 @@ export function WorkspaceSettings({ workspaceId }: { workspaceId: string }) {
   const { data: memberships } = trpc.workspace.list.useQuery();
   const workspace = memberships?.find((m) => m.workspaceId === workspaceId)?.workspace;
   const { data: members } = trpc.workspace.members.useQuery({ workspaceId }, { enabled: !!workspaceId });
+  const { data: customRoles } = trpc.role.list.useQuery({ workspaceId }, { enabled: !!workspaceId });
   const [name, setName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteCustomRoleId, setInviteCustomRoleId] = useState<string>("");
 
   useEffect(() => {
     if (workspace) setName(workspace.name);
@@ -24,7 +26,11 @@ export function WorkspaceSettings({ workspaceId }: { workspaceId: string }) {
   });
 
   const inviteMember = trpc.workspace.inviteMember.useMutation({
-    onSuccess: () => { addToast({ message: "멤버를 초대했습니다", type: "success" }); setInviteEmail(""); },
+    onSuccess: () => {
+      addToast({ message: "멤버를 초대했습니다", type: "success" });
+      setInviteEmail("");
+      setInviteCustomRoleId("");
+    },
     onError: (err) => addToast({ message: err.message, type: "error" }),
   });
 
@@ -57,13 +63,45 @@ export function WorkspaceSettings({ workspaceId }: { workspaceId: string }) {
                   <div className="text-xs" style={{ color: "var(--text-tertiary)" }}>{member.user.email}</div>
                 </div>
               </div>
-              <span className="text-xs px-2 py-0.5 rounded" style={{ color: "var(--text-secondary)", backgroundColor: "var(--bg-secondary)" }}>{member.role}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs px-2 py-0.5 rounded" style={{ color: "var(--text-secondary)", backgroundColor: "var(--bg-secondary)" }}>
+                  {member.role}
+                </span>
+                {member.customRole?.name && (
+                  <span className="text-xs px-2 py-0.5 rounded" style={{ color: "#2383e2", backgroundColor: "rgba(35, 131, 226, 0.12)" }}>
+                    {member.customRole.name}
+                  </span>
+                )}
+              </div>
             </div>
           ))}
         </div>
-        <div className="flex gap-2 max-w-[400px]">
+        <div className="flex flex-col gap-2 max-w-[400px]">
           <Input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="이메일로 초대" type="email" />
-          <Button onClick={() => inviteMember.mutate({ workspaceId, email: inviteEmail, role: "MEMBER" })} disabled={!inviteEmail}>초대</Button>
+          <select
+            value={inviteCustomRoleId}
+            onChange={(e) => setInviteCustomRoleId(e.target.value)}
+            className="px-3 py-2 rounded-md border text-sm"
+            style={{ backgroundColor: "var(--bg-primary)", borderColor: "var(--border-default)", color: "var(--text-primary)" }}
+          >
+            <option value="">커스텀 역할 없음</option>
+            {customRoles?.map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.name}
+              </option>
+            ))}
+          </select>
+          <Button
+            onClick={() => inviteMember.mutate({
+              workspaceId,
+              email: inviteEmail,
+              role: "MEMBER",
+              customRoleId: inviteCustomRoleId || null,
+            })}
+            disabled={!inviteEmail}
+          >
+            초대
+          </Button>
         </div>
       </section>
 

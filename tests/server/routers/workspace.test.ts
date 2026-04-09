@@ -27,9 +27,19 @@ async function createTestUser() {
 
 describe("workspace router", () => {
   beforeEach(async () => {
+    await db.activityLog.deleteMany();
+    await db.notification.deleteMany();
+    await db.block.deleteMany();
     await db.session.deleteMany();
     await db.favorite.deleteMany();
     await db.page.deleteMany();
+    await db.workspaceChannelAuditLog.deleteMany();
+    await db.workspaceChannelReadState.deleteMany();
+    await db.workspaceChannelBrowserTab.deleteMany();
+    await db.workspaceChannelBrowserSession.deleteMany();
+    await db.workspaceChannelVoicePresence.deleteMany();
+    await db.workspaceChannelMessage.deleteMany();
+    await db.workspaceChannel.deleteMany();
     await db.workspaceMember.deleteMany();
     await db.workspace.deleteMany();
     await db.user.deleteMany();
@@ -40,13 +50,13 @@ describe("workspace router", () => {
       const { user } = await createTestUser();
       const caller = createCaller({
         db,
-        session: { user: { id: user.id, email: user.email, name: user.name } },
+        session: { user: { id: user.id, email: user.email, name: user.name }, token: "test-token" },
         headers: new Headers(),
       });
 
       const result = await caller.workspace.list();
       expect(result).toHaveLength(1);
-      expect(result[0].workspace.name).toBe("Test Workspace");
+      expect(result[0]!.workspace.name).toBe("Test Workspace");
     });
   });
 
@@ -55,7 +65,7 @@ describe("workspace router", () => {
       const { user, workspace } = await createTestUser();
       const caller = createCaller({
         db,
-        session: { user: { id: user.id, email: user.email, name: user.name } },
+        session: { user: { id: user.id, email: user.email, name: user.name }, token: "test-token" },
         headers: new Headers(),
       });
 
@@ -75,14 +85,14 @@ describe("workspace router", () => {
       const { user, workspace } = await createTestUser();
       const caller = createCaller({
         db,
-        session: { user: { id: user.id, email: user.email, name: user.name } },
+        session: { user: { id: user.id, email: user.email, name: user.name }, token: "test-token" },
         headers: new Headers(),
       });
 
       const result = await caller.workspace.members({ workspaceId: workspace.id });
       expect(result).toHaveLength(1);
-      expect(result[0].user.email).toBe("test@example.com");
-      expect(result[0].role).toBe("OWNER");
+      expect(result[0]!.user.email).toBe("test@example.com");
+      expect(result[0]!.role).toBe("OWNER");
     });
   });
 });

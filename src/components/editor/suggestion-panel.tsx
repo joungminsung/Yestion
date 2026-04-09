@@ -1,8 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { Check, X, User } from "lucide-react";
+
+type SuggestionRange = {
+  from: number;
+  to: number;
+};
 
 type Suggestion = {
   id: string;
@@ -14,7 +19,55 @@ type Suggestion = {
   createdAt: string;
   from: number;
   to: number;
+  ranges: SuggestionRange[];
 };
+
+function collectSuggestions(editor: Editor): Suggestion[] {
+  const suggestions = new Map<string, Suggestion>();
+
+  editor.state.doc.descendants((node, pos) => {
+    if (!node.isText || node.textContent.length === 0) return;
+
+    node.marks.forEach((mark) => {
+      if (mark.type.name !== "suggestion") return;
+
+      const suggestionId = String(mark.attrs.suggestionId ?? `sug-${pos}`);
+      const range = { from: pos, to: pos + node.nodeSize };
+      const existing = suggestions.get(suggestionId);
+
+      if (existing) {
+        existing.text += node.textContent;
+        existing.from = Math.min(existing.from, range.from);
+        existing.to = Math.max(existing.to, range.to);
+        existing.ranges.push(range);
+        if (!existing.originalText && mark.attrs.originalText) {
+          existing.originalText = mark.attrs.originalText;
+        }
+        return;
+      }
+
+      suggestions.set(suggestionId, {
+        id: suggestionId,
+        authorId: mark.attrs.authorId,
+        authorName: mark.attrs.authorName || "Unknown",
+        action: mark.attrs.action,
+        text: node.textContent,
+        originalText: mark.attrs.originalText,
+        createdAt: mark.attrs.createdAt,
+        from: range.from,
+        to: range.to,
+        ranges: [range],
+      });
+    });
+  });
+
+  return Array.from(suggestions.values())
+    .map((suggestion) => ({
+      ...suggestion,
+      ranges: suggestion.ranges.sort((left, right) => left.from - right.from),
+    }))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
 
 export function SuggestionPanel({
   editor,
@@ -24,52 +77,57 @@ export function SuggestionPanel({
   onClose: () => void;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>(() => collectSuggestions(editor));
 
-  // Collect all suggestion marks from the document
-  const suggestions = useMemo(() => {
-    const result: Suggestion[] = [];
-    editor.state.doc.descendants((node, pos) => {
-      node.marks.forEach((mark) => {
-        if (mark.type.name === "suggestion") {
-          result.push({
-            id: mark.attrs.suggestionId,
-            authorId: mark.attrs.authorId,
-            authorName: mark.attrs.authorName || "Unknown",
-            action: mark.attrs.action,
-            text: node.textContent,
-            originalText: mark.attrs.originalText,
-            createdAt: mark.attrs.createdAt,
-            from: pos,
-            to: pos + node.nodeSize,
-          });
-        }
-      });
-    });
-    return result.sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-  }, [editor.state.doc]);
+  useEffect(() => {
+    const syncSuggestions = () => {
+      setSuggestions(collectSuggestions(editor));
+    };
+
+    syncSuggestions();
+    editor.on("update", syncSuggestions);
+    return () => {
+      editor.off("update", syncSuggestions);
+    };
+  }, [editor]);
+
+  useEffect(() => {
+    if (expandedId && !suggestions.some((suggestion) => suggestion.id === expandedId)) {
+      setExpandedId(null);
+    }
+  }, [expandedId, suggestions]);
+
+  const runSuggestionCommand = (
+    suggestion: Suggestion,
+    command: "acceptSuggestion" | "rejectSuggestion",
+  ) => {
+    const ranges = [...suggestion.ranges].sort((left, right) => right.from - left.from);
+
+    for (const range of ranges) {
+      editor.chain().focus().setTextSelection(range)[command]().run();
+    }
+  };
 
   const handleAccept = (suggestion: Suggestion) => {
-    editor.chain().focus().setTextSelection({ from: suggestion.from, to: suggestion.to }).acceptSuggestion().run();
+    runSuggestionCommand(suggestion, "acceptSuggestion");
   };
 
   const handleReject = (suggestion: Suggestion) => {
-    editor.chain().focus().setTextSelection({ from: suggestion.from, to: suggestion.to }).rejectSuggestion().run();
+    runSuggestionCommand(suggestion, "rejectSuggestion");
   };
 
   const handleAcceptAll = () => {
     // Accept from end to start to preserve positions
     const sorted = [...suggestions].sort((a, b) => b.from - a.from);
     for (const sug of sorted) {
-      editor.chain().focus().setTextSelection({ from: sug.from, to: sug.to }).acceptSuggestion().run();
+      handleAccept(sug);
     }
   };
 
   const handleRejectAll = () => {
     const sorted = [...suggestions].sort((a, b) => b.from - a.from);
     for (const sug of sorted) {
-      editor.chain().focus().setTextSelection({ from: sug.from, to: sug.to }).rejectSuggestion().run();
+      handleReject(sug);
     }
   };
 
@@ -152,7 +210,8 @@ export function SuggestionPanel({
               className="px-4 py-3 border-b cursor-pointer hover:bg-notion-bg-hover"
               style={{ borderColor: "var(--border-divider)" }}
               onClick={() => {
-                editor.chain().focus().setTextSelection({ from: sug.from, to: sug.to }).run();
+                const focusRange = sug.ranges[0] ?? { from: sug.from, to: sug.to };
+                editor.chain().focus().setTextSelection(focusRange).run();
                 setExpandedId(expandedId === sug.id ? null : sug.id);
               }}
             >

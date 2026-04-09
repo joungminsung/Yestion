@@ -29,12 +29,30 @@ export default function AdminDashboardPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const [roleFilter, setRoleFilter] = useState("");
 
-  const { data: members, refetch } = trpc.workspace.members.useQuery({ workspaceId });
+  const { data: members, refetch, isLoading } = trpc.workspace.members.useQuery({ workspaceId });
   const { data: wsData } = trpc.workspace.get.useQuery({ id: workspaceId });
+  const { data: customRoles } = trpc.role.list.useQuery({ workspaceId });
   const updateRole = trpc.workspace.updateMemberRole.useMutation({ onSuccess: () => refetch() });
   const removeMember = trpc.workspace.removeMember.useMutation({ onSuccess: () => refetch() });
 
-  const filteredMembers = members?.filter((m: { role: string }) => !roleFilter || m.role === roleFilter) ?? [];
+  if (isLoading) {
+    return (
+      <div className="max-w-5xl mx-auto p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 w-48 rounded" style={{ backgroundColor: "var(--bg-tertiary)" }} />
+          <div className="grid grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => <div key={i} className="h-24 rounded" style={{ backgroundColor: "var(--bg-tertiary)" }} />)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const filteredMembers = members?.filter((m: { role: string; customRole?: { id: string; name: string } | null }) => {
+    if (!roleFilter) return true;
+    if (m.role === roleFilter) return true;
+    return m.customRole?.id === roleFilter;
+  }) ?? [];
 
   const stats = {
     totalMembers: members?.length ?? 0,
@@ -49,7 +67,7 @@ export default function AdminDashboardPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={<Users size={18} style={{ color: "#2383e2" }} />} label="전체 멤버" value={stats.totalMembers} />
-        <StatCard icon={<Shield size={18} style={{ color: "#e2832383" }} />} label="관리자" value={stats.admins} />
+        <StatCard icon={<Shield size={18} style={{ color: "#e28323" }} />} label="관리자" value={stats.admins} />
         <StatCard icon={<Users size={18} style={{ color: "#9b59b6" }} />} label="게스트" value={stats.guests} />
         <StatCard icon={<FileText size={18} style={{ color: "#27ae60" }} />} label="워크스페이스" value={wsData?.name ?? "-"} subtext="현재 워크스페이스" />
       </div>
@@ -69,6 +87,9 @@ export default function AdminDashboardPage() {
             <option value="ADMIN">관리자</option>
             <option value="MEMBER">멤버</option>
             <option value="GUEST">게스트</option>
+            {customRoles?.map((role) => (
+              <option key={role.id} value={role.id}>{role.name}</option>
+            ))}
           </select>
         </div>
 
@@ -97,18 +118,42 @@ export default function AdminDashboardPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <select
-                      value={member.role}
-                      onChange={(e) => updateRole.mutate({ workspaceId, memberId: member.id, role: e.target.value as "ADMIN" | "MEMBER" | "GUEST" })}
-                      disabled={member.role === "OWNER"}
-                      className="px-2 py-1 rounded text-xs border"
-                      style={{ backgroundColor: "var(--bg-primary)", borderColor: "var(--border-default)", color: "var(--text-primary)" }}
-                    >
-                      <option value="ADMIN">관리자</option>
-                      <option value="MEMBER">멤버</option>
-                      <option value="GUEST">게스트</option>
-                      {member.role === "OWNER" && <option value="OWNER">소유자</option>}
-                    </select>
+                    <div className="flex flex-col gap-2">
+                      <select
+                        value={member.role}
+                        onChange={(e) => updateRole.mutate({
+                          workspaceId,
+                          memberId: member.id,
+                          role: e.target.value as "ADMIN" | "MEMBER" | "GUEST",
+                          customRoleId: member.customRole?.id ?? null,
+                        })}
+                        disabled={member.role === "OWNER"}
+                        className="px-2 py-1 rounded text-xs border"
+                        style={{ backgroundColor: "var(--bg-primary)", borderColor: "var(--border-default)", color: "var(--text-primary)" }}
+                      >
+                        <option value="ADMIN">관리자</option>
+                        <option value="MEMBER">멤버</option>
+                        <option value="GUEST">게스트</option>
+                        {member.role === "OWNER" && <option value="OWNER">소유자</option>}
+                      </select>
+                      <select
+                        value={member.customRole?.id ?? ""}
+                        onChange={(e) => updateRole.mutate({
+                          workspaceId,
+                          memberId: member.id,
+                          role: member.role as "ADMIN" | "MEMBER" | "GUEST",
+                          customRoleId: e.target.value || null,
+                        })}
+                        disabled={member.role === "OWNER"}
+                        className="px-2 py-1 rounded text-xs border"
+                        style={{ backgroundColor: "var(--bg-primary)", borderColor: "var(--border-default)", color: "var(--text-primary)" }}
+                      >
+                        <option value="">커스텀 역할 없음</option>
+                        {customRoles?.map((role) => (
+                          <option key={role.id} value={role.id}>{role.name}</option>
+                        ))}
+                      </select>
+                    </div>
                   </td>
                   <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>
                     {new Date(member.joinedAt).toLocaleDateString("ko-KR")}

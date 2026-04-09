@@ -1,11 +1,20 @@
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "@/server/trpc/init";
 
 export const activityRouter = router({
   list: protectedProcedure
-    .input(z.object({ pageId: z.string(), limit: z.number().default(50) }))
+    .input(z.object({ pageId: z.string(), limit: z.number().max(200).default(50) }))
     .query(async ({ ctx, input }) => {
+      // Verify page access
+      const page = await ctx.db.page.findUnique({ where: { id: input.pageId }, select: { workspaceId: true } });
+      if (!page) throw new TRPCError({ code: "NOT_FOUND" });
+      const member = await ctx.db.workspaceMember.findUnique({
+        where: { userId_workspaceId: { userId: ctx.session.user.id, workspaceId: page.workspaceId } },
+      });
+      if (!member) throw new TRPCError({ code: "FORBIDDEN" });
+
       return ctx.db.activityLog.findMany({
         where: { pageId: input.pageId },
         include: {
@@ -20,11 +29,19 @@ export const activityRouter = router({
     .input(
       z.object({
         pageId: z.string(),
-        action: z.string(),
+        action: z.string().max(100),
         metadata: z.record(z.string(), z.unknown()).default({}),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Verify page access
+      const page = await ctx.db.page.findUnique({ where: { id: input.pageId }, select: { workspaceId: true } });
+      if (!page) throw new TRPCError({ code: "NOT_FOUND" });
+      const member = await ctx.db.workspaceMember.findUnique({
+        where: { userId_workspaceId: { userId: ctx.session.user.id, workspaceId: page.workspaceId } },
+      });
+      if (!member) throw new TRPCError({ code: "FORBIDDEN" });
+
       return ctx.db.activityLog.create({
         data: {
           pageId: input.pageId,
@@ -49,12 +66,26 @@ export const activityRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
+      // Verify workspace access
+      const member = await ctx.db.workspaceMember.findUnique({
+        where: { userId_workspaceId: { userId: ctx.session.user.id, workspaceId: input.workspaceId } },
+      });
+      if (!member) throw new TRPCError({ code: "FORBIDDEN" });
+
       const where: Record<string, unknown> = {
         page: { workspaceId: input.workspaceId },
       };
-      if (input.action) where.action = input.action;
+      if (input.action && input.search) {
+        // When both exact action and search text are provided,
+        // filter by action type AND search in metadata
+        where.action = input.action;
+        where.metadata = { path: [], string_contains: input.search };
+      } else if (input.action) {
+        where.action = input.action;
+      } else if (input.search) {
+        where.action = { contains: input.search, mode: "insensitive" };
+      }
       if (input.userId) where.userId = input.userId;
-      if (input.search) where.action = { contains: input.search, mode: "insensitive" };
       if (input.from || input.to) {
         const createdAt: Record<string, Date> = {};
         if (input.from) createdAt.gte = new Date(input.from);
@@ -89,6 +120,12 @@ export const activityRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
+      // Verify workspace access
+      const member = await ctx.db.workspaceMember.findUnique({
+        where: { userId_workspaceId: { userId: ctx.session.user.id, workspaceId: input.workspaceId } },
+      });
+      if (!member) throw new TRPCError({ code: "FORBIDDEN" });
+
       const since = new Date();
       since.setDate(since.getDate() - input.days);
 

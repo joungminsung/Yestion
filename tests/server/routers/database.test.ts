@@ -31,13 +31,16 @@ async function setup() {
 function getCaller() {
   return createCaller({
     db,
-    session: { user: { id: userId, email: "db-test@example.com", name: "DB Tester" } },
+    session: { user: { id: userId, email: "db-test@example.com", name: "DB Tester" }, token: "test-token" },
     headers: new Headers(),
   });
 }
 
 describe("database router", () => {
   beforeEach(async () => {
+    await db.activityLog.deleteMany();
+    await db.notification.deleteMany();
+    await db.rowTemplate.deleteMany();
     await db.row.deleteMany();
     await db.databaseView.deleteMany();
     await db.property.deleteMany();
@@ -46,6 +49,13 @@ describe("database router", () => {
     await db.favorite.deleteMany();
     await db.session.deleteMany();
     await db.page.deleteMany();
+    await db.workspaceChannelAuditLog.deleteMany();
+    await db.workspaceChannelReadState.deleteMany();
+    await db.workspaceChannelBrowserTab.deleteMany();
+    await db.workspaceChannelBrowserSession.deleteMany();
+    await db.workspaceChannelVoicePresence.deleteMany();
+    await db.workspaceChannelMessage.deleteMany();
+    await db.workspaceChannel.deleteMany();
     await db.workspaceMember.deleteMany();
     await db.workspace.deleteMany();
     await db.user.deleteMany();
@@ -65,15 +75,15 @@ describe("database router", () => {
 
       // Default Title property
       expect(database.properties).toHaveLength(1);
-      expect(database.properties[0].name).toBe("Title");
-      expect(database.properties[0].type).toBe("title");
-      expect(database.properties[0].position).toBe(0);
+      expect(database.properties[0]!.name).toBe("Title");
+      expect(database.properties[0]!.type).toBe("title");
+      expect(database.properties[0]!.position).toBe(0);
 
       // Default table view
       expect(database.views).toHaveLength(1);
-      expect(database.views[0].name).toBe("Table View");
-      expect(database.views[0].type).toBe("table");
-      expect(database.views[0].position).toBe(0);
+      expect(database.views[0]!.name).toBe("Table View");
+      expect(database.views[0]!.type).toBe("table");
+      expect(database.views[0]!.position).toBe(0);
     });
   });
 
@@ -93,8 +103,8 @@ describe("database router", () => {
       const database = await caller.database.get({ databaseId: created.id });
       expect(database.id).toBe(created.id);
       expect(database.properties).toHaveLength(2);
-      expect(database.properties[0].name).toBe("Title");
-      expect(database.properties[1].name).toBe("Status");
+      expect(database.properties[0]!.name).toBe("Title");
+      expect(database.properties[1]!.name).toBe("Status");
       expect(database.views).toHaveLength(1);
     });
   });
@@ -115,7 +125,7 @@ describe("database router", () => {
       expect(prop.name).toBe("Status");
       expect(prop.type).toBe("select");
       expect(prop.position).toBe(1); // Title is 0
-      expect((prop.config as any).options).toHaveLength(1);
+      expect((prop.config as { options: { id: string; name: string; color: string }[] }).options).toHaveLength(1);
     });
   });
 
@@ -182,14 +192,14 @@ describe("database router", () => {
     it("should merge config with existing", async () => {
       const caller = getCaller();
       const database = await caller.database.create({ workspaceId });
-      const view = database.views[0];
+      const view = database.views[0]!;
 
       const updated = await caller.database.updateView({
-        id: view.id,
+        id: view!.id,
         config: { wrapCells: true },
       });
 
-      expect((updated.config as any).wrapCells).toBe(true);
+      expect((updated.config as { wrapCells: boolean }).wrapCells).toBe(true);
     });
   });
 
@@ -216,11 +226,11 @@ describe("database router", () => {
     it("should create a row with its own page as child of database page", async () => {
       const caller = getCaller();
       const database = await caller.database.create({ workspaceId, name: "Tasks" });
-      const titleProp = database.properties[0];
+      const titleProp = database.properties[0]!;
 
       const row = await caller.database.addRow({
         databaseId: database.id,
-        values: { [titleProp.id]: "My Task" },
+        values: { [titleProp!.id]: "My Task" },
       });
 
       expect(row.id).toBeDefined();
@@ -239,11 +249,11 @@ describe("database router", () => {
     it("should merge new values with existing", async () => {
       const caller = getCaller();
       const database = await caller.database.create({ workspaceId });
-      const titleProp = database.properties[0];
+      const titleProp = database.properties[0]!;
 
       const row = await caller.database.addRow({
         databaseId: database.id,
-        values: { [titleProp.id]: "Original" },
+        values: { [titleProp!.id]: "Original" },
       });
 
       const updated = await caller.database.updateRow({
@@ -252,7 +262,7 @@ describe("database router", () => {
       });
 
       const vals = updated.values as Record<string, unknown>;
-      expect(vals[titleProp.id]).toBe("Original");
+      expect(vals[titleProp!.id]).toBe("Original");
       expect(vals.extraField).toBe("new value");
     });
   });
@@ -283,21 +293,21 @@ describe("database router", () => {
     it("should return all rows with page data sorted by createdAt", async () => {
       const caller = getCaller();
       const database = await caller.database.create({ workspaceId });
-      const titleProp = database.properties[0];
+      const titleProp = database.properties[0]!;
 
       await caller.database.addRow({
         databaseId: database.id,
-        values: { [titleProp.id]: "First" },
+        values: { [titleProp!.id]: "First" },
       });
       await caller.database.addRow({
         databaseId: database.id,
-        values: { [titleProp.id]: "Second" },
+        values: { [titleProp!.id]: "Second" },
       });
 
       const rows = await caller.database.queryRows({ databaseId: database.id });
       expect(rows).toHaveLength(2);
-      expect(rows[0].page!.title).toBe("First");
-      expect(rows[1].page!.title).toBe("Second");
+      expect(rows[0]!.page!.title).toBe("First");
+      expect(rows[1]!.page!.title).toBe("Second");
     });
   });
 });

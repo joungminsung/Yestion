@@ -1,0 +1,4 @@
+ALTER TABLE "MeetingSession"
+ADD COLUMN "lastNotesChunkIndex" INTEGER NOT NULL DEFAULT -1,
+ADD COLUMN "lastError" TEXT,
+ADD COLUMN "lastErrorAt" TIMESTAMP(3);

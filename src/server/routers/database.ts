@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "@/server/trpc/init";
 import type { Context } from "@/server/trpc/init";
+import { requireWorkspacePermission } from "@/lib/permissions";
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -139,6 +140,13 @@ export const databaseRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await verifyWorkspaceAccess(ctx.db, ctx.session.user.id, input.workspaceId);
+      await requireWorkspacePermission(
+        ctx.db,
+        ctx.session.user.id,
+        input.workspaceId,
+        "database.create",
+        "Database creation permission is required",
+      );
 
       // Create a page for the database
       const page = await ctx.db.page.create({
@@ -674,13 +682,23 @@ export const databaseRouter = router({
     .input(
       z.object({
         rowIds: z.array(z.string()),
+        workspaceId: z.string(),
       }),
     )
     .query(async ({ ctx, input }) => {
       if (input.rowIds.length === 0) return [];
 
+      // Verify workspace access before returning row data
+      const member = await ctx.db.workspaceMember.findUnique({
+        where: { userId_workspaceId: { userId: ctx.session.user.id, workspaceId: input.workspaceId } },
+      });
+      if (!member) throw new TRPCError({ code: "FORBIDDEN", message: "No access to this workspace" });
+
       const rows = await ctx.db.row.findMany({
-        where: { id: { in: input.rowIds } },
+        where: {
+          id: { in: input.rowIds },
+          database: { page: { workspaceId: input.workspaceId } },
+        },
         include: {
           page: { select: { id: true, title: true, icon: true } },
         },
@@ -907,23 +925,23 @@ export const databaseRouter = router({
     .input(z.object({ databaseId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const database = await verifyDatabaseAccess(ctx.db, ctx.session.user.id, input.databaseId);
+      await requireWorkspacePermission(
+        ctx.db,
+        ctx.session.user.id,
+        database.page.workspaceId,
+        "database.edit",
+        "Database edit permission is required",
+      );
 
       // If locked by someone else, only admin/owner can unlock
       if (database.isLocked && database.lockedBy !== ctx.session.user.id) {
-        const member = await ctx.db.workspaceMember.findUnique({
-          where: {
-            userId_workspaceId: {
-              userId: ctx.session.user.id,
-              workspaceId: database.page.workspaceId,
-            },
-          },
-        });
-        if (!member || !["OWNER", "ADMIN"].includes(member.role)) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Only the user who locked it or admins can unlock",
-          });
-        }
+        await requireWorkspacePermission(
+          ctx.db,
+          ctx.session.user.id,
+          database.page.workspaceId,
+          "database.edit",
+          "Only the user who locked it or members with database edit permission can unlock",
+        );
       }
 
       const newLocked = !database.isLocked;

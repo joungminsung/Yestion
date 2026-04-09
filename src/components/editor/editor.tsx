@@ -40,8 +40,11 @@ import { ToggleBlock, DetailsSummary, DetailsContent } from "./extensions/toggle
 import { Callout } from "./extensions/callout";
 import { Equation } from "./extensions/equation";
 import { SyncedBlockNode } from "./extensions/synced-block";
+import { SuggestionMark } from "./extensions/suggestion-mark";
+import { CommentMark } from "./extensions/comment-mark";
 import { LinkToPage } from "./extensions/link-to-page";
 import { DatabaseBlock } from "./extensions/database-block";
+import { LinkedDatabaseBlock } from "./extensions/linked-database-block";
 import { TableOfContents } from "./extensions/table-of-contents";
 import { ColumnList, Column } from "./extensions/column-list";
 import { SlashCommandExtension } from "./extensions/slash-command-ext";
@@ -70,6 +73,8 @@ const BlockMenu = lazy(() => import("./block-menu").then(m => ({ default: m.Bloc
 const BlockContextMenu = lazy(() => import("./block-context-menu").then(m => ({ default: m.BlockContextMenu })));
 const AiDraftInline = lazy(() => import("./ai/ai-draft-inline").then(m => ({ default: m.AiDraftInline })));
 const TableControls = lazy(() => import("./media/table-controls").then(m => ({ default: m.TableControls })));
+const CommentPopover = lazy(() => import("./comment-popover").then(m => ({ default: m.CommentPopover })));
+const SuggestionPanel = lazy(() => import("./suggestion-panel").then(m => ({ default: m.SuggestionPanel })));
 import { SelectionActionBar } from "./selection-action-bar";
 import { EmptyPageGuide } from "./empty-page-guide";
 import "./utils/editor-styles.css";
@@ -84,34 +89,53 @@ type CollaborationConfig = {
 };
 
 type NotionEditorProps = {
+  pageId?: string;
+  currentUser?: { id: string; name: string };
   initialContent?: Record<string, unknown>;
   onUpdate?: (json: Record<string, unknown>) => void;
   editable?: boolean;
   collaboration?: CollaborationConfig;
   mentionItems?: MentionItem[];
   onTyping?: () => void;
-  onAddComment?: (content: string, range: { from: number; to: number }) => void;
   onTurnIntoPage?: (blockText: string, from: number, to: number) => void;
 };
 
-export type NotionEditorHandle = { commands: { setContent: (content: unknown) => boolean } };
+type SetContentCommandOptions = {
+  emitUpdate?: boolean;
+};
+
+export type NotionEditorHandle = {
+  commands: {
+    setContent: (content: unknown, options?: SetContentCommandOptions) => boolean;
+  };
+};
 
 export const NotionEditor = forwardRef<
   NotionEditorHandle,
   NotionEditorProps
 >(function NotionEditor({
+  pageId,
+  currentUser,
   initialContent,
   onUpdate,
   editable = true,
   collaboration,
   mentionItems = [],
   onTyping,
-  onAddComment,
   onTurnIntoPage,
 }, ref) {
   const [menuState, setMenuState] = useState<{pos: number; coords: {top: number; left: number}} | null>(null);
+  const [showSuggestionPanel, setShowSuggestionPanel] = useState(false);
+  const [suggestionModeEnabled, setSuggestionModeEnabled] = useState(false);
+  const [suggestionCount, setSuggestionCount] = useState(0);
+  const [activeCommentPopover, setActiveCommentPopover] = useState<{
+    commentId: string | null;
+    position: { top: number; left: number };
+    textRange: { from: number; to: number } | null;
+  } | null>(null);
   const aiStore = useAiStore();
   const { isMobile } = useDevice();
+  const effectiveUser = currentUser ?? collaboration?.user;
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -160,8 +184,15 @@ export const NotionEditor = forwardRef<
       ToggleHeading,
       Equation,
       SyncedBlockNode,
+      SuggestionMark.configure({
+        currentUser: effectiveUser
+          ? { id: effectiveUser.id, name: effectiveUser.name }
+          : undefined,
+      }),
+      CommentMark,
       LinkToPage,
       DatabaseBlock,
+      LinkedDatabaseBlock,
       TableOfContents,
       ColumnList,
       Column,
@@ -190,13 +221,40 @@ export const NotionEditor = forwardRef<
       content: [{ type: "paragraph" }],
     }),
     editable,
-    onUpdate: collaboration ? () => {
-      onTyping?.();
-    } : ({ editor }) => {
+    onUpdate: ({ editor, transaction }) => {
+      if (!transaction.docChanged) {
+        return;
+      }
+
+      if (collaboration) {
+        onTyping?.();
+
+        // Ignore remote Yjs sync transactions and only mirror local edits to block storage.
+        if (transaction.getMeta("y-sync$")) {
+          return;
+        }
+      }
+
       onUpdate?.(editor.getJSON() as Record<string, unknown>);
     },
     editorProps: {
       attributes: { class: "notion-editor", role: "textbox", "aria-multiline": "true", "aria-label": "페이지 에디터" },
+      handleClick(_view, _pos, event) {
+        const target = event.target as HTMLElement | null;
+        const commentElement = target?.closest?.("[data-comment-id]") as HTMLElement | null;
+        const commentId = commentElement?.dataset.commentId;
+
+        if (commentId && pageId && effectiveUser) {
+          setActiveCommentPopover({
+            commentId,
+            position: { top: event.clientY + 12, left: event.clientX + 12 },
+            textRange: null,
+          });
+          return true;
+        }
+
+        return false;
+      },
       handleKeyDown(_view, event) {
         // Cmd+Shift+H: toggle highlight
         if (event.key === "h" && (event.metaKey || event.ctrlKey) && event.shiftKey) {
@@ -261,7 +319,15 @@ export const NotionEditor = forwardRef<
 
   useImperativeHandle(ref, () => {
     if (!editor) return { commands: { setContent: () => false } };
-    return { commands: { setContent: (content: unknown) => editor.commands.setContent(content as Parameters<typeof editor.commands.setContent>[0]) } };
+    return {
+      commands: {
+        setContent: (content: unknown, options?: SetContentCommandOptions) =>
+          editor.commands.setContent(
+            content as Parameters<typeof editor.commands.setContent>[0],
+            options as Parameters<typeof editor.commands.setContent>[1],
+          ),
+      },
+    };
   }, [editor]);
 
   useEffect(() => {
@@ -274,6 +340,31 @@ export const NotionEditor = forwardRef<
   }, [aiStore]);
 
   const linkPreview = useLinkPreview(editor);
+
+  useEffect(() => {
+    if (!editor) return;
+
+    const countSuggestions = () => {
+      let count = 0;
+      editor.state.doc.descendants((node) => {
+        if (node.marks.some((mark) => mark.type.name === "suggestion")) {
+          count += 1;
+        }
+      });
+      setSuggestionCount(count);
+      setSuggestionModeEnabled(
+        Boolean((editor.storage as { suggestion?: { enabled?: boolean } }).suggestion?.enabled)
+      );
+    };
+
+    countSuggestions();
+    editor.on("update", countSuggestions);
+    editor.on("selectionUpdate", countSuggestions);
+    return () => {
+      editor.off("update", countSuggestions);
+      editor.off("selectionUpdate", countSuggestions);
+    };
+  }, [editor]);
 
   if (!editor) return null;
 
@@ -292,7 +383,18 @@ export const NotionEditor = forwardRef<
       {editor && <EmptyPageGuide editor={editor} />}
       {!isMobile && editor.view && (
         <Suspense fallback={null}>
-          <InlineToolbar editor={editor} onAddComment={onAddComment} />
+          <InlineToolbar
+            editor={editor}
+            onRequestComment={(range, popupPosition) => {
+              if (!pageId || !effectiveUser) return;
+              setActiveCommentPopover({
+                commentId: null,
+                position: popupPosition,
+                textRange: range,
+              });
+            }}
+            onSuggestionModeChange={setSuggestionModeEnabled}
+          />
           <DragHandle editor={editor} onMenuOpen={(pos) => {
             if (!editor.view) return;
             const coords = editor.view.coordsAtPos(pos);
@@ -304,7 +406,19 @@ export const NotionEditor = forwardRef<
         <Suspense fallback={null}>
           <SlashCommand editor={editor} />
           <MentionList editor={editor} items={mentionItems} />
-          <BlockContextMenu editor={editor} onTurnIntoPage={onTurnIntoPage} onAddComment={onAddComment} />
+          <BlockContextMenu
+            editor={editor}
+            onTurnIntoPage={onTurnIntoPage}
+            onAddComment={(_content, range) => {
+              if (!pageId || !effectiveUser || !editor.view) return;
+              const coords = editor.view.coordsAtPos(range.to);
+              setActiveCommentPopover({
+                commentId: null,
+                position: { top: coords.bottom + 8, left: coords.left },
+                textRange: range,
+              });
+            }}
+          />
         </Suspense>
       )}
       {isMobile && editor && (
@@ -336,6 +450,42 @@ export const NotionEditor = forwardRef<
           onCopyLink={linkPreview.handleCopyLink}
           onRemoveLink={linkPreview.handleRemoveLink}
         />
+      )}
+      {(showSuggestionPanel || suggestionModeEnabled || suggestionCount > 0) && (
+        <div className="fixed bottom-4 right-4 z-30 flex items-center gap-2">
+          <button
+            onClick={() => setShowSuggestionPanel((prev) => !prev)}
+            className="rounded-full px-3 py-2 text-xs font-medium"
+            style={{
+              backgroundColor: suggestionModeEnabled ? "#2383e2" : "var(--bg-primary)",
+              color: suggestionModeEnabled ? "white" : "var(--text-primary)",
+              boxShadow: "var(--shadow-popup)",
+              border: suggestionModeEnabled ? "none" : "1px solid var(--border-default)",
+            }}
+          >
+            {suggestionModeEnabled
+              ? `Suggesting on${suggestionCount > 0 ? ` · ${suggestionCount}` : ""}`
+              : `Review suggestions${suggestionCount > 0 ? ` · ${suggestionCount}` : ""}`}
+          </button>
+        </div>
+      )}
+      {showSuggestionPanel && (
+        <Suspense fallback={null}>
+          <SuggestionPanel editor={editor} onClose={() => setShowSuggestionPanel(false)} />
+        </Suspense>
+      )}
+      {activeCommentPopover && pageId && effectiveUser && (
+        <Suspense fallback={null}>
+          <CommentPopover
+            pageId={pageId}
+            commentId={activeCommentPopover.commentId}
+            currentUserId={effectiveUser.id}
+            editor={editor}
+            position={activeCommentPopover.position}
+            textRange={activeCommentPopover.textRange}
+            onClose={() => setActiveCommentPopover(null)}
+          />
+        </Suspense>
       )}
     </div>
   );

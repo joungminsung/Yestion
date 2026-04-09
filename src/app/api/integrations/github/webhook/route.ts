@@ -24,34 +24,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  // Determine which integration this belongs to via the installation or sender
-  const sender = payload.sender as Record<string, unknown> | undefined;
-  const senderId = sender?.id ? String(sender.id) : null;
+  if (!signature) {
+    return NextResponse.json({ error: "Missing webhook signature" }, { status: 401 });
+  }
 
   // Look up connected GitHub integrations
   const integrations = await db.integration.findMany({
     where: { service: "GITHUB", status: "CONNECTED" },
   });
 
-  // Match by webhook secret or external ID
+  // Match strictly by webhook secret
   let matchedIntegration = null;
   for (const integration of integrations) {
-    if (integration.webhookSecret && signature) {
+    if (integration.webhookSecret) {
       if (verifyGitHubSignature(rawBody, signature, integration.webhookSecret)) {
         matchedIntegration = integration;
         break;
       }
     }
-    // Fallback: match by external ID (GitHub user ID who connected)
-    if (integration.externalId === senderId) {
-      matchedIntegration = integration;
-      break;
-    }
   }
 
   if (!matchedIntegration) {
-    // Accept the webhook but don't process (may be a stale hook)
-    return NextResponse.json({ ok: true, processed: false });
+    return NextResponse.json({ error: "Invalid webhook signature" }, { status: 401 });
   }
 
   // Build the event

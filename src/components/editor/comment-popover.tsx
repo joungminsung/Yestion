@@ -141,7 +141,7 @@ export function CommentPopover({
             className="w-full bg-transparent outline-none text-sm resize-none"
             style={{ color: "var(--text-primary)", minHeight: "60px" }}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 handleSubmitNew();
               }
@@ -240,7 +240,7 @@ export function CommentPopover({
               className="w-full bg-transparent outline-none text-sm resize-none"
               style={{ color: "var(--text-primary)", minHeight: "40px" }}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   handleSubmitReply();
                 }

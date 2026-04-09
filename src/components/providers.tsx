@@ -12,6 +12,8 @@ import { ShortcutsHelpModal } from "@/components/shortcuts-help-modal";
 import { QuickActions } from "@/components/quick-actions";
 import { useToastStore } from "@/stores/toast";
 import { ResponsiveProvider } from "@/components/providers/responsive-provider";
+import { VoiceProvider } from "@/components/voice/voice-provider";
+import { VoiceMiniBar } from "@/components/voice/voice-mini-bar";
 
 function OfflineBanner() {
   const [isOffline, setIsOffline] = useState(false);
@@ -82,6 +84,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <ResponsiveProvider>
           <ShortcutsProvider>{children}</ShortcutsProvider>
         </ResponsiveProvider>
+        <VoiceProvider />
+        <VoiceMiniBar />
         <ToastContainer />
         <ScrollToTop />
         <ShortcutsHelpModal />

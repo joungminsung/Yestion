@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "@/server/auth/session";
 
 function isAllowedUrl(input: string): boolean {
   let parsed: URL;
@@ -33,10 +34,19 @@ function isAllowedUrl(input: string): boolean {
       return false;
     }
   }
+  // Block common cloud metadata endpoints
+  if (hostname === "metadata.google.internal" || hostname.endsWith(".internal")) {
+    return false;
+  }
   return true;
 }
 
 export async function GET(request: NextRequest) {
+  const session = await getServerSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const url = request.nextUrl.searchParams.get("url");
   if (!url) {
     return NextResponse.json({ error: "Missing url parameter" }, { status: 400 });
@@ -52,6 +62,7 @@ export async function GET(request: NextRequest) {
 
     const response = await fetch(url, {
       signal: controller.signal,
+      redirect: "manual", // Prevent open redirect to internal hosts
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; NotionWeb/1.0; +https://notion-web.app)",
         Accept: "text/html",
@@ -59,11 +70,62 @@ export async function GET(request: NextRequest) {
     });
     clearTimeout(timeout);
 
+    // Handle redirects: validate redirect target before following
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      const resolvedUrl = location ? new URL(location, url).toString() : null;
+      if (!resolvedUrl || !isAllowedUrl(resolvedUrl)) {
+        return NextResponse.json({ title: url, domain: new URL(url).hostname }, { status: 200 });
+      }
+      // Follow the allowed redirect to get actual metadata
+      const redirectController = new AbortController();
+      const redirectTimeout = setTimeout(() => redirectController.abort(), 5000);
+      try {
+        const redirectResponse = await fetch(resolvedUrl, {
+          signal: redirectController.signal,
+          redirect: "manual",
+          headers: {
+            "User-Agent": "Mozilla/5.0 (compatible; NotionWeb/1.0; +https://notion-web.app)",
+            Accept: "text/html",
+          },
+        });
+        clearTimeout(redirectTimeout);
+        if (!redirectResponse.ok || redirectResponse.status >= 300) {
+          return NextResponse.json({ title: url, domain: new URL(url).hostname }, { status: 200 });
+        }
+        const redirectHtml = await redirectResponse.text();
+        const getRedirectMeta = (property: string): string | null => {
+          const regex = new RegExp(
+            `<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']*)["']|<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']${property}["']`,
+            "i"
+          );
+          const match = redirectHtml.match(regex);
+          return match?.[1] || match?.[2] || null;
+        };
+        const titleMatch = redirectHtml.match(/<title[^>]*>([^<]*)<\/title>/i);
+        return NextResponse.json({
+          title: getRedirectMeta("og:title") || titleMatch?.[1]?.trim() || url,
+          description: getRedirectMeta("og:description") || getRedirectMeta("description") || "",
+          image: getRedirectMeta("og:image") || "",
+          domain: new URL(resolvedUrl).hostname,
+        });
+      } catch {
+        clearTimeout(redirectTimeout);
+        return NextResponse.json({ title: url, domain: new URL(url).hostname }, { status: 200 });
+      }
+    }
+
     if (!response.ok) {
       return NextResponse.json({ title: url }, { status: 200 });
     }
 
-    const html = await response.text();
+    // Limit response body size to prevent memory exhaustion (1MB)
+    const contentLength = response.headers.get("content-length");
+    if (contentLength && parseInt(contentLength, 10) > 1_000_000) {
+      return NextResponse.json({ title: url, domain: new URL(url).hostname }, { status: 200 });
+    }
+
+    const html = (await response.text()).slice(0, 1_000_000);
 
     // Parse OG tags from HTML
     const getMetaContent = (property: string): string | null => {

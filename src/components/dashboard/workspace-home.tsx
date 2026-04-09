@@ -39,7 +39,7 @@ export function WorkspaceHome() {
 
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto px-6 py-8">
+      <div className="w-full max-w-[1100px] px-6 py-8 lg:px-8">
         <div className="h-8 w-48 rounded bg-notion-bg-hover animate-pulse mb-8" />
         <div className="flex gap-3 mb-8">
           <div className="h-10 w-28 rounded-lg bg-notion-bg-hover animate-pulse" />
@@ -55,7 +55,7 @@ export function WorkspaceHome() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8">
+    <div className="w-full max-w-[1100px] px-6 py-8 lg:px-8">
       {/* Greeting */}
       <h1
         className="text-2xl font-semibold mb-8"

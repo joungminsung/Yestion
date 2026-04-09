@@ -440,6 +440,9 @@ export function DragHandle({ editor, onMenuOpen }: DragHandleProps) {
               if (blockId) {
                 e.dataTransfer.setData("text/block-id", blockId);
                 e.dataTransfer.setData("text/plain", node?.textContent ?? "");
+                // Include block metadata for chat drag-and-drop
+                e.dataTransfer.setData("text/block-type", node?.type?.name ?? "paragraph");
+                e.dataTransfer.setData("text/block-preview", (node?.textContent ?? "").slice(0, 200));
               }
             }}
             onMouseDown={handleGripMouseDown}

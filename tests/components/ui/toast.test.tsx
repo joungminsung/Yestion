@@ -37,4 +37,34 @@ describe("toast store", () => {
     });
     expect(result.current.toasts[0]!.undo).toBe(undoFn);
   });
+
+  it("should update an existing toast", () => {
+    const { result } = renderHook(() => useToastStore());
+    let toastId = "";
+
+    act(() => {
+      toastId = result.current.addToast({
+        message: "Uploading",
+        type: "info",
+        loading: true,
+      });
+    });
+
+    act(() => {
+      result.current.updateToast(toastId, {
+        message: "Upload complete",
+        type: "success",
+        loading: false,
+        progress: 100,
+      });
+    });
+
+    expect(result.current.toasts[0]).toMatchObject({
+      id: toastId,
+      message: "Upload complete",
+      type: "success",
+      loading: false,
+      progress: 100,
+    });
+  });
 });

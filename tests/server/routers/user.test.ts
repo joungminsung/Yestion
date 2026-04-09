@@ -23,9 +23,19 @@ async function createTestUser() {
 
 describe("user router", () => {
   beforeEach(async () => {
+    await db.activityLog.deleteMany();
+    await db.notification.deleteMany();
+    await db.block.deleteMany();
     await db.session.deleteMany();
     await db.favorite.deleteMany();
     await db.page.deleteMany();
+    await db.workspaceChannelAuditLog.deleteMany();
+    await db.workspaceChannelReadState.deleteMany();
+    await db.workspaceChannelBrowserTab.deleteMany();
+    await db.workspaceChannelBrowserSession.deleteMany();
+    await db.workspaceChannelVoicePresence.deleteMany();
+    await db.workspaceChannelMessage.deleteMany();
+    await db.workspaceChannel.deleteMany();
     await db.workspaceMember.deleteMany();
     await db.workspace.deleteMany();
     await db.user.deleteMany();
@@ -37,7 +47,7 @@ describe("user router", () => {
 
       const caller = createCaller({
         db,
-        session: { user: { id: user.id, email: user.email, name: user.name } },
+        session: { user: { id: user.id, email: user.email, name: user.name }, token: "test-token" },
         headers: new Headers(),
       });
 
@@ -67,7 +77,7 @@ describe("user router", () => {
 
       const caller = createCaller({
         db,
-        session: { user: { id: user.id, email: user.email, name: user.name } },
+        session: { user: { id: user.id, email: user.email, name: user.name }, token: "test-token" },
         headers: new Headers(),
       });
 
@@ -82,7 +92,7 @@ describe("user router", () => {
 
       const caller = createCaller({
         db,
-        session: { user: { id: user.id, email: user.email, name: user.name } },
+        session: { user: { id: user.id, email: user.email, name: user.name }, token: "test-token" },
         headers: new Headers(),
       });
 
@@ -96,7 +106,7 @@ describe("user router", () => {
 
       const caller = createCaller({
         db,
-        session: { user: { id: user.id, email: user.email, name: user.name } },
+        session: { user: { id: user.id, email: user.email, name: user.name }, token: "test-token" },
         headers: new Headers(),
       });
 
@@ -112,7 +122,7 @@ describe("user router", () => {
 
       const caller = createCaller({
         db,
-        session: { user: { id: user.id, email: user.email, name: user.name } },
+        session: { user: { id: user.id, email: user.email, name: user.name }, token: "test-token" },
         headers: new Headers(),
       });
 
@@ -143,7 +153,7 @@ describe("user router", () => {
 
       const caller = createCaller({
         db,
-        session: { user: { id: user.id, email: user.email, name: user.name } },
+        session: { user: { id: user.id, email: user.email, name: user.name }, token: "test-token" },
         headers: new Headers(),
       });
 
@@ -160,7 +170,7 @@ describe("user router", () => {
 
       const caller = createCaller({
         db,
-        session: { user: { id: user.id, email: user.email, name: user.name } },
+        session: { user: { id: user.id, email: user.email, name: user.name }, token: "test-token" },
         headers: new Headers(),
       });
 

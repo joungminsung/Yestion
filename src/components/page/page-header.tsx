@@ -165,7 +165,7 @@ export function PageHeader({ page }: PageHeaderProps) {
         )}
 
         {/* Title */}
-        <div style={{ marginTop: !page.icon && !page.cover && !(!page.icon || !page.cover) ? "72px" : undefined }}>
+        <div style={{ marginTop: !page.icon && !page.cover ? "72px" : undefined }}>
           <PageTitle pageId={page.id} initialTitle={page.title || "제목 없음"} />
         </div>
       </div>
@@ -249,13 +249,29 @@ function CoverPickerTabs({
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && urlInput.trim()) {
-                  onSelect(urlInput.trim());
+                  try {
+                    const parsed = new URL(urlInput.trim());
+                    if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+                      onSelect(urlInput.trim());
+                    }
+                  } catch {
+                    // Invalid URL - ignore
+                  }
                 }
               }}
             />
             <button
               onClick={() => {
-                if (urlInput.trim()) onSelect(urlInput.trim());
+                if (urlInput.trim()) {
+                  try {
+                    const parsed = new URL(urlInput.trim());
+                    if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+                      onSelect(urlInput.trim());
+                    }
+                  } catch {
+                    // Invalid URL - ignore
+                  }
+                }
               }}
               className="px-4 py-2 rounded text-sm font-medium text-white"
               style={{ backgroundColor: "#2383e2" }}
@@ -295,17 +311,21 @@ function UnsplashPickerInline({ onSelect }: { onSelect: (url: string) => void })
   const [photos, setPhotos] = useState<UnsplashPhoto[]>([]);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const abortRef = useRef<AbortController>();
 
   useEffect(() => {
     if (!accessKey) return;
+    const controller = new AbortController();
     setLoading(true);
     fetch(`${UNSPLASH_API}/photos?per_page=18&order_by=popular`, {
       headers: { Authorization: `Client-ID ${accessKey}` },
+      signal: controller.signal,
     })
       .then((r) => r.json())
       .then((data) => setPhotos(data || []))
       .catch(() => {})
       .finally(() => setLoading(false));
+    return () => controller.abort();
   }, [accessKey]);
 
   const handleSearch = (value: string) => {
@@ -314,16 +334,22 @@ function UnsplashPickerInline({ onSelect }: { onSelect: (url: string) => void })
     if (!value.trim()) return;
     debounceRef.current = setTimeout(async () => {
       if (!accessKey) return;
+      // Abort previous search request
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
       setLoading(true);
       try {
         const res = await fetch(
           `${UNSPLASH_API}/search/photos?query=${encodeURIComponent(value)}&per_page=18&orientation=landscape`,
-          { headers: { Authorization: `Client-ID ${accessKey}` } }
+          {
+            headers: { Authorization: `Client-ID ${accessKey}` },
+            signal: abortRef.current.signal,
+          }
         );
         const data = await res.json();
         setPhotos(data.results || []);
       } catch {
-        // ignore
+        // ignore (includes AbortError)
       } finally {
         setLoading(false);
       }

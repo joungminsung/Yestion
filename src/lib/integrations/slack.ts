@@ -17,7 +17,7 @@ class SlackAdapter extends BaseIntegrationAdapter {
     description: "Send notifications and receive commands from Slack",
     icon: "MessageSquare",
     features: [
-      "Send page/task notifications to channels",
+      "Send workspace notifications to channels",
       "Slash commands (/notion-search, /notion-create)",
       "Receive message reactions as page comments",
     ],

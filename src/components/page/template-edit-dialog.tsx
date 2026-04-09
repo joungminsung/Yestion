@@ -15,10 +15,10 @@ const CATEGORY_OPTIONS = [
   { value: "documents", label: "문서" },
   { value: "personal", label: "개인" },
   { value: "team", label: "팀" },
-  { value: "project", label: "프로젝트" },
   { value: "engineering", label: "엔지니어링" },
-  { value: "education", label: "교육" },
+  { value: "design", label: "디자인" },
   { value: "marketing", label: "마케팅" },
+  { value: "hr", label: "인사" },
   { value: "custom", label: "사용자 정의" },
 ];
 
@@ -44,7 +44,13 @@ export function TemplateEditDialog({ templateId, onClose, onSaved }: Props) {
       setDescription(template.description || "");
       setDescriptionKo(template.descriptionKo || "");
       setIcon(template.icon || "");
-      setCategory(template.category);
+      setCategory(
+        template.category === "education"
+          ? "design"
+          : template.category === "project"
+            ? "team"
+            : template.category
+      );
       setTags(template.tags.join(", "));
       setIsPublic(template.isPublic);
     }
@@ -65,7 +71,7 @@ export function TemplateEditDialog({ templateId, onClose, onSaved }: Props) {
       description: description || undefined,
       descriptionKo: descriptionKo || undefined,
       icon: icon || undefined,
-      category: category as "documents" | "personal" | "team" | "project" | "engineering" | "education" | "marketing" | "custom",
+      category: category as "documents" | "design" | "personal" | "team" | "engineering" | "marketing" | "hr" | "custom",
       tags: tags
         .split(",")
         .map((t) => t.trim())

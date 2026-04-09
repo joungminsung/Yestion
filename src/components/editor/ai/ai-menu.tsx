@@ -4,6 +4,7 @@ import { useRef, useEffect, type ReactNode } from "react";
 import type { Editor } from "@tiptap/react";
 import { useAiStore } from "@/stores/ai";
 import {
+  Sparkles,
   FileText, Pencil, Ruler, Scissors, CheckCircle,
   Globe, Languages, Briefcase, SmilePlus, Target, ListChecks,
 } from "lucide-react";
@@ -72,35 +73,65 @@ export function AiMenu({ editor, position, onClose }: Props) {
   return (
     <div
       ref={menuRef}
-      className="fixed rounded-lg overflow-hidden py-1"
+      className="fixed overflow-hidden rounded-xl border py-1"
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,
         zIndex: "var(--z-dropdown)",
         backgroundColor: "var(--bg-primary)",
-        boxShadow: "var(--shadow-popup)",
-        width: "220px",
+        borderColor: "var(--border-default)",
+        boxShadow: "0 14px 28px rgba(15, 23, 42, 0.10)",
+        width: "232px",
         maxHeight: "400px",
         overflowY: "auto",
       }}
     >
       <div
-        className="px-3 py-1.5"
-        style={{ fontSize: "11px", color: "var(--text-tertiary)", fontWeight: 500 }}
+        className="border-b px-3 py-2"
+        style={{
+          borderColor: "var(--border-default)",
+          backgroundColor: "var(--bg-primary)",
+        }}
       >
-        AI 작업
+        <div className="flex items-center gap-2">
+          <div
+            className="flex h-7 w-7 items-center justify-center rounded-md border"
+            style={{
+              borderColor: "var(--border-default)",
+              backgroundColor: "var(--bg-secondary)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            <Sparkles size={13} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+              AI 편집
+            </p>
+            <p className="text-[11px]" style={{ color: "var(--text-secondary)" }}>
+              선택한 문장을 바로 다듬습니다
+            </p>
+          </div>
+        </div>
       </div>
       {AI_MENU_ITEMS.map((item) => (
         <button
           key={item.action}
-          className="w-full flex items-center gap-2.5 px-3 py-1.5 text-sm hover:bg-notion-bg-hover text-left transition-colors"
+          className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-notion-bg-hover"
           style={{ color: "var(--text-primary)" }}
           onClick={() => handleAction(item.action)}
         >
-          <span className="w-5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }}>
+          <span
+            className="flex h-8 w-8 items-center justify-center rounded-md border"
+            style={{
+              color: "var(--text-secondary)",
+              backgroundColor: "var(--bg-secondary)",
+              borderColor: "var(--border-default)",
+            }}
+          >
             {item.icon}
           </span>
-          {item.label}
+          <span className="min-w-0 flex-1 truncate">{item.label}</span>
         </button>
       ))}
     </div>

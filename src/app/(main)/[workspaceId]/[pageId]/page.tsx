@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page/page-header";
 import { SubPagesList } from "@/components/page/sub-pages-list";
 import { OfflinePageCache } from "@/components/editor/offline-page-cache";
 import { getEffectivePermission } from "@/lib/permissions";
+import { PageMeetingSurface } from "@/components/meeting/page-meeting-surface";
 
 export default async function PageView({ params }: { params: { workspaceId: string; pageId: string } }) {
   const session = await getServerSession();
@@ -75,12 +76,15 @@ export default async function PageView({ params }: { params: { workspaceId: stri
           paddingBottom: "32px",
         }}
       >
+        <PageMeetingSurface pageId={page.id} />
         <PageEditor
+          key={`${page.id}:${page.updatedAt.toISOString()}:${serializedBlocks.length}`}
           pageId={page.id}
           initialBlocks={serializedBlocks}
           isLocked={page.isLocked || isReadOnly}
           sessionToken={sessionToken}
           user={{ id: session.user.id, name: session.user.name }}
+          hasCollabState={Boolean(page.yjsState && page.yjsState.length > 0)}
         />
         {page.children.length > 0 && (
           <SubPagesList pages={page.children} workspaceId={params.workspaceId} />

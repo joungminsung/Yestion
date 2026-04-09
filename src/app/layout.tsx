@@ -20,6 +20,27 @@ export default async function RootLayout({
 }) {
   const locale = await getLocale();
   const messages = await getMessages();
+  const serviceWorkerScript = process.env.NODE_ENV === "production"
+    ? `
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js');
+        });
+      }
+    `
+    : `
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', async () => {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map((registration) => registration.unregister()));
+
+          if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+          }
+        });
+      }
+    `;
 
   return (
     <html lang={locale} suppressHydrationWarning>
@@ -33,13 +54,7 @@ export default async function RootLayout({
         >
           본문으로 건너뛰기
         </a>
-        <script dangerouslySetInnerHTML={{ __html: `
-          if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-              navigator.serviceWorker.register('/sw.js');
-            });
-          }
-        ` }} />
+        <script dangerouslySetInnerHTML={{ __html: serviceWorkerScript }} />
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Providers>{children}</Providers>
         </NextIntlClientProvider>

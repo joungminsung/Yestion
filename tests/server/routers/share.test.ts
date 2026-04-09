@@ -34,16 +34,26 @@ async function setup() {
 }
 
 function getOwnerCaller() {
-  return createCaller({ db, session: { user: { id: ownerId, email: "owner@test.com", name: "Owner" } }, headers: new Headers() });
+  return createCaller({ db, session: { user: { id: ownerId, email: "owner@test.com", name: "Owner" }, token: "test-token" }, headers: new Headers() });
 }
 
 describe("share router", () => {
   beforeEach(async () => {
+    await db.activityLog.deleteMany();
+    await db.notification.deleteMany();
     await db.pagePermission.deleteMany();
+    await db.comment.deleteMany();
     await db.block.deleteMany();
     await db.session.deleteMany();
     await db.favorite.deleteMany();
     await db.page.deleteMany();
+    await db.workspaceChannelAuditLog.deleteMany();
+    await db.workspaceChannelReadState.deleteMany();
+    await db.workspaceChannelBrowserTab.deleteMany();
+    await db.workspaceChannelBrowserSession.deleteMany();
+    await db.workspaceChannelVoicePresence.deleteMany();
+    await db.workspaceChannelMessage.deleteMany();
+    await db.workspaceChannel.deleteMany();
     await db.workspaceMember.deleteMany();
     await db.workspace.deleteMany();
     await db.user.deleteMany();
@@ -63,7 +73,7 @@ describe("share router", () => {
     await caller.share.sharePage({ pageId, email: "target@test.com", level: "view" });
     const permissions = await caller.share.listPermissions({ pageId });
     expect(permissions).toHaveLength(1);
-    expect(permissions[0].user.email).toBe("target@test.com");
+    expect(permissions[0]!.user.email).toBe("target@test.com");
   });
 
   it("should update a permission level", async () => {

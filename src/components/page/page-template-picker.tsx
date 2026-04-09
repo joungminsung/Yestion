@@ -45,18 +45,6 @@ const BUILT_IN_TEMPLATES = [
     { type: "heading_2", content: "📝 회고" },
     { type: "paragraph", content: "" },
   ]},
-  { id: "project", name: "프로젝트 계획", icon: "🎯", description: "프로젝트를 구조화합니다", blocks: [
-    { type: "heading_2", content: "📌 개요" },
-    { type: "paragraph", content: "" },
-    { type: "heading_2", content: "🎯 목표" },
-    { type: "bulleted_list", content: "" },
-    { type: "heading_2", content: "📅 타임라인" },
-    { type: "paragraph", content: "" },
-    { type: "heading_2", content: "👥 팀" },
-    { type: "paragraph", content: "" },
-    { type: "heading_2", content: "⚠️ 리스크" },
-    { type: "bulleted_list", content: "" },
-  ]},
   { id: "todo", name: "할 일 목록", icon: "☑️", description: "할 일을 관리합니다", blocks: [
     { type: "heading_2", content: "오늘 할 일" },
     { type: "to_do", content: "" },

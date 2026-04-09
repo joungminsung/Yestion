@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { trpc } from "@/server/trpc/client";
 import { useDatabaseStore } from "@/stores/database";
 import { filterRows } from "@/lib/database/filter-engine";
 import { sortRows } from "@/lib/database/sort-engine";
 import { DatabaseToolbar } from "./database-toolbar";
+import { RowTemplateManager } from "./row-template-manager";
 import { TableView } from "./views/table-view";
 import { BoardView } from "./views/board-view";
 import { ListView } from "./views/list-view";
@@ -31,6 +32,8 @@ function asViewConfig(config: unknown): ViewConfig {
 
 export function DatabaseView({ databaseId }: DatabaseViewProps) {
   const router = useRouter();
+  const params = useParams();
+  const workspaceId = params.workspaceId as string | undefined;
   const { isMobile } = useDevice();
   const utils = trpc.useUtils();
   const { data, isLoading, error } = trpc.database.get.useQuery(
@@ -42,6 +45,9 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
     onSuccess: () => utils.database.get.invalidate({ databaseId }),
   });
   const updateRowMutation = trpc.database.updateRow.useMutation({
+    onSuccess: () => utils.database.get.invalidate({ databaseId }),
+  });
+  const addRowFromTemplateMutation = trpc.database.addRowFromTemplate.useMutation({
     onSuccess: () => utils.database.get.invalidate({ databaseId }),
   });
   const addPropertyMutation = trpc.database.addProperty.useMutation({
@@ -83,10 +89,13 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
     setCurrentPage,
   } = useDatabaseStore();
 
-  // Auto-select first view
+  // Ensure the current database always has a valid active view.
   useEffect(() => {
     const firstView = data?.views[0];
-    if (firstView && !activeViewId) {
+    if (!firstView) return;
+
+    const hasActiveView = data.views.some((view) => view.id === activeViewId);
+    if (!hasActiveView) {
       setActiveView(firstView.id);
     }
   }, [data, activeViewId, setActiveView]);
@@ -106,13 +115,25 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
     [activeView],
   );
 
+  const normalizedRows = useMemo(() => {
+    if (!data?.rows) return [];
+
+    return data.rows.map((row) => ({
+      ...row,
+      values: (row.values && typeof row.values === "object" && !Array.isArray(row.values)
+        ? row.values
+        : {}) as Record<string, unknown>,
+    }));
+  }, [data?.rows]);
+
   // Build property type map for sort engine
   const propertyTypes = useMemo(() => {
-    if (!data) return {};
+    if (!data?.properties) return {};
+
     return Object.fromEntries(
       data.properties.map((p) => [p.id, p.type]),
     );
-  }, [data]);
+  }, [data?.properties]);
 
   // Effective filter/sort (local overrides > view config)
   const effectiveFilter: FilterGroup | undefined =
@@ -150,6 +171,13 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
       });
     },
     [addRowMutation, databaseId],
+  );
+
+  const handleAddRowFromTemplate = useCallback(
+    (templateId: string) => {
+      addRowFromTemplateMutation.mutate({ databaseId, templateId });
+    },
+    [addRowFromTemplateMutation, databaseId],
   );
 
   const handleUpdateRow = useCallback(
@@ -194,14 +222,9 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
 
   // Apply filter + sort + search
   const allProcessedRows = useMemo(() => {
-    if (!data) return [];
-    const rows = data.rows.map((r) => ({
-      ...r,
-      values: (r.values && typeof r.values === "object" && !Array.isArray(r.values)
-        ? r.values
-        : {}) as Record<string, unknown>,
-    }));
-    let filtered = filterRows(rows, effectiveFilter);
+    if (normalizedRows.length === 0) return [];
+
+    let filtered = filterRows(normalizedRows, effectiveFilter);
 
     // Apply search query across all text values
     if (searchQuery.trim()) {
@@ -218,11 +241,18 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
     }
 
     return sortRows(filtered, effectiveSorts, propertyTypes);
-  }, [data, effectiveFilter, effectiveSorts, propertyTypes, searchQuery]);
+  }, [normalizedRows, effectiveFilter, effectiveSorts, propertyTypes, searchQuery]);
 
   // Pagination
   const totalRows = allProcessedRows.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+
+  useEffect(() => {
+    if (currentPage >= totalPages) {
+      setCurrentPage(Math.max(0, totalPages - 1));
+    }
+  }, [currentPage, totalPages, setCurrentPage]);
+
   const processedRows = useMemo(() => {
     const start = currentPage * pageSize;
     return allProcessedRows.slice(start, start + pageSize);
@@ -230,30 +260,45 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
 
   // ── Peek view state ──────────────────────────────────────────
   const [peekRow, setPeekRow] = useState<RowData | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    resetLocal();
+    setPeekRow(null);
+    setCollapsedGroups(new Set());
+  }, [databaseId, resetLocal]);
+
+  const rowsByPageId = useMemo(
+    () => new Map(allProcessedRows.map((row) => [row.pageId, row] as const)),
+    [allProcessedRows],
+  );
+
+  const buildPageHref = useCallback(
+    (pageId: string) => (workspaceId ? `/${workspaceId}/${pageId}` : `/page/${pageId}`),
+    [workspaceId],
+  );
 
   const handleRowClick = useCallback(
     (pageId: string) => {
-      const row = allProcessedRows.find((r) => r.pageId === pageId);
+      const row = rowsByPageId.get(pageId);
       if (row) {
         setPeekRow(row);
       } else {
-        router.push(`/page/${pageId}`);
+        router.push(buildPageHref(pageId));
       }
     },
-    [allProcessedRows, router],
+    [buildPageHref, router, rowsByPageId],
   );
 
   const handleOpenFullPage = useCallback(
     (pageId: string) => {
       setPeekRow(null);
-      router.push(`/page/${pageId}`);
+      router.push(buildPageHref(pageId));
     },
-    [router],
+    [buildPageHref, router],
   );
 
   // ── Grouping ────────────────────────────────────────────────
-
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const toggleGroupCollapse = useCallback((groupValue: string) => {
     setCollapsedGroups((prev) => {
@@ -448,6 +493,17 @@ export function DatabaseView({ databaseId }: DatabaseViewProps) {
         onUpdateViewConfig={handleUpdateViewConfig}
         databaseId={databaseId}
       />
+
+      <div
+        className="flex items-center justify-end px-3 py-1.5 border-b"
+        style={{ borderColor: "var(--border-default)" }}
+      >
+        <RowTemplateManager
+          databaseId={databaseId}
+          properties={data.properties as DatabaseData["properties"]}
+          onAddRowFromTemplate={handleAddRowFromTemplate}
+        />
+      </div>
 
       {/* Group collapse/expand controls */}
       {groupedRows && (

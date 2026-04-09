@@ -1,36 +1,19 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "@/server/trpc/init";
 import { TRPCError } from "@trpc/server";
+import {
+  WORKSPACE_PERMISSION_KEYS,
+  requireWorkspaceMembership,
+  requireWorkspacePermission,
+} from "@/lib/permissions";
 
-const PERMISSIONS = [
-  "page.create", "page.edit", "page.delete", "page.share",
-  "member.invite", "member.remove", "member.changeRole",
-  "workspace.settings", "workspace.billing",
-  "database.create", "database.edit", "database.delete",
-  "automation.manage", "webhook.manage", "apikey.manage",
-] as const;
-
-async function verifyWorkspaceMember(db: import("@prisma/client").PrismaClient, workspaceId: string, userId: string) {
-  const member = await db.workspaceMember.findFirst({
-    where: { workspaceId, userId },
-  });
-  if (!member) throw new TRPCError({ code: "FORBIDDEN", message: "Not a workspace member" });
-  return member;
-}
-
-async function verifyWorkspaceAdmin(db: import("@prisma/client").PrismaClient, workspaceId: string, userId: string) {
-  const member = await verifyWorkspaceMember(db, workspaceId, userId);
-  if (!["OWNER", "ADMIN"].includes(member.role)) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "Requires OWNER or ADMIN role" });
-  }
-  return member;
-}
+const permissionEnum = z.enum(WORKSPACE_PERMISSION_KEYS);
 
 export const roleRouter = router({
   list: protectedProcedure
     .input(z.object({ workspaceId: z.string() }))
     .query(async ({ ctx, input }) => {
-      await verifyWorkspaceMember(ctx.db, input.workspaceId, ctx.session.user.id);
+      await requireWorkspaceMembership(ctx.db, ctx.session.user.id, input.workspaceId);
       return ctx.db.customRole.findMany({
         where: { workspaceId: input.workspaceId },
         orderBy: { createdAt: "asc" },
@@ -42,15 +25,23 @@ export const roleRouter = router({
       z.object({
         workspaceId: z.string(),
         name: z.string().min(1).max(50),
-        permissions: z.array(z.string()),
+        description: z.string().max(200).optional(),
+        permissions: z.array(permissionEnum),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await verifyWorkspaceAdmin(ctx.db, input.workspaceId, ctx.session.user.id);
+      await requireWorkspacePermission(
+        ctx.db,
+        ctx.session.user.id,
+        input.workspaceId,
+        "workspace.settings",
+        "Workspace settings permission is required",
+      );
       return ctx.db.customRole.create({
         data: {
           workspaceId: input.workspaceId,
           name: input.name,
+          description: input.description,
           permissions: input.permissions,
         },
       });
@@ -61,17 +52,25 @@ export const roleRouter = router({
       z.object({
         id: z.string(),
         name: z.string().min(1).max(50).optional(),
-        permissions: z.array(z.string()).optional(),
+        description: z.string().max(200).nullable().optional(),
+        permissions: z.array(permissionEnum).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const role = await ctx.db.customRole.findUniqueOrThrow({ where: { id: input.id } });
-      await verifyWorkspaceAdmin(ctx.db, role.workspaceId, ctx.session.user.id);
+      await requireWorkspacePermission(
+        ctx.db,
+        ctx.session.user.id,
+        role.workspaceId,
+        "workspace.settings",
+        "Workspace settings permission is required",
+      );
       if (role.isBuiltIn) throw new TRPCError({ code: "FORBIDDEN", message: "Built-in roles cannot be modified" });
       return ctx.db.customRole.update({
         where: { id: input.id },
         data: {
           ...(input.name ? { name: input.name } : {}),
+          ...(input.description !== undefined ? { description: input.description } : {}),
           ...(input.permissions ? { permissions: input.permissions } : {}),
         },
       });
@@ -81,13 +80,19 @@ export const roleRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const role = await ctx.db.customRole.findUniqueOrThrow({ where: { id: input.id } });
-      await verifyWorkspaceAdmin(ctx.db, role.workspaceId, ctx.session.user.id);
+      await requireWorkspacePermission(
+        ctx.db,
+        ctx.session.user.id,
+        role.workspaceId,
+        "workspace.settings",
+        "Workspace settings permission is required",
+      );
       if (role.isBuiltIn) throw new TRPCError({ code: "FORBIDDEN", message: "Built-in roles cannot be deleted" });
       return ctx.db.customRole.delete({ where: { id: input.id } });
     }),
 
   permissions: protectedProcedure.query(() => {
-    return PERMISSIONS.map((p) => ({
+    return WORKSPACE_PERMISSION_KEYS.map((p) => ({
       key: p,
       category: p.split(".")[0],
       action: p.split(".")[1],

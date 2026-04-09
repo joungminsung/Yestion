@@ -18,42 +18,144 @@ export function WorkspaceSwitcher({ currentWorkspaceId }: Props) {
   const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
   const addToast = useToastStore((s) => s.addToast);
+  const updateToast = useToastStore((s) => s.updateToast);
   const utils = trpc.useUtils();
   const { data: memberships } = trpc.workspace.list.useQuery();
 
+  const logoutMutation = trpc.auth.logout.useMutation();
+
   const createWorkspace = trpc.workspace.create.useMutation({
-    onSuccess: (ws) => {
+    onMutate: () => {
+      const toastId = addToast({
+        type: "info",
+        title: "워크스페이스 생성 중",
+        message: "새 워크스페이스와 기본 구조를 준비하고 있습니다.",
+        loading: true,
+        progress: 24,
+        persistent: true,
+      });
+      return { toastId };
+    },
+    onSuccess: (ws, _variables, context) => {
       utils.workspace.list.invalidate();
       router.push(`/${ws.id}`);
       setShowCreate(false);
       setNewName("");
       setNewIcon("");
-      addToast({ message: "워크스페이스가 생성되었습니다", type: "success" });
+      if (context?.toastId) {
+        updateToast(context.toastId, {
+          type: "success",
+          title: "워크스페이스 생성 완료",
+          message: "새 워크스페이스로 이동하고 있습니다.",
+          loading: false,
+          progress: 100,
+          persistent: false,
+        });
+      }
     },
-    onError: (err) => addToast({ message: err.message, type: "error" }),
+    onError: (err, _variables, context) => {
+      if (context?.toastId) {
+        updateToast(context.toastId, {
+          type: "error",
+          title: "워크스페이스 생성 실패",
+          message: err.message,
+          loading: false,
+          progress: 100,
+          persistent: false,
+        });
+        return;
+      }
+      addToast({ message: err.message, type: "error" });
+    },
   });
 
   const deleteWorkspace = trpc.workspace.delete.useMutation({
-    onSuccess: () => {
+    onMutate: () => {
+      const toastId = addToast({
+        type: "warning",
+        title: "워크스페이스 삭제 중",
+        message: "관련 데이터를 정리하고 있습니다.",
+        loading: true,
+        progress: 34,
+        persistent: true,
+      });
+      return { toastId };
+    },
+    onSuccess: (_data, _variables, context) => {
       utils.workspace.list.invalidate();
       const other = memberships?.find((m) => m.workspaceId !== currentWorkspaceId);
       if (other) router.push(`/${other.workspaceId}`);
       setShowDelete(false);
       setDeleteConfirm("");
-      addToast({ message: "워크스페이스가 삭제되었습니다", type: "success" });
+      if (context?.toastId) {
+        updateToast(context.toastId, {
+          type: "success",
+          title: "워크스페이스 삭제 완료",
+          message: other ? "다른 워크스페이스로 이동하고 있습니다." : "삭제가 완료되었습니다.",
+          loading: false,
+          progress: 100,
+          persistent: false,
+        });
+      }
     },
-    onError: (err) => addToast({ message: err.message, type: "error" }),
+    onError: (err, _variables, context) => {
+      if (context?.toastId) {
+        updateToast(context.toastId, {
+          type: "error",
+          title: "워크스페이스 삭제 실패",
+          message: err.message,
+          loading: false,
+          progress: 100,
+          persistent: false,
+        });
+        return;
+      }
+      addToast({ message: err.message, type: "error" });
+    },
   });
 
   const leaveWorkspace = trpc.workspace.leave.useMutation({
-    onSuccess: () => {
+    onMutate: () => {
+      const toastId = addToast({
+        type: "info",
+        title: "워크스페이스 나가는 중",
+        message: "권한과 이동 경로를 정리하고 있습니다.",
+        loading: true,
+        progress: 28,
+        persistent: true,
+      });
+      return { toastId };
+    },
+    onSuccess: (_data, _variables, context) => {
       utils.workspace.list.invalidate();
       const other = memberships?.find((m) => m.workspaceId !== currentWorkspaceId);
       if (other) router.push(`/${other.workspaceId}`);
       setIsOpen(false);
-      addToast({ message: "워크스페이스에서 나갔습니다", type: "success" });
+      if (context?.toastId) {
+        updateToast(context.toastId, {
+          type: "success",
+          title: "워크스페이스에서 나왔습니다",
+          message: other ? "다른 워크스페이스로 이동하고 있습니다." : "현재 워크스페이스를 정리했습니다.",
+          loading: false,
+          progress: 100,
+          persistent: false,
+        });
+      }
     },
-    onError: (err) => addToast({ message: err.message, type: "error" }),
+    onError: (err, _variables, context) => {
+      if (context?.toastId) {
+        updateToast(context.toastId, {
+          type: "error",
+          title: "워크스페이스 나가기 실패",
+          message: err.message,
+          loading: false,
+          progress: 100,
+          persistent: false,
+        });
+        return;
+      }
+      addToast({ message: err.message, type: "error" });
+    },
   });
 
   useEffect(() => {
@@ -277,8 +379,35 @@ export function WorkspaceSwitcher({ currentWorkspaceId }: Props) {
           <button
             className="w-full flex items-center gap-2 px-3 py-2 hover:bg-notion-bg-hover text-left"
             style={{ fontSize: "14px", color: "var(--text-secondary)" }}
-            onClick={() => {
-              document.cookie = "session-token=; path=/; max-age=0; samesite=lax";
+            onClick={async () => {
+              const toastId = addToast({
+                type: "info",
+                title: "로그아웃 중",
+                message: "현재 세션을 안전하게 종료하고 있습니다.",
+                loading: true,
+                progress: 40,
+                persistent: true,
+              });
+              try {
+                await logoutMutation.mutateAsync();
+                updateToast(toastId, {
+                  type: "success",
+                  title: "로그아웃 완료",
+                  message: "로그인 화면으로 이동합니다.",
+                  loading: false,
+                  progress: 100,
+                  persistent: false,
+                });
+              } catch {
+                updateToast(toastId, {
+                  type: "warning",
+                  title: "로그아웃 처리 중 경고",
+                  message: "서버 응답은 불안정했지만, 로그인 화면으로 이동합니다.",
+                  loading: false,
+                  progress: 100,
+                  persistent: false,
+                });
+              }
               router.push("/login");
               router.refresh();
               setIsOpen(false);

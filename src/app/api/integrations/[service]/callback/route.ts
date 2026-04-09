@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes, randomUUID } from "crypto";
 import { db } from "@/server/db/client";
 import { getAdapter } from "@/lib/integrations/base-adapter";
 import { encryptToken, verifyOAuthState } from "@/lib/integrations/crypto";
-import type { IntegrationServiceType } from "@/lib/integrations/types";
+import { watchCalendar } from "@/lib/integrations/google-calendar";
+import { getIntegrationServiceSlug, parseIntegrationServiceSlug } from "@/lib/integrations/service-slug";
 
 // Import adapters to trigger registration
 import "@/lib/integrations/slack";
@@ -10,19 +12,12 @@ import "@/lib/integrations/github";
 import "@/lib/integrations/google-calendar";
 import "@/lib/integrations/email";
 
-const SERVICE_MAP: Record<string, IntegrationServiceType> = {
-  slack: "SLACK",
-  github: "GITHUB",
-  "google-calendar": "GOOGLE_CALENDAR",
-  email: "EMAIL",
-};
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ service: string }> }
 ) {
   const { service: serviceSlug } = await params;
-  const serviceType = SERVICE_MAP[serviceSlug];
+  const serviceType = parseIntegrationServiceSlug(serviceSlug);
   if (!serviceType) {
     return NextResponse.json({ error: "Unknown service" }, { status: 400 });
   }
@@ -69,9 +64,41 @@ export async function GET(
   try {
     const adapter = getAdapter(serviceType);
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-    const redirectUri = `${baseUrl}/api/integrations/${serviceSlug}/callback`;
+    const redirectUri = `${baseUrl}/api/integrations/${getIntegrationServiceSlug(serviceType)}/callback`;
 
     const tokens = await adapter.exchangeCode(code, redirectUri);
+    let webhookSecret: string | null = integration.webhookSecret;
+    let nextConfig = (integration.config as Record<string, unknown>) ?? {};
+
+    if (serviceType === "GOOGLE_CALENDAR") {
+      webhookSecret ??= randomBytes(32).toString("hex");
+
+      try {
+        const channelId = randomUUID();
+        const watch = await watchCalendar(
+          tokens.accessToken,
+          "primary",
+          `${baseUrl}/api/integrations/google-calendar/webhook`,
+          channelId,
+          webhookSecret
+        );
+
+        nextConfig = {
+          ...nextConfig,
+          calendarId: "primary",
+          syncCalendarUpdates: true,
+          channelId,
+          resourceId: watch.resourceId,
+          watchExpiration: watch.expiration,
+        };
+      } catch (watchError) {
+        console.error("Failed to register Google Calendar watch:", watchError);
+      }
+    }
+
+    if (serviceType === "GITHUB") {
+      webhookSecret ??= randomBytes(32).toString("hex");
+    }
 
     await db.integration.update({
       where: { id: integration.id },
@@ -82,12 +109,14 @@ export async function GET(
         tokenExpiry: tokens.expiresAt,
         externalId: tokens.externalId,
         externalName: tokens.externalName,
+        webhookSecret,
+        config: nextConfig as import("@prisma/client").Prisma.InputJsonValue,
       },
     });
 
     // Redirect back to settings page
     return NextResponse.redirect(
-      new URL(`/${workspaceId}/settings?tab=integrations&connected=${serviceSlug}`, request.url)
+      new URL(`/${workspaceId}/settings?tab=integrations&connected=${getIntegrationServiceSlug(serviceType)}`, request.url)
     );
   } catch (err) {
     console.error(`OAuth callback error for ${serviceSlug}:`, err);

@@ -54,6 +54,8 @@ export const syncQueue = {
 
     for (const op of queue) {
       if (op.retries >= 5) {
+        // Remove permanently failed operations from the queue
+        await this.dequeue(op.id);
         failed++;
         continue;
       }
@@ -81,5 +83,21 @@ export const syncQueue = {
   async size(): Promise<number> {
     const queue = await this.getQueue();
     return queue.length;
+  },
+
+  /** Register the online event listener to auto-flush when connectivity is restored */
+  registerAutoFlush(executor: (op: SyncOperation) => Promise<boolean>): () => void {
+    const handler = () => {
+      this.flush(executor).then(({ success, failed }) => {
+        if (success > 0 || failed > 0) {
+          console.log(`[SyncQueue] Auto-flush: ${success} synced, ${failed} failed`);
+        }
+      });
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", handler);
+      return () => window.removeEventListener("online", handler);
+    }
+    return () => {};
   },
 };

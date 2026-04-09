@@ -58,7 +58,7 @@ export function NotificationPanel({ onClose }: { onClose: () => void }) {
     },
   });
 
-  const notifications = data?.items ?? [];
+  const notifications = useMemo(() => data?.items ?? [], [data?.items]);
   const unreadCount = countData?.unread ?? notifications.filter((n) => !n.read).length;
 
   const filteredNotifications = useMemo(() => {

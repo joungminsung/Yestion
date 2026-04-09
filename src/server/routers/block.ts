@@ -11,10 +11,8 @@ async function verifyPageAccess(db: PrismaClient, userId: string, pageId: string
   });
   if (!page) throw new TRPCError({ code: "NOT_FOUND", message: "Page not found" });
 
-  const membership = await db.workspaceMember.findUnique({
-    where: { userId_workspaceId: { userId, workspaceId: page.workspaceId } },
-  });
-  if (!membership) throw new TRPCError({ code: "FORBIDDEN", message: "No access to this workspace" });
+  const perm = await getEffectivePermission(db, userId, pageId);
+  if (perm === "none") throw new TRPCError({ code: "FORBIDDEN", message: "No access to this page" });
 }
 
 async function verifyEditPermission(db: PrismaClient, userId: string, pageId: string) {
@@ -77,6 +75,7 @@ export const blockRouter = router({
     .input(z.object({ pageId: z.string(), blocks: z.array(z.object({ id: z.string(), position: z.number(), parentId: z.string().nullable().optional() })) }))
     .mutation(async ({ ctx, input }) => {
       await verifyPageAccess(ctx.db, ctx.session.user.id, input.pageId);
+      await verifyEditPermission(ctx.db, ctx.session.user.id, input.pageId);
       await ctx.db.$transaction(input.blocks.map((b) => ctx.db.block.update({ where: { id: b.id }, data: { position: b.position, ...(b.parentId !== undefined && { parentId: b.parentId }) } })));
       await ctx.db.page.update({ where: { id: input.pageId }, data: { lastEditedBy: ctx.session.user.id } });
       return { success: true };

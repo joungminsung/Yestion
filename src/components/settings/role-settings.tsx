@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { trpc } from "@/server/trpc/client";
 import { Plus, Trash2, Check, X } from "lucide-react";
+import type { WorkspacePermissionKey } from "@/lib/permissions";
 
 interface RoleSettingsProps {
   workspaceId: string;
@@ -20,7 +21,7 @@ export function RoleSettings({ workspaceId }: RoleSettingsProps) {
 
   const categories = Array.from(new Set(permissionDefs?.map((p) => p.category) ?? []));
 
-  const togglePermission = (roleId: string, currentPerms: string[], permKey: string) => {
+  const togglePermission = (roleId: string, currentPerms: WorkspacePermissionKey[], permKey: WorkspacePermissionKey) => {
     const newPerms = currentPerms.includes(permKey)
       ? currentPerms.filter((p) => p !== permKey)
       : [...currentPerms, permKey];
@@ -98,12 +99,12 @@ export function RoleSettings({ workspaceId }: RoleSettingsProps) {
                         {perm.key}
                       </td>
                       {roles.map((role) => {
-                        const perms = (role.permissions as string[]) ?? [];
-                        const checked = perms.includes(perm.key);
+                        const perms = (role.permissions as WorkspacePermissionKey[]) ?? [];
+                        const checked = perms.includes(perm.key as WorkspacePermissionKey);
                         return (
                           <td key={role.id} className="text-center px-4 py-2.5">
                             <button
-                              onClick={() => togglePermission(role.id, perms, perm.key)}
+                              onClick={() => togglePermission(role.id, perms, perm.key as WorkspacePermissionKey)}
                               disabled={role.isBuiltIn}
                               className="w-5 h-5 rounded border inline-flex items-center justify-center"
                               style={{

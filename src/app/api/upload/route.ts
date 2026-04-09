@@ -8,7 +8,7 @@ const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 
 const ALLOWED_EXTENSIONS = new Set([
-  ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg",
+  ".jpg", ".jpeg", ".png", ".gif", ".webp",
   ".mp4", ".webm", ".mp3", ".wav", ".ogg",
   ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
   ".txt", ".csv", ".zip",
@@ -43,17 +43,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "File type not allowed" }, { status: 400 });
     }
 
+    // Sanitize filename to prevent path traversal
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     await mkdir(UPLOAD_DIR, { recursive: true });
 
     const uniqueName = `${Date.now()}-${crypto.randomBytes(4).toString("hex")}${ext}`;
     const filePath = path.join(UPLOAD_DIR, uniqueName);
+
+    // Verify the resolved path is within UPLOAD_DIR
+    if (!filePath.startsWith(UPLOAD_DIR)) {
+      return NextResponse.json({ error: "Invalid file path" }, { status: 400 });
+    }
 
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(filePath, buffer);
 
     return NextResponse.json({
       url: `/uploads/${uniqueName}`,
-      name: file.name,
+      name: sanitizedName,
       size: file.size,
       type: file.type,
     });
